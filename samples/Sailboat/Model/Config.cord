@@ -1,0 +1,34 @@
+using Sailboat.Model;
+
+// Sailboat (SEK port). The classic sample's `bind`, `construct point shoot` and
+// `construct bounded exploration` constructs are Spec Explorer scenario-control features;
+// here we explore the model program directly. Sail's heading/hours/knots domains and the
+// pairwise strategy come from Cord and are solved by Z3.
+
+config MovementActions
+{
+    action static void SailboatController.Sail(Heading heading, int hours, int knots);
+    action event static void SailboatController.RunAground(int atx, int aty);
+    action static void SailboatController.Rescue();
+
+    switch StateBound = 4000;
+    switch StepBound = 4000;
+    switch PathDepthBound = 100;
+    switch TestEnabled = false;
+}
+
+config AllDirections : MovementActions
+{
+    action static void SailboatController.Sail(Heading heading, int hours, int knots)
+      where {.
+                Condition.In(hours, 5, 10);
+                Condition.In(knots, 20, 30);
+                Combination.Pairwise(heading, hours, knots);
+          .};
+}
+
+// Full voyage: sail (pairwise over all headings), run aground, rescue, repeat.
+machine Voyage() : AllDirections
+{
+    construct model program from AllDirections
+}

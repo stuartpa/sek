@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Sek.Cord: a from-scratch implementation of the Cord scripting language front-end
+    (lexer + parser + AST), following the authoritative MSDN grammar (ee691953).
+    Covers using-clauses, configurations (action all / declared action / domain /
+    bound / switch clauses), machines, and the full behavior algebra (sequencing,
+    choice, parallel/interleaving, repetition, permutation, hiding, let, preconstraint,
+    and the construct forms), plus embedded C# code blocks (. .) and {. .}.
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>Sek.Cord</RootNamespace>
+    <AssemblyName>Sek.Cord</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Sek.Solver\Sek.Solver.csproj" />
+  </ItemGroup>
+
+</Project>

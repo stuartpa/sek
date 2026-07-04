@@ -1,0 +1,181 @@
+ImageRuntimeVersion: v4.0.30319
+Assembly Security, Version=0.0.*, Culture=Invariant Language (Invariant Country): 
+	hash=SHA1, flags=PublicKey
+Assembly mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089: 
+	hash=None, flags=None
+Assembly System, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089: 
+	hash=None, flags=None
+Class SMB2.SSPI.SSPIException: AutoLayout, AnsiClass, Class, Public, Serializable, BeforeFieldInit
+  :System.Exception
+    Void .ctor(System.String, Int32): PrivateScope, Public, HideBySig, SpecialName, RTSpecialName
+    Void .ctor(System.String, System.Exception): PrivateScope, Public, HideBySig, SpecialName, RTSpecialName
+    Void .ctor(System.String): PrivateScope, Public, HideBySig, SpecialName, RTSpecialName
+    Void .ctor(): PrivateScope, Public, HideBySig, SpecialName, RTSpecialName
+  Properties:
+    Int32 ErrorCode 'get ' : 
+    System.String Message 'get ' : 
+  Methods:
+    GetObjectData(SerializationInfo, StreamingContext): PrivateScope, Public, Virtual, HideBySig, HasSecurity
+    get_Message(): PrivateScope, Public, Virtual, HideBySig, SpecialName
+    get_ErrorCode(): PrivateScope, Public, HideBySig, SpecialName
+Class SMB2.SSPI.DelegateNotSupportedByNTLMException: AutoLayout, AnsiClass, Class, Public, Serializable, BeforeFieldInit
+  :System.Exception
+    Void .ctor(System.String, System.Exception): PrivateScope, Public, HideBySig, SpecialName, RTSpecialName
+    Void .ctor(System.String): PrivateScope, Public, HideBySig, SpecialName, RTSpecialName
+    Void .ctor(): PrivateScope, Public, HideBySig, SpecialName, RTSpecialName
+  Properties:
+    System.String Message 'get ' : 
+  Methods:
+    get_Message(): PrivateScope, Public, Virtual, HideBySig, SpecialName
+Class SMB2.SSPI.CertStore: AutoLayout, AnsiClass, Class, Public, BeforeFieldInit
+    Void .ctor(): PrivateScope, Public, HideBySig, SpecialName, RTSpecialName
+  Interfaces:
+    System.IDisposable
+  Properties:
+    IntPtr RegSubKey 'get ' : 
+    IntPtr CertContextHandle 'get ' : 
+    IntPtr CertStoreHandle 'get ' : 
+  Methods:
+    get_CertStoreHandle(): PrivateScope, Public, HideBySig, SpecialName
+    get_CertContextHandle(): PrivateScope, Public, HideBySig, SpecialName
+    get_RegSubKey(): PrivateScope, Public, HideBySig, SpecialName
+    CertOpenStore(CertStoreProvider, CertStoreLocation): PrivateScope, Public, HideBySig
+    CertOpenSysStore(CertStoreLocation): PrivateScope, Public, HideBySig
+    CertOpenRegStore(): PrivateScope, Public, HideBySig
+    CertFindStoreByName(String): PrivateScope, Public, HideBySig
+    CertFindStoreByIssuer(String): PrivateScope, Public, HideBySig
+    CertFindStoreAny(): PrivateScope, Public, HideBySig
+    CertCloseStore(): PrivateScope, Public, HideBySig
+    RegOpenKeyW(RegKey, String): PrivateScope, Public, HideBySig
+    Dispose(): PrivateScope, Public, Final, Virtual, HideBySig
+Struct SMB2.SSPI.CertStore+CertStoreProvider: AutoLayout, AnsiClass, Class, NestedPublic, Sealed, BeforeFieldInit
+  :System.Enum
+  Fields:
+    Int32 value__ : Public, SpecialName, RTSpecialName
+    CertStoreProvider File = 0 : Public, Static, Literal, HasDefault
+    CertStoreProvider Memory = 1 : Public, Static, Literal, HasDefault
+    CertStoreProvider System = 2 : Public, Static, Literal, HasDefault
+    CertStoreProvider Registry = 3 : Public, Static, Literal, HasDefault
+Struct SMB2.SSPI.CertStore+CertStoreLocation: AutoLayout, AnsiClass, Class, NestedPublic, Sealed, BeforeFieldInit
+  :System.Enum
+  Fields:
+    Int32 value__ : Public, SpecialName, RTSpecialName
+    CertStoreLocation CurrentUser = 0 : Public, Static, Literal, HasDefault
+    CertStoreLocation LocalMachine = 1 : Public, Static, Literal, HasDefault
+    CertStoreLocation CurrentService = 2 : Public, Static, Literal, HasDefault
+    CertStoreLocation CurrentGroupPolicy = 3 : Public, Static, Literal, HasDefault
+Struct SMB2.SSPI.CertStore+RegKey: AutoLayout, AnsiClass, Class, NestedPublic, Sealed, BeforeFieldInit
+  :System.Enum
+  Fields:
+    Int32 value__ : Public, SpecialName, RTSpecialName
+    RegKey ClassesRoot = 0 : Public, Static, Literal, HasDefault
+    RegKey CurrentUser = 1 : Public, Static, Literal, HasDefault
+    RegKey LocalMachine = 2 : Public, Static, Literal, HasDefault
+    RegKey Users = 3 : Public, Static, Literal, HasDefault
+Class SMB2.SSPI.Credential: AutoLayout, AnsiClass, Class, Public, Abstract, BeforeFieldInit
+  Interfaces:
+    System.IDisposable
+  Properties:
+    System.String Name 'get ' : 
+    IntPtr CredentialHandle 'get ' : 
+    Package SecurityPackage 'get ' : 
+  Methods:
+    get_SecurityPackage(): PrivateScope, Public, HideBySig, SpecialName
+    get_CredentialHandle(): PrivateScope, Public, HideBySig, SpecialName
+    get_Name(): PrivateScope, Public, HideBySig, SpecialName
+    Dispose(): PrivateScope, Public, Final, Virtual, HideBySig
+Struct SMB2.SSPI.Credential+Package: AutoLayout, AnsiClass, Class, NestedPublic, Sealed, BeforeFieldInit
+  :System.Enum
+  Fields:
+    Int32 value__ : Public, SpecialName, RTSpecialName
+    Package Negotiate = 0 : Public, Static, Literal, HasDefault
+    Package Kerberos = 1 : Public, Static, Literal, HasDefault
+    Package NTLM = 2 : Public, Static, Literal, HasDefault
+    Package Schannel = 3 : Public, Static, Literal, HasDefault
+Struct SMB2.SSPI.Credential+CredentialType: AutoLayout, AnsiClass, Class, NestedPublic, Sealed, BeforeFieldInit
+  :System.Enum
+  Fields:
+    Int32 value__ : Public, SpecialName, RTSpecialName
+    CredentialType Client = 0 : Public, Static, Literal, HasDefault
+    CredentialType Server = 1 : Public, Static, Literal, HasDefault
+Class SMB2.SSPI.ClientCredential: AutoLayout, AnsiClass, Class, Public, BeforeFieldInit
+  :SMB2.SSPI.Credential
+    Void .ctor(Package, System.String): PrivateScope, Public, HideBySig, SpecialName, RTSpecialName
+    Void .ctor(Package): PrivateScope, Public, HideBySig, SpecialName, RTSpecialName
+Class SMB2.SSPI.ServerCredential: AutoLayout, AnsiClass, Class, Public, BeforeFieldInit
+  :SMB2.SSPI.Credential
+    Void .ctor(Package, System.String): PrivateScope, Public, HideBySig, SpecialName, RTSpecialName
+    Void .ctor(Package): PrivateScope, Public, HideBySig, SpecialName, RTSpecialName
+Class SMB2.SSPI.Context: AutoLayout, AnsiClass, Class, Public, Abstract, BeforeFieldInit
+  Interfaces:
+    System.IDisposable
+  Properties:
+    Boolean ContinueProcessing 'get ' : 
+    Byte[] SessionKey 'get ' : 
+    Byte[] Token 'get ' : 
+    Package SecurityPackage 'get ' : 
+    System.String Name 'get ' : 
+    System.Collections.Specialized.StringCollection ContextAttributes 'get ' : 
+    SMB2.SSPI.Credential Credential 'get ' : 
+  Methods:
+    SignMessage(Byte[]): PrivateScope, Public, HideBySig
+    VerifyMessage(Byte[]): PrivateScope, Public, HideBySig
+    EncryptMessage(Byte[]): PrivateScope, Public, HideBySig
+    DecryptMessage(Byte[]): PrivateScope, Public, HideBySig
+    QuerySessionKey(): PrivateScope, Public, HideBySig
+    get_Credential(): PrivateScope, Public, HideBySig, SpecialName
+    get_ContextAttributes(): PrivateScope, Public, Virtual, HideBySig, VtableLayoutMask, SpecialName
+    get_Name(): PrivateScope, Public, HideBySig, SpecialName
+    get_SecurityPackage(): PrivateScope, Public, HideBySig, SpecialName
+    get_Token(): PrivateScope, Public, HideBySig, SpecialName
+    get_SessionKey(): PrivateScope, Public, HideBySig, SpecialName
+    get_ContinueProcessing(): PrivateScope, Public, HideBySig, SpecialName
+    Dispose(): PrivateScope, Public, Final, Virtual, HideBySig
+Class SMB2.SSPI.ClientContext: AutoLayout, AnsiClass, Class, Public, BeforeFieldInit
+  :SMB2.SSPI.Context
+    Void .ctor(SMB2.SSPI.ClientCredential, System.String, ContextAttribute): PrivateScope, Public, HideBySig, SpecialName, RTSpecialName
+  Properties:
+    System.Collections.Specialized.StringCollection ContextAttributes 'get ' : 
+  Methods:
+    Initialize(Byte[]): PrivateScope, Public, HideBySig
+    get_ContextAttributes(): PrivateScope, Public, Virtual, HideBySig, SpecialName
+Struct SMB2.SSPI.ClientContext+ContextAttribute: AutoLayout, AnsiClass, Class, NestedPublic, Sealed, BeforeFieldInit
+  :System.Enum
+  Fields:
+    Int32 value__ : Public, SpecialName, RTSpecialName
+    ContextAttribute None = 0 : Public, Static, Literal, HasDefault
+    ContextAttribute Delegate = 1 : Public, Static, Literal, HasDefault
+    ContextAttribute MutualAuthentication = 2 : Public, Static, Literal, HasDefault
+    ContextAttribute ReplayDetect = 4 : Public, Static, Literal, HasDefault
+    ContextAttribute SequenceDetect = 8 : Public, Static, Literal, HasDefault
+    ContextAttribute Confindentiality = 16 : Public, Static, Literal, HasDefault
+    ContextAttribute UseSessionKey = 32 : Public, Static, Literal, HasDefault
+    ContextAttribute PromptForCreds = 64 : Public, Static, Literal, HasDefault
+    ContextAttribute UseSuppliedCreds = 128 : Public, Static, Literal, HasDefault
+    ContextAttribute AllocMemory = 256 : Public, Static, Literal, HasDefault
+    ContextAttribute UseDceStyle = 512 : Public, Static, Literal, HasDefault
+    ContextAttribute Datagram = 1024 : Public, Static, Literal, HasDefault
+    ContextAttribute Connection = 2048 : Public, Static, Literal, HasDefault
+    ContextAttribute CallLevel = 4096 : Public, Static, Literal, HasDefault
+    ContextAttribute FragmentSupplied = 8192 : Public, Static, Literal, HasDefault
+    ContextAttribute ExtendedError = 16384 : Public, Static, Literal, HasDefault
+    ContextAttribute Stream = 32768 : Public, Static, Literal, HasDefault
+    ContextAttribute Integrity = 65536 : Public, Static, Literal, HasDefault
+    ContextAttribute Identify = 131072 : Public, Static, Literal, HasDefault
+Class SMB2.SSPI.ServerContext: AutoLayout, AnsiClass, Class, Public, BeforeFieldInit
+  :SMB2.SSPI.Context
+    Void .ctor(SMB2.SSPI.ServerCredential, Byte[]): PrivateScope, Public, HideBySig, SpecialName, RTSpecialName
+  Properties:
+    IntPtr ClientSecurityToken 'get ' : 
+    System.Collections.Specialized.StringCollection ContextAttributes 'get ' : 
+  Methods:
+    Accept(Byte[]): PrivateScope, Public, HideBySig
+    ImpersonateClient(): PrivateScope, Public, HideBySig
+    RevertImpersonation(): PrivateScope, Public, HideBySig
+    get_ContextAttributes(): PrivateScope, Public, Virtual, HideBySig, SpecialName
+    get_ClientSecurityToken(): PrivateScope, Public, HideBySig, SpecialName
+Class SMB2.SSPI.SecurityPackages: AutoLayout, AnsiClass, Class, Public, Sealed, BeforeFieldInit
+  Properties:
+    System.Collections.Specialized.StringCollection AllSecurityPackages 'get ' : 
+  Methods:
+    get_AllSecurityPackages(): PrivateScope, Public, Static, HideBySig, SpecialName

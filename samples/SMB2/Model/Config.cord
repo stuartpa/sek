@@ -1,0 +1,25 @@
+using SMB2.Model;
+
+// SMB2 (SEK port). Session/tree/file lifecycle. Tree and SFile objects created during
+// exploration form the domains of the object-typed parameters. Pure state machine (no
+// value parameters), so no Cord `where` block is needed.
+
+config Actions
+{
+    action void SetupConnectionAndSession();
+    action void TreeConnect();
+    action void Create(Tree tree);
+    action void Write(SFile file);
+    action void Close(SFile file);
+    action void TreeDisconnect(Tree tree);
+    action void LogOff();
+
+    switch StateBound = 4096;
+    switch StepBound = 4096;
+    switch TestEnabled = false;
+}
+
+machine Smb2Lifecycle() : Actions
+{
+    construct model program from Actions
+}

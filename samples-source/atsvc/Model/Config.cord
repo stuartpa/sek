@@ -1,0 +1,75 @@
+
+using Microsoft.Modeling;
+using ATSvc.Adapter;
+using ATSvc.Model;
+
+/// The basic configuration
+config Config 
+{
+	action all ATService; // get all actions in adapter interface
+	
+    switch generatedtestpath = "..\\ModeledTests";
+    switch TestClassBase = "GeneratedTests.AtsvcTestClass";
+    switch StepBound = 65000;
+    switch StateBound = 1024;
+    switch PathDepthBound = 65000;
+    switch TestEnabled = false;
+}
+
+
+// ========== Parameter slicing: with action declarations
+
+config ConfigWithParameters : Config
+{
+    action static bool ATService.AddJob(JobInfo info, out int jobId)
+        where {.
+            Condition.In(info.Command, "x", "y");
+            Condition.In(info.Time, 340000, 600000);
+            Condition.IsTrue(!(info.Command == "x" & info.Time < 600000));
+        .};
+        
+}
+
+machine ModelProgramWithConfigParameters() : Config where ForExploration = false
+{
+    construct model program from ConfigWithParameters
+}
+
+
+// ========== Parameter slicing: with bind construct
+
+machine ModelProgramWithBoundParameters() : Config
+{
+    bind AddJob(JobInfo(Command={"x","y"}, Time={340000, 600000}), out _)
+    in
+    construct model program from Config
+}
+
+// ========== State slicing with bound in model
+
+machine ModelProgramWithJobBound() : Config
+{
+    {. ModelProgram.JobBound = 2; .}:
+    ModelProgramWithConfigParameters
+}
+
+// ========== Trace pattern slicing
+
+machine AddTwoJobsPattern() : Config
+{
+	AddJob; AddJob; GetJobInfo; DeleteJob; AddJob; GetJobInfo; DeleteJob*
+}
+
+machine ModelProgramWithTwoJobsPattern() : Config
+{
+	AddTwoJobsPattern || ModelProgramWithConfigParameters
+}
+
+
+// ========= Test suite
+
+machine TestSuite() : Config where TestEnabled = true
+{
+	  construct test cases where strategy = "shorttests" 
+	  for ModelProgramWithTwoJobsPattern
+}

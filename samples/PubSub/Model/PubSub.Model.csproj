@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    PubSub sample, ported to SpecExplorerKit.
+
+    Publishers and Subscribers are created dynamically and held in model state. Rules that
+    take a Publisher/Subscriber parameter draw their domain from the objects reachable in
+    the current state (SEK's general reachable-object domain). Publish appends a message to
+    every subscriber's queue; Received consumes the head of a subscriber's queue (guarded).
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>PubSub.Model</RootNamespace>
+    <AssemblyName>Model</AssemblyName>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Sek.Modeling\Sek.Modeling.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="*.cord" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,100 @@
+using Chat.Adapter;
+using Chat.Model;
+using Microsoft.Modeling; 
+
+config Actions 
+{
+    action all ChatSetupAdapter;
+    action all ChatAdapter;
+
+    switch StateBound = 1000;
+    switch StepBound = 1000;
+    switch PathDepthBound = 1000;
+    
+    switch generatedtestpath = "..\\GeneratedTest";
+    switch TestClassBase = "GeneratedTests.ChatTestClass";
+        
+    switch ForExploration = false;
+    switch TestEnabled = false;
+}
+
+machine ModelProgram() : Actions
+{
+  construct model program from Actions 
+  where scope = "Chat.Model"
+}
+
+machine BoundModelProgram() : Actions where ForExploration = true
+{
+  ( bind LogonRequest({1}), BroadcastRequest(_,"hi")
+    in
+    ModelProgram 
+  )
+}
+
+machine LogOnOffListScenario() : Actions 
+{
+    LogonRequest(1); LogonResponse; 
+    LogonRequest(2); LogonResponse;
+    LogonRequest(3); LogonResponse;
+    ListRequest; ListResponse;
+    ( LogoffRequest; (LogoffResponse|ErrorResponse) )*
+}
+
+machine LogOnOffListSlice() : Actions where ForExploration = true
+{
+    LogOnOffListScenario() || ModelProgram
+}
+
+
+machine BroadcastOrderedScenario() : Actions 
+{
+    LogonRequest(1); LogonResponse; 
+    LogonRequest(2); LogonResponse;
+    BroadcastRequest(1, "1a");
+    BroadcastRequest(1, "1b");
+   ( BroadcastAck )*
+}
+
+machine BroadcastOrderedSlice() : Actions where ForExploration = true
+{
+    BroadcastOrderedScenario || ModelProgram
+}
+
+machine BroadcastUnorderedScenario() : Actions 
+{
+    LogonRequest(1); LogonResponse; 
+    LogonRequest(2); LogonResponse;
+    BroadcastRequest(1, "1");
+    BroadcastRequest(2, "2");
+   ( BroadcastAck )*
+}
+
+machine BroadcastUnorderedSlice() : Actions where ForExploration = true
+{
+    BroadcastUnorderedScenario || ModelProgram
+}
+
+machine CombinedSlices() : Actions where ForExploration = true
+{
+    StartServer; ConnectToServer;
+    (LogOnOffListSlice | BroadcastOrderedSlice | BroadcastUnorderedSlice)
+}
+
+machine TestSuite() : Actions where ForExploration = true, TestEnabled = true
+{
+    construct test cases
+        where AllowUndeterminedCoverage = true
+    for CombinedSlices
+}
+
+machine ReqCoverage() : Actions where ForExploration = true
+{
+    construct requirement coverage where strategy = "selective" for CombinedSlices
+}
+
+machine MinimumReqCoverage() : Actions where ForExploration = true
+{
+    construct requirement coverage where MinimumRequirementCount=2, RequirementsToCover = "ms-chat_R5,ms-chat_R6"
+        for CombinedSlices
+}

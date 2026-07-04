@@ -1,0 +1,5 @@
+{
+  "model": { "assembly": "Model/bin/Debug/Model.dll", "type": "PubSub.Model.PubSubModel" },
+  "cord":  "Model",
+  "out":   ".specexplorerkit/out"
+}

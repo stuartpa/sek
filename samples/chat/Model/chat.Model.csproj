@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    chat (MS-CHAT) sample, ported to SpecExplorerKit.
+
+    A request/response chat protocol: users log on, broadcast messages that are queued to
+    all logged-on users and acknowledged, then log off. Users are objects in model state;
+    the response/ack/logoff rules take a User parameter drawn from the reachable users.
+    User ids and broadcast payloads come from the Cord `where` block (Z3).
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>Chat.Model</RootNamespace>
+    <AssemblyName>Model</AssemblyName>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Sek.Modeling\Sek.Modeling.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="*.cord" />
+  </ItemGroup>
+
+</Project>

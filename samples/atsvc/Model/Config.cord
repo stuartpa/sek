@@ -1,0 +1,30 @@
+using ATSvc.Model;
+
+// atsvc (SEK port). Job objects created during exploration form the domain of the Job
+// parameters; AddJob's command/time domains and validity predicate come from Cord (Z3).
+
+config Config
+{
+    action static void ATService.AddJob(string command, int time);
+    action static void ATService.GetJobInfo(Job job);
+    action static void ATService.DeleteJob(Job job);
+
+    switch StateBound = 1024;
+    switch StepBound = 65000;
+    switch TestEnabled = false;
+}
+
+config ConfigWithParameters : Config
+{
+    action static void ATService.AddJob(string command, int time)
+      where {.
+        Condition.In(command, "x", "y");
+        Condition.In(time, 340000, 600000);
+        Condition.IsTrue(!(command == "x" & time < 600000));
+      .};
+}
+
+machine JobScheduler() : ConfigWithParameters
+{
+    construct model program from ConfigWithParameters
+}

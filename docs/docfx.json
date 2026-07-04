@@ -1,0 +1,26 @@
+{
+  "build": {
+    "content": [
+      {
+        "files": [ "**/*.md", "**/toc.yml", "toc.yml", "*.md" ],
+        "exclude": [ "_site/**", "obj/**", "**/bin/**" ]
+      }
+    ],
+    "resource": [
+      { "files": [ "media/**" ] }
+    ],
+    "output": "_site",
+    "template": [ "default", "modern" ],
+    "globalMetadata": {
+      "_appName": "SpecExplorerKit",
+      "_appTitle": "SpecExplorerKit (SEK)",
+      "_enableSearch": true,
+      "_disableContribution": false,
+      "_appFooter": "SpecExplorerKit (SEK) &mdash; model-based testing, revived. A Spec Kit community extension.",
+      "pdf": false
+    },
+    "sitemap": {
+      "baseUrl": "https://spec-kit-community.github.io/spec-kit-sek/"
+    }
+  }
+}

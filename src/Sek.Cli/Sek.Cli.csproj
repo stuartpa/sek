@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Sek.Cli: the `sek` command-line tool (packaged as a .NET global tool).
+
+    This is the primary entry point for SpecExplorerKit, following Spec Kit's
+    CLI-first pattern. VS Code integration is additive (tasks + a skill), shelling
+    out to this tool rather than embedding an engine.
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Sek.Cli</RootNamespace>
+    <AssemblyName>sek</AssemblyName>
+
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>sek</ToolCommandName>
+    <PackageId>SpecExplorerKit.Tool</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>SpecExplorerKit</Authors>
+    <Description>SpecExplorerKit (SEK): a modern, CLI-first model-based testing toolkit inspired by Spec Explorer + Cord.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Sek.Core\Sek.Core.csproj" />
+    <ProjectReference Include="..\Sek.Cord\Sek.Cord.csproj" />
+    <ProjectReference Include="..\Sek.Engine\Sek.Engine.csproj" />
+    <ProjectReference Include="..\Sek.Solver\Sek.Solver.csproj" />
+  </ItemGroup>
+
+</Project>

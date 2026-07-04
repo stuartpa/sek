@@ -1,0 +1,5 @@
+{
+  "model": { "assembly": "Model/bin/Debug/Model.dll", "type": "Sailboat.Model.SailboatModel" },
+  "cord":  "Model",
+  "out":   ".specexplorerkit/out"
+}

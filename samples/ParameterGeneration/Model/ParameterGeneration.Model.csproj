@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    ParameterGeneration sample, ported to SpecExplorerKit.
+
+    The classic Spec Explorer sample demonstrates Spec Explorer's parameter generator.
+    In SEK the parameter domains and combination strategies come straight from the Cord
+    `where { Condition.In(...); Combination.Pairwise(...); ... }` blocks and are solved by
+    Z3 (see Sek.Solver.Z3Solver). The model itself is stateless: AddJob simply records
+    that the action fired, so the number of transitions equals the number of generated
+    parameter combinations for each strategy.
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>PG</RootNamespace>
+    <AssemblyName>Model</AssemblyName>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Sek.Modeling\Sek.Modeling.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="*.cord" />
+  </ItemGroup>
+
+</Project>

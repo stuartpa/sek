@@ -1,0 +1,5 @@
+{
+  "model": { "assembly": "Model/bin/Debug/Model.dll", "type": "PG.SUT" },
+  "cord":  "Model",
+  "out":   ".specexplorerkit/out"
+}

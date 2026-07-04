@@ -1,0 +1,394 @@
+using Sek.Cli;
+using Sek.Cord;
+using Sek.Cord.Ast;
+using Sek.Core.Model;
+using Sek.Core.Rendering;
+using Sek.Core.Seexpl;
+using Sek.Engine;
+using Sek.Solver;
+
+// SpecExplorerKit (sek) — CLI entry point.
+//
+//   init                 scaffold a .specexplorerkit project
+//   validate             check the model + cord line up
+//   explore <machine>    explore a machine into a .seexpl graph
+//   view <file.seexpl>   render an exploration (mermaid/dot/html)
+//   test <machine>       explore + replay against the SUT (conformance)
+//   version
+
+const string Version = "0.1.0";
+
+if (args.Length == 0 || IsHelp(args[0]))
+{
+    PrintUsage();
+    return 0;
+}
+
+try
+{
+    return args[0].ToLowerInvariant() switch
+    {
+        "version" => CmdVersion(),
+        "z3" => CmdZ3(),
+        "view" => CmdView(args.Skip(1).ToArray()),
+        "init" => CmdInit(args.Skip(1).ToArray()),
+        "validate" => CmdValidate(args.Skip(1).ToArray()),
+        "explore" => CmdExplore(args.Skip(1).ToArray()),
+        "test" => CmdTest(args.Skip(1).ToArray()),
+        "run" => CmdTest(args.Skip(1).ToArray()),
+        _ => Unknown(args[0]),
+    };
+}
+catch (Exception ex)
+{
+    Console.Error.WriteLine($"sek: error: {ex.Message}");
+    return 1;
+}
+
+static bool IsHelp(string a) => a is "-h" or "--help" or "help" or "-?" or "/?";
+
+static string? GetOption(string[] args, string name)
+{
+    var i = Array.IndexOf(args, name);
+    return i >= 0 && i + 1 < args.Length ? args[i + 1] : null;
+}
+
+int CmdVersion()
+{
+    Console.WriteLine($"sek {Version}");
+    return 0;
+}
+
+int CmdZ3()
+{
+    Console.WriteLine(Sek.Solver.Z3Probe.SelfTest());
+    return 0;
+}
+
+// --- view ----------------------------------------------------------------------
+
+int CmdView(string[] rest)
+{
+    if (rest.Length == 0 || IsHelp(rest[0]))
+    {
+        Console.WriteLine("Usage: sek view <exploration.seexpl> [--format mermaid|dot|html] [--out <file>]");
+        return rest.Length == 0 ? 1 : 0;
+    }
+
+    var path = rest[0];
+    var format = GetOption(rest, "--format") ?? "mermaid";
+    var outPath = GetOption(rest, "--out");
+
+    if (!File.Exists(path))
+    {
+        Console.Error.WriteLine($"sek: error: file not found: {path}");
+        return 1;
+    }
+
+    var graph = SeexplDocument.Load(path).ToGraph();
+    var rendered = format.ToLowerInvariant() switch
+    {
+        "mermaid" or "mmd" => MermaidRenderer.Render(graph),
+        "dot" => DotRenderer.Render(graph),
+        "html" => HtmlRenderer.Render(graph),
+        _ => throw new ArgumentException($"unknown --format '{format}' (expected mermaid|dot|html)"),
+    };
+
+    if (outPath is null)
+    {
+        Console.WriteLine(rendered);
+    }
+    else
+    {
+        File.WriteAllText(outPath, rendered);
+        Console.WriteLine($"Wrote {format} for '{graph.Machine}' ({graph.States.Count} states, {graph.Transitions.Count} transitions) to {outPath}");
+    }
+
+    return 0;
+}
+
+// --- init ----------------------------------------------------------------------
+
+int CmdInit(string[] rest)
+{
+    var dir = GetOption(rest, "--project") ?? Directory.GetCurrentDirectory();
+    var sekDir = Path.Combine(dir, ".specexplorerkit");
+    Directory.CreateDirectory(Path.Combine(sekDir, "out"));
+    var configPath = Path.Combine(sekDir, "config.json");
+    if (File.Exists(configPath))
+    {
+        Console.WriteLine($"Project already initialized: {configPath}");
+        return 0;
+    }
+
+    File.WriteAllText(configPath,
+        """
+        {
+          "model":   { "assembly": "Model/bin/Debug/Model.dll", "type": "MyProject.Model" },
+          "cord":    "Model",
+          "binding": { "assembly": "Adapter/bin/Debug/Adapter.dll", "namespace": "Adapter" },
+          "out":     ".specexplorerkit/out"
+        }
+        """);
+    Console.WriteLine($"Initialized SpecExplorerKit project at {configPath}");
+    return 0;
+}
+
+// --- shared: load project, cord, model, bounds ---------------------------------
+
+(ProjectConfig config, string dir, CordDocument cord) LoadProject(string[] rest)
+{
+    var (config, dir) = ProjectConfig.Load(GetOption(rest, "--project"));
+    var cordDir = config.ResolveCordDir(dir);
+    var cord = CordDocument.LoadDirectory(cordDir);
+    return (config, dir, cord);
+}
+
+ExplorationOptions BoundsFor(CordDocument cord, string machine)
+{
+    var options = new ExplorationOptions();
+    var switches = cord.ResolveMachineSwitches(machine);
+    if (switches.TryGetValue("StateBound", out var sb) && int.TryParse(sb, out var sbi)) options.MaxStates = sbi;
+    if (switches.TryGetValue("StepBound", out var stb) && int.TryParse(stb, out var stbi)) options.MaxTransitions = stbi;
+    if (switches.TryGetValue("PathDepthBound", out var pd) && int.TryParse(pd, out var pdi)) options.MaxDepth = pdi;
+    return options;
+}
+
+ExplorationGraph ExploreBehavior(CordDocument cord, string machine)
+{
+    var m = cord.GetMachine(machine);
+    if (m?.Body is null)
+    {
+        throw new InvalidOperationException($"Machine '{machine}' has no behavior body to explore.");
+    }
+
+    var alphabet = cord.ResolveMachineDeclaredActions(machine).Keys
+        .Select(t => { var i = t.LastIndexOf('.'); return i >= 0 ? t[(i + 1)..] : t; })
+        .ToHashSet(StringComparer.Ordinal);
+
+    var explorer = new BehaviorExplorer(name => cord.GetMachine(name)?.Body, alphabet);
+    return explorer.Explore(machine, m.Body);
+}
+
+ExplorationResult ExploreMachine(ProjectConfig config, string dir, CordDocument cord, string machine, string solverName)
+{
+    var modelType = ModelLoader.LoadModelType(config.ResolveModelAssembly(dir), config.Model.Type);
+    var introspector = new ModelIntrospector(modelType);
+    var options = BoundsFor(cord, machine);
+    var paramGen = BuildParamGen(cord, machine, solverName);
+    return new Explorer(introspector, options, paramGen).Explore(machine);
+}
+
+ParameterGeneration BuildParamGen(CordDocument cord, string machine, string solverName)
+{
+    var byAction = new Dictionary<string, ActionParamSpec>();
+    var m = cord.GetMachine(machine);
+    var construct = m?.Body?.FindConstruct();
+    var cfgName = construct is { Kind: ConstructKind.ModelProgram }
+        ? construct.Reference
+        : (m?.BaseConfigs.FirstOrDefault() ?? string.Empty);
+
+    var declared = new Dictionary<string, DeclaredAction>();
+    if (!string.IsNullOrEmpty(cfgName))
+    {
+        foreach (var kv in cord.ResolveDeclaredActions(cfgName)) declared[kv.Key] = kv.Value;
+    }
+
+    foreach (var kv in cord.ResolveMachineDeclaredActions(machine)) declared[kv.Key] = kv.Value;
+
+    foreach (var da in declared.Values)
+    {
+        var ac = CordConstraintExtractor.Extract(da);
+        if (ac.Constraints.Count > 0 || ac.Combination.Mode != CombinationSpec.Strategy.AllCombinations)
+        {
+            byAction[da.Target] = new ActionParamSpec { Constraints = ac.Constraints, Combination = ac.Combination };
+        }
+    }
+
+    IParameterSolver solver = solverName.Equals("enum", StringComparison.OrdinalIgnoreCase)
+        ? new EnumerativeSolver()
+        : new Z3Solver();
+
+    return new ParameterGeneration { Solver = solver, ByAction = byAction };
+}
+
+// --- explore -------------------------------------------------------------------
+
+int CmdExplore(string[] rest)
+{
+    if (rest.Length == 0 || IsHelp(rest[0]))
+    {
+        Console.WriteLine("Usage: sek explore <machine> [--project <dir>] [--out <file>]");
+        return rest.Length == 0 ? 1 : 0;
+    }
+
+    var machine = rest[0];
+    var solverName = GetOption(rest, "--solver") ?? "z3";
+    var (config, dir, cord) = LoadProject(rest);
+
+    var cordMachine = cord.GetMachine(machine);
+    if (cordMachine is null)
+    {
+        Console.Error.WriteLine($"sek: error: machine '{machine}' not found in Cord. Available: {string.Join(", ", cord.Script.Machines.Select(m => m.Name))}");
+        return 1;
+    }
+
+    // Behavior-mode: a pure Cord scenario/operator machine (no model program).
+    if (string.IsNullOrWhiteSpace(config.Model.Type))
+    {
+        var bgraph = ExploreBehavior(cord, machine);
+        var boutPath = GetOption(rest, "--out") ?? Path.Combine(config.ResolveOutDir(dir), machine + ".seexpl");
+        Directory.CreateDirectory(Path.GetDirectoryName(boutPath)!);
+        SeexplDocument.FromGraph(bgraph).Save(boutPath);
+        Console.WriteLine($"Explored behavior '{machine}': {bgraph.States.Count} states, {bgraph.Transitions.Count} transitions, {bgraph.States.Count(s => s.Accepting)} accepting.");
+        Console.WriteLine($"Wrote {boutPath}");
+        return 0;
+    }
+
+    var construct = cordMachine.Body?.FindConstruct();
+    if (construct is { Kind: not ConstructKind.ModelProgram })
+    {
+        Console.WriteLine($"note: machine '{machine}' is a {construct.Kind} machine; exploring the underlying model program (scenario slicing is on the roadmap).");
+    }
+
+    var result = ExploreMachine(config, dir, cord, machine, solverName);
+    var graph = result.Graph;
+
+    var outPath = GetOption(rest, "--out") ?? Path.Combine(config.ResolveOutDir(dir), machine + ".seexpl");
+    Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
+    SeexplDocument.FromGraph(graph).Save(outPath);
+
+    Console.WriteLine($"Explored '{machine}': {graph.States.Count} states, {graph.Transitions.Count} transitions, {graph.States.Count(s => s.Accepting)} accepting{(result.HitBound ? " (bound hit)" : "")}.");
+    Console.WriteLine($"Wrote {outPath}");
+    if (result.Diagnostics.Count > 0)
+    {
+        Console.WriteLine($"  {result.Diagnostics.Count} rule diagnostic(s); first: {result.Diagnostics[0]}");
+    }
+
+    return 0;
+}
+
+// --- validate ------------------------------------------------------------------
+
+int CmdValidate(string[] rest)
+{
+    var (config, dir, cord) = LoadProject(rest);
+    var modelType = ModelLoader.LoadModelType(config.ResolveModelAssembly(dir), config.Model.Type);
+    var introspector = new ModelIntrospector(modelType);
+    var ruleLabels = introspector.Rules.Select(r => r.ActionLabel).ToHashSet();
+
+    var problems = new List<string>();
+
+    // Every declared cord action should map to a model rule.
+    foreach (var target in cord.AllDeclaredActionTargets().Distinct())
+    {
+        if (!ruleLabels.Contains(target))
+        {
+            problems.Add($"cord action '{target}' has no matching model rule");
+        }
+    }
+
+    // Every construct reference should resolve to a config or machine.
+    foreach (var m in cord.Script.Machines)
+    {
+        var construct = m.Body?.FindConstruct();
+        if (construct is null) continue;
+        var refName = construct.Reference;
+        var resolves = cord.GetConfiguration(refName) is not null || cord.GetMachine(refName) is not null;
+        if (!resolves) problems.Add($"machine '{m.Name}' constructs from unknown '{refName}'");
+    }
+
+    Console.WriteLine($"Model:   {modelType.FullName}");
+    Console.WriteLine($"Rules:   {introspector.Rules.Count} ({string.Join(", ", ruleLabels.OrderBy(x => x))})");
+    Console.WriteLine($"Accept:  {introspector.AcceptingConditions.Count} accepting condition(s)");
+    Console.WriteLine($"Cord:    {cord.Script.Configurations.Count} config(s), {cord.Script.Machines.Count} machine(s)");
+
+    if (problems.Count == 0)
+    {
+        Console.WriteLine("validate: OK");
+        return 0;
+    }
+
+    Console.Error.WriteLine($"validate: {problems.Count} problem(s):");
+    foreach (var p in problems) Console.Error.WriteLine($"  - {p}");
+    return 1;
+}
+
+// --- test / run (conformance) --------------------------------------------------
+
+int CmdTest(string[] rest)
+{
+    if (rest.Length == 0 || IsHelp(rest[0]))
+    {
+        Console.WriteLine("Usage: sek test <machine> [--project <dir>]");
+        return rest.Length == 0 ? 1 : 0;
+    }
+
+    var machine = rest[0];
+    var solverName = GetOption(rest, "--solver") ?? "z3";
+    var (config, dir, cord) = LoadProject(rest);
+
+    if (cord.GetMachine(machine) is null)
+    {
+        Console.Error.WriteLine($"sek: error: machine '{machine}' not found. Available: {string.Join(", ", cord.Script.Machines.Select(m => m.Name))}");
+        return 1;
+    }
+
+    if (config.Binding is null)
+    {
+        Console.Error.WriteLine("sek: error: no 'binding' configured in .specexplorerkit/config.json.");
+        return 1;
+    }
+
+    var result = ExploreMachine(config, dir, cord, machine, solverName);
+    Console.WriteLine($"Explored '{machine}': {result.Graph.States.Count} states, {result.Graph.Transitions.Count} transitions.");
+
+    var bindingAsm = Path.GetFullPath(Path.Combine(dir, config.Binding.Assembly));
+    var report = Conformance.Replay(result.Graph, bindingAsm, config.Binding.Namespace);
+
+    Console.WriteLine($"Conformance against SUT ({config.Binding.Namespace}):");
+    Console.WriteLine($"  transitions replayed : {report.TransitionsReplayed}");
+    Console.WriteLine($"  succeeded            : {report.Succeeded}");
+    Console.WriteLine($"  failed               : {report.Failed}");
+    Console.WriteLine($"  actions covered      : {report.ActionsCovered.Count} ({string.Join(", ", report.ActionsCovered.OrderBy(x => x))})");
+
+    if (!report.Passed)
+    {
+        Console.Error.WriteLine("  failures:");
+        foreach (var f in report.Failures.Take(20)) Console.Error.WriteLine($"    - {f}");
+        Console.WriteLine("TEST FAILED");
+        return 1;
+    }
+
+    Console.WriteLine("TEST PASSED");
+    return 0;
+}
+
+int Unknown(string command)
+{
+    Console.Error.WriteLine($"sek: unknown command '{command}'.");
+    PrintUsage();
+    return 1;
+}
+
+void PrintUsage()
+{
+    Console.WriteLine($"""
+    SpecExplorerKit (sek) {Version} — modern, CLI-first model-based testing (Spec Explorer + Cord revived).
+
+    Usage:
+      sek <command> [options]
+
+    Commands:
+      init [--project <dir>]        Scaffold a .specexplorerkit/ project
+      validate [--project <dir>]    Check the model program and Cord scripts line up
+      explore <machine>             Explore a machine into a .seexpl graph
+                                      --project <dir>   (default: current dir)
+                                      --out <file>      (default: .specexplorerkit/out/<machine>.seexpl)
+      view <file.seexpl>            Render an exploration
+                                      --format mermaid|dot|html   (default: mermaid)
+                                      --out <file>                (default: stdout)
+      test <machine>                Explore, then replay against the SUT (conformance)
+      version                       Print version
+    """);
+}

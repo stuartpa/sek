@@ -1,0 +1,324 @@
+7/13/2019 12:14:22 PM Begin test case TestCase0.
+7/13/2019 12:14:23 PM Finish test case TestCase0 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:14:23 PM End test case TestCase0.
+7/13/2019 12:14:24 PM Begin test case TestCase1.
+7/13/2019 12:14:24 PM Finish test case TestCase1 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:14:24 PM End test case TestCase1.
+7/13/2019 12:14:25 PM Begin test case TestCase2.
+7/13/2019 12:14:25 PM Finish test case TestCase2 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:14:25 PM End test case TestCase2.
+7/13/2019 12:14:26 PM Begin test case TestCase3.
+7/13/2019 12:14:26 PM Finish test case TestCase3 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:14:26 PM End test case TestCase3.
+7/13/2019 12:14:27 PM Begin test case TestCase4.
+7/13/2019 12:14:28 PM Finish test case TestCase4 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:14:28 PM End test case TestCase4.
+7/13/2019 12:14:29 PM Begin test case TestCase5.
+7/13/2019 12:14:29 PM Finish test case TestCase5 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:14:29 PM End test case TestCase5.
+7/13/2019 12:14:30 PM Begin test case TestCase6.
+7/13/2019 12:14:30 PM Finish test case TestCase6 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:14:30 PM End test case TestCase6.
+7/13/2019 12:14:31 PM Begin test case TestCase7.
+7/13/2019 12:14:31 PM Finish test case TestCase7 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:14:31 PM End test case TestCase7.
+7/13/2019 12:14:32 PM Begin test case TestCase8.
+7/13/2019 12:14:33 PM Finish test case TestCase8 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:14:33 PM End test case TestCase8.
+7/13/2019 12:14:34 PM Begin test case TestCase9.
+7/13/2019 12:14:34 PM Finish test case TestCase9 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:14:34 PM End test case TestCase9.
+7/13/2019 12:14:35 PM Begin test case TestCase10.
+7/13/2019 12:14:35 PM Finish test case TestCase10 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:14:35 PM End test case TestCase10.
+7/13/2019 12:14:36 PM Begin test case TestCase11.
+7/13/2019 12:14:36 PM Finish test case TestCase11 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:14:36 PM End test case TestCase11.
+7/13/2019 12:14:37 PM Begin test case TestCase12.
+7/13/2019 12:14:37 PM Finish test case TestCase12 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:14:37 PM End test case TestCase12.
+7/13/2019 12:14:38 PM Begin test case TestCase13.
+7/13/2019 12:14:38 PM Finish test case TestCase13 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:14:38 PM End test case TestCase13.
+7/13/2019 12:14:39 PM Begin test case TestCase14.
+7/13/2019 12:14:39 PM Finish test case TestCase14 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:14:39 PM End test case TestCase14.
+7/13/2019 12:14:40 PM Begin test case TestCase15.
+7/13/2019 12:14:41 PM Finish test case TestCase15 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:14:41 PM End test case TestCase15.
+7/13/2019 12:14:42 PM Begin test case TestCase16.
+7/13/2019 12:14:42 PM Finish test case TestCase16 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:14:42 PM End test case TestCase16.
+7/13/2019 12:14:43 PM Begin test case TestCase17.
+7/13/2019 12:14:43 PM Finish test case TestCase17 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:14:43 PM End test case TestCase17.
+7/13/2019 12:14:44 PM Begin test case TestCase18.
+7/13/2019 12:14:44 PM Finish test case TestCase18 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:14:44 PM End test case TestCase18.
+7/13/2019 12:14:45 PM Begin test case TestCase19.
+7/13/2019 12:14:45 PM Finish test case TestCase19 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:14:45 PM End test case TestCase19.
+7/13/2019 12:14:46 PM Begin test case TestCase20.
+7/13/2019 12:14:46 PM Finish test case TestCase20 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:14:46 PM End test case TestCase20.
+7/13/2019 12:14:47 PM Begin test case TestCase21.
+7/13/2019 12:14:47 PM Finish test case TestCase21 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:14:47 PM End test case TestCase21.
+7/13/2019 12:14:48 PM Begin test case TestCase22.
+7/13/2019 12:14:49 PM Finish test case TestCase22 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:14:49 PM End test case TestCase22.
+7/13/2019 12:14:50 PM Begin test case TestCase23.
+7/13/2019 12:14:50 PM Finish test case TestCase23 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:14:50 PM End test case TestCase23.
+7/13/2019 12:14:51 PM Begin test case TestCase24.
+7/13/2019 12:14:51 PM Finish test case TestCase24 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:14:51 PM End test case TestCase24.
+7/13/2019 12:14:52 PM Begin test case TestCase25.
+7/13/2019 12:14:52 PM Finish test case TestCase25 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:14:52 PM End test case TestCase25.
+7/13/2019 12:14:53 PM Begin test case TestCase26.
+7/13/2019 12:14:53 PM Finish test case TestCase26 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:14:53 PM End test case TestCase26.
+7/13/2019 12:14:54 PM Begin test case TestCase27.
+7/13/2019 12:14:54 PM Finish test case TestCase27 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:14:54 PM End test case TestCase27.
+7/13/2019 12:14:55 PM Begin test case TestCase28.
+7/13/2019 12:14:55 PM Finish test case TestCase28 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:14:55 PM End test case TestCase28.
+7/13/2019 12:14:56 PM Begin test case TestCase29.
+7/13/2019 12:14:57 PM Finish test case TestCase29 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:14:57 PM End test case TestCase29.
+7/13/2019 12:14:58 PM Begin test case TestCase30.
+7/13/2019 12:14:58 PM Finish test case TestCase30 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:14:58 PM End test case TestCase30.
+7/13/2019 12:14:59 PM Begin test case TestCase31.
+7/13/2019 12:14:59 PM Finish test case TestCase31 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:14:59 PM End test case TestCase31.
+7/13/2019 12:15:00 PM Begin test case TestCase32.
+7/13/2019 12:15:00 PM Finish test case TestCase32 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:15:00 PM End test case TestCase32.
+7/13/2019 12:15:01 PM Begin test case TestCase33.
+7/13/2019 12:15:01 PM Finish test case TestCase33 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:15:01 PM End test case TestCase33.
+7/13/2019 12:15:02 PM Begin test case TestCase34.
+7/13/2019 12:15:02 PM Finish test case TestCase34 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:15:02 PM End test case TestCase34.
+7/13/2019 12:15:03 PM Begin test case TestCase35.
+7/13/2019 12:15:03 PM Finish test case TestCase35 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:15:03 PM End test case TestCase35.
+7/13/2019 12:15:04 PM Begin test case TestCase36.
+7/13/2019 12:15:05 PM Finish test case TestCase36 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:15:05 PM End test case TestCase36.
+7/13/2019 12:15:06 PM Begin test case TestCase37.
+7/13/2019 12:15:06 PM Finish test case TestCase37 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:15:06 PM End test case TestCase37.
+7/13/2019 12:15:07 PM Begin test case TestCase38.
+7/13/2019 12:15:07 PM Finish test case TestCase38 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:15:07 PM End test case TestCase38.
+7/13/2019 12:15:08 PM Begin test case TestCase39.
+7/13/2019 12:15:08 PM Finish test case TestCase39 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:15:08 PM End test case TestCase39.
+7/13/2019 12:15:09 PM Begin test case TestCase40.
+7/13/2019 12:15:09 PM Finish test case TestCase40 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:15:09 PM End test case TestCase40.
+7/13/2019 12:15:10 PM Begin test case TestCase41.
+7/13/2019 12:15:10 PM Finish test case TestCase41 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:15:10 PM End test case TestCase41.
+7/13/2019 12:15:11 PM Begin test case TestCase42.
+7/13/2019 12:15:12 PM Finish test case TestCase42 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:15:12 PM End test case TestCase42.
+7/13/2019 12:15:13 PM Begin test case TestCase43.
+7/13/2019 12:15:13 PM Finish test case TestCase43 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:15:13 PM End test case TestCase43.
+7/13/2019 12:15:14 PM Begin test case TestCase44.
+7/13/2019 12:15:14 PM Finish test case TestCase44 with inconclusive. Exception is thrown during test execution. 
+ Exception: Microsoft.VisualStudio.TestTools.UnitTesting.AssertInconclusiveException: Assert.Inconclusive failed. share '\\localhost\smb2test' does exist
+   at Microsoft.VisualStudio.TestTools.UnitTesting.Assert.Inconclusive(String message, Object[] parameters)
+   at SMB2.Adapter.Smb2SetupAdapter.AssumeShareExists(Int32 shareId, ShareType type) in C:\Users\stuar\Documents\Spec Explorer 2010\Samples\SMB2\Adapter\Smb2Adapter.cs:line 54
+7/13/2019 12:15:14 PM End test case TestCase44.
+
+Results             Test Case Name      Executed Step Count
+-------             --------------      -------------------
+Inconclusive        TestCase0           1
+Inconclusive        TestCase1           1
+Inconclusive        TestCase2           1
+Inconclusive        TestCase3           1
+Inconclusive        TestCase4           1
+Inconclusive        TestCase5           1
+Inconclusive        TestCase6           1
+Inconclusive        TestCase7           1
+Inconclusive        TestCase8           1
+Inconclusive        TestCase9           1
+Inconclusive        TestCase10          1
+Inconclusive        TestCase11          1
+Inconclusive        TestCase12          1
+Inconclusive        TestCase13          1
+Inconclusive        TestCase14          1
+Inconclusive        TestCase15          1
+Inconclusive        TestCase16          1
+Inconclusive        TestCase17          1
+Inconclusive        TestCase18          1
+Inconclusive        TestCase19          1
+Inconclusive        TestCase20          1
+Inconclusive        TestCase21          1
+Inconclusive        TestCase22          1
+Inconclusive        TestCase23          1
+Inconclusive        TestCase24          1
+Inconclusive        TestCase25          1
+Inconclusive        TestCase26          1
+Inconclusive        TestCase27          1
+Inconclusive        TestCase28          1
+Inconclusive        TestCase29          1
+Inconclusive        TestCase30          1
+Inconclusive        TestCase31          1
+Inconclusive        TestCase32          1
+Inconclusive        TestCase33          1
+Inconclusive        TestCase34          1
+Inconclusive        TestCase35          1
+Inconclusive        TestCase36          1
+Inconclusive        TestCase37          1
+Inconclusive        TestCase38          1
+Inconclusive        TestCase39          1
+Inconclusive        TestCase40          1
+Inconclusive        TestCase41          1
+Inconclusive        TestCase42          1
+Inconclusive        TestCase43          1
+Inconclusive        TestCase44          1
+
+Summary
+-------
+Inconclusive    44
+--------------------
+Total           44

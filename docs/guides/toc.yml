@@ -1,0 +1,12 @@
+- name: Guides
+  href: index.md
+- name: Quickstart
+  href: quickstart.md
+- name: Authoring a model
+  href: authoring-a-model.md
+- name: Writing Cord scenarios
+  href: writing-cord.md
+- name: Running conformance
+  href: conformance.md
+- name: Migrating from Spec Explorer
+  href: migrating-from-spec-explorer.md

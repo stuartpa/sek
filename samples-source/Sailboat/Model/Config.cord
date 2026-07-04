@@ -1,0 +1,100 @@
+
+using Sailboat.Implementation;
+using Sailboat.Model;
+
+config MovementActions 
+{
+    action static void SailboatController.Sail(Heading heading,int hours,int knots);	
+    action event static void SailboatController.RunAground(int atx, int aty);
+    action static void SailboatController.Rescue();
+
+    switch StepBound = 4000;
+    switch StateBound = 4000;
+    switch PathDepthBound = 100;
+    switch ProceedControlTimeout = 1000;
+    switch TestClassBase = "vs";
+    switch GeneratedTestPath = "..\\TestSuite";
+    switch GeneratedTestNamespace = "Sailboat.TestSuite";
+	switch RecommendedViews = "SailBoatView";
+	switch TestEnabled = false;
+}
+
+config AllDirections : MovementActions
+{
+    action static void SailboatController.Sail(Heading heading, int hours, int knots)
+		where
+		{.
+			Condition.In<int>(hours, 5, 10);
+			Condition.In<int>(knots, 20, 30);
+			Combination.Pairwise(heading, hours, knots);	
+		.};
+}
+
+
+
+machine ShootCompleter() : MovementActions
+{
+    bind Sail(Heading.NE, 30, 20)
+    in
+    construct model program from MovementActions
+		where scope = "Sailboat.Model"
+}
+
+machine Point() : MovementActions
+{
+    bind Sail(Heading.NE, {30, 15}, 10)
+    in
+    construct model program from MovementActions
+    where scope = "Sailboat.Model"
+}
+
+machine Shoot() : MovementActions where ForExploration = false
+{
+    construct model program from AllDirections
+    where scope = "Sailboat.Model"
+}
+
+machine BoundedShoot() : MovementActions 
+{
+    construct accept completion where Completer = "ShootCompleter" for 
+       construct bounded exploration where PathDepth = 2 for
+            Shoot
+}
+
+machine BoundedShoot1() : MovementActions
+{
+    construct bounded exploration where PathDepth = 2 for Shoot
+}
+
+
+machine BoundedShoot2() : MovementActions 
+{
+	construct bounded exploration where 
+		PathDepth = 2, Completer = "ShootCompleter" for
+			Shoot
+			
+}
+
+
+
+machine PointAndShoot() : MovementActions 
+{
+    construct point shoot where Shoot = "BoundedShoot" with 
+		(. Sailboat.Model.SailboatModel.AwayFromTheShore .) for 
+          Point
+}
+
+machine PointAndShoot2() : MovementActions 
+{
+    construct point shoot where 
+		PathDepth = 2, Shoot = "Shoot", Completer = "ShootCompleter" with 
+			(. SailboatModel.AwayFromTheShore .) for 
+				Point
+}
+
+
+machine TestSuite() : MovementActions where TestEnabled = true
+{
+     construct test cases where Strategy="longtests" for PointAndShoot
+}
+

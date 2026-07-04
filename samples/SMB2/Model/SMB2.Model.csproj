@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    SMB2 sample, ported to SpecExplorerKit.
+
+    Models the SMB2 session/tree/file lifecycle: set up a session, connect a tree, create
+    a file, write to it, then tear down. Trees and files are objects in model state; the
+    rules that act on them take a Tree/SFile parameter drawn from the reachable objects
+    (SEK's general reachable-object domain). This is a simplified state machine capturing
+    the protocol shape, matching the spirit of the (explicitly simplified) classic sample.
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>SMB2.Model</RootNamespace>
+    <AssemblyName>Model</AssemblyName>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Sek.Modeling\Sek.Modeling.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="*.cord" />
+  </ItemGroup>
+
+</Project>

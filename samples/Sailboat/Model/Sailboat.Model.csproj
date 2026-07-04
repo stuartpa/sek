@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Sailboat sample, ported to SpecExplorerKit.
+
+    A single static-state model (position X,Y plus aground flags). Sail moves the boat
+    using trig; RunAground/Rescue model the grounding lifecycle. Sail's heading/hours/knots
+    domains come from the Cord `where` block (Z3 + pairwise); RunAground's atx/aty use
+    state-dependent [Domain] methods so the "atx == x" guard is always satisfiable.
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>Sailboat.Model</RootNamespace>
+    <AssemblyName>Model</AssemblyName>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Sek.Modeling\Sek.Modeling.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="*.cord" />
+  </ItemGroup>
+
+</Project>

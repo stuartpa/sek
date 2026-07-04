@@ -1,0 +1,58 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{FEF8C359-D340-41FD-A9D5-397393EAFCDA}"
+	ProjectSection(SolutionItems) = preProject
+		localtestrun.testrunconfig = localtestrun.testrunconfig
+	EndProjectSection
+	ProjectSection(FolderStartupServices) = postProject
+		{B4F97281-0DBD-4835-9ED8-7DFB966E87FF} = {B4F97281-0DBD-4835-9ED8-7DFB966E87FF}
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GeneratedTest", "GeneratedTest\GeneratedTest.csproj", "{ADD03ADD-2D5C-412B-975B-8D9551E96393}"
+	ProjectSection(ProjectDependencies) = postProject
+		{16C1312B-3EAD-4248-95D2-C99FCB820728} = {16C1312B-3EAD-4248-95D2-C99FCB820728}
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adapter", "Adapter\Adapter.csproj", "{E98D1DF4-0846-41D5-A14B-C2DE5AB0396C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Model", "Model\Model.csproj", "{E09DBD07-DE63-475B-8463-1FF585CD8D1F}"
+	ProjectSection(ProjectDependencies) = postProject
+		{16C1312B-3EAD-4248-95D2-C99FCB820728} = {16C1312B-3EAD-4248-95D2-C99FCB820728}
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Server", "Server\Server.csproj", "{16C1312B-3EAD-4248-95D2-C99FCB820728}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{E98D1DF4-0846-41D5-A14B-C2DE5AB0396C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E98D1DF4-0846-41D5-A14B-C2DE5AB0396C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E98D1DF4-0846-41D5-A14B-C2DE5AB0396C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E98D1DF4-0846-41D5-A14B-C2DE5AB0396C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E09DBD07-DE63-475B-8463-1FF585CD8D1F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E09DBD07-DE63-475B-8463-1FF585CD8D1F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E09DBD07-DE63-475B-8463-1FF585CD8D1F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E09DBD07-DE63-475B-8463-1FF585CD8D1F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{ADD03ADD-2D5C-412B-975B-8D9551E96393}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ADD03ADD-2D5C-412B-975B-8D9551E96393}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ADD03ADD-2D5C-412B-975B-8D9551E96393}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ADD03ADD-2D5C-412B-975B-8D9551E96393}.Release|Any CPU.Build.0 = Release|Any CPU
+		{16C1312B-3EAD-4248-95D2-C99FCB820728}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{16C1312B-3EAD-4248-95D2-C99FCB820728}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{16C1312B-3EAD-4248-95D2-C99FCB820728}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{16C1312B-3EAD-4248-95D2-C99FCB820728}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(SpecExplorer.ActivityCompletionStatus) = preSolution
+		SpecExplorer.ActivityCompletionStatus = 
+	EndGlobalSection
+	GlobalSection(TextTemplating) = postSolution
+		TextTemplating = 1
+	EndGlobalSection
+EndGlobal

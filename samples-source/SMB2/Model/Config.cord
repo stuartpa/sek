@@ -1,0 +1,147 @@
+using SMB2.Adapter;
+using Microsoft.Modeling;
+using SMB2.Model;
+
+/// The actions and default switches.
+config Actions 
+{
+	action all Smb2SetupAdapter;
+	action all Smb2Adapter;	
+	
+    switch StepBound = 4096;
+	switch PathDepthBound = 1024;
+    switch StateBound = 4096;
+        
+    switch TestClassBase = "GeneratedTests.SMB2TestClass";
+    switch GeneratedTestPath = "..\\ModeledTests";
+    
+    switch RecommendedViews = "ShowRequirementView";
+    switch ForExploration = true;
+    switch TestEnabled = false;
+}
+
+/// Represents the mere state machine. Not intended for exploration.
+machine StateMachine() : Actions where ForExploration = false
+{
+	construct model program from Actions where scope = "SMB2.Model"
+}
+
+/// Slice for synchronous mode (window size = 1)
+/// and one share which captures all actions.
+machine AllSync() : Actions
+{
+    (   AssumeShareExists(1, ShareType.DISK);        // assume one share
+        SetupConnectionAndSession(1);				 // assume sync (credit window size == 1)
+        ...                                          // do whatever is possible from here
+    )
+    || StateMachine
+}
+
+/// As AllSync, but allows number of open files == 2
+machine AllSyncTwoFiles() : Actions
+{
+    {. Parameters.maxNoOfFiles = 2; .}: AllSync
+}
+
+/// Requirement reduction for AllSync machine
+machine AllSyncRequirementReduction() : Actions
+{
+	construct requirement coverage for AllSync
+}
+			
+/// Slice for asynchronous mode, which tests
+/// asynchronous closing of a file.
+machine AsyncCreateClose() : Actions
+{
+    (   AssumeShareExists(1, ShareType.DISK);        // assume one share
+        SetupConnectionAndSession(2);                // assume async (credit window size == 2)
+        TreeConnectRequest; TreeConnectResponse;     // create a tree
+        ( CreateRequest(_,_,_,CreateType.Create,_)   // any creations, closes, and responses
+        | CreateResponse
+        | CloseRequest
+        | CloseResponse
+        | ErrorResponse
+        )*                                          
+    )
+    || StateMachine
+}
+ 
+
+machine TestSuite() : Actions where TestEnabled = true
+{
+    // {. Parameters.allowReadEmptyFile = true; .}: // uncomment this to inject error into model
+    construct test cases 
+      where strategy = "shorttests", allowundeterminedcoverage = true 
+    for (AllSync | AsyncCreateClose)
+}
+
+// ============================================================================================
+// Model checking demo
+
+/// A configuration useful for model checking.
+/// It displays only errors traces, and stops at the
+/// first error encountered.
+config ModelCheck : Actions
+{
+    switch RecommendedViews = "ShowErrorOnly";
+    switch StopAtError = true;
+    switch TestEnabled = false;
+}
+
+/// An anti-scenario describing an asynchronous
+/// request/response pair. Such a pair should
+/// not appear in any trace.
+machine AsyncAntiScenario() : ModelCheck where ForExploration = false
+{
+	let int id, int otherId where {. 
+	    // bounding ids to a reasonable range
+	    Condition.IsTrue(id >= 1 & id <= 8);
+	    Condition.IsTrue(otherId >= 2 & otherId <= 8);
+	    // imposing requirement for asynchronicity
+	    Condition.IsTrue(id != otherId);
+	.}
+	in
+	...; AnyRequest(id); AnyResponse(otherId) : fail
+}
+
+/// A machine which checks the all-sync machine
+/// for actually being synchronous. Expected
+/// exploration result is empty.
+machine CheckAllSyncForNoAsync() : ModelCheck
+{
+	AsyncAntiScenario || AllSync
+}
+
+/// A machine which checks the async-create-close
+/// machine for actually being asynchronous. Expected
+/// result is a trace leading into a failure state
+machine CheckAsyncCreateCloseForNoAsync() : ModelCheck
+{
+	AsyncAntiScenario || AsyncCreateClose
+}
+
+/// A machine which represents any request using
+/// the given message id.
+machine AnyRequest(int id) : Actions where ForExploration = false
+{
+	TreeConnectRequest(id,_,_) |
+	CreateRequest(id,_,_,_,_) |
+	ReadRequest(id,_,_,_) |
+	WriteRequest(id,_,_,_,_) |
+	CloseRequest(id,_,_,_)
+}
+
+/// A machine which represents any response using
+/// the given message id.
+machine AnyResponse(int id) : Actions where ForExploration  = false
+{
+	TreeConnectResponse(id,_,_,_) |
+	CreateResponse(id,_,_) |
+	ReadResponse(id,_,_) |
+	WriteResponse(id,_) |
+	CloseResponse(id,_) |
+	ErrorResponse(_,id,_)
+}	
+
+
+	

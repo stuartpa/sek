@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    atsvc (AT Service / task scheduler) sample, ported to SpecExplorerKit.
+
+    Models the job lifecycle: AddJob creates a job, GetJobInfo observes one, DeleteJob
+    removes one. Jobs are objects in model state; GetJobInfo/DeleteJob take a Job parameter
+    whose domain is the reachable jobs. AddJob's command/time domains and the validity
+    predicate come from the Cord `where` block and are solved by Z3. (The classic sample's
+    JobInfo struct is flattened into value parameters, which SEK's solver handles directly.)
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>ATSvc.Model</RootNamespace>
+    <AssemblyName>Model</AssemblyName>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Sek.Modeling\Sek.Modeling.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="*.cord" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Account (TypeBinding) sample, ported to SpecExplorerKit.
+
+    Demonstrates dynamic object domains: CreateAccount adds Account objects to model state,
+    and SetBalance/GetBalance take an Account parameter whose domain is the set of accounts
+    reachable in the current state (SEK's general reachable-object domain). SetBalance's
+    balance values come from the Cord `where { Condition.In(...) }` block.
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>AccountSample</RootNamespace>
+    <AssemblyName>Model</AssemblyName>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Sek.Modeling\Sek.Modeling.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="*.cord" />
+  </ItemGroup>
+
+</Project>

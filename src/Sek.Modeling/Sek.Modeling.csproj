@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Sek.Modeling: the modern modeling runtime for SpecExplorerKit models.
+
+    This is the clean-room replacement for Spec Explorer's Microsoft.Modeling. A model
+    program is a class deriving from ModelProgram whose *public properties* hold the
+    model state (so the engine can snapshot/restore it via serialization) and whose
+    methods marked [Rule] describe actions. Guards use Require(...); accepting states
+    use [AcceptingCondition]; parameter value sets use [Domain].
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>Sek.Modeling</RootNamespace>
+    <AssemblyName>Sek.Modeling</AssemblyName>
+  </PropertyGroup>
+
+</Project>

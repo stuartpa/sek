@@ -1,0 +1,32 @@
+using Chat.Model;
+
+// chat (SEK port). Users are created on logon and form the domain of the User parameters;
+// user ids and broadcast payloads come from Cord Condition.In (Z3 parameter generation).
+
+config Actions
+{
+    action void LogonRequest(int userId);
+    action void LogonResponse(User user);
+    action void BroadcastRequest(User sender, string message);
+    action void BroadcastAck(User receiver);
+    action void LogoffRequest(User user);
+    action void LogoffResponse(User user);
+
+    switch StateBound = 1000;
+    switch StepBound = 5000;
+    switch TestEnabled = false;
+}
+
+config Parameters : Actions
+{
+    action void LogonRequest(int userId)
+      where {. Condition.In(userId, 1, 2); .};
+
+    action void BroadcastRequest(User sender, string message)
+      where {. Condition.In(message, "hi"); .};
+}
+
+machine ChatProtocol() : Parameters
+{
+    construct model program from Parameters
+}

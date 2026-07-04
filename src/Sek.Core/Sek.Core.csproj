@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Sek.Core: the heart of SpecExplorerKit.
+
+    Contains the transition-system intermediate representation (IR) that every other
+    stage consumes - exploration produces it; visualization, test generation and
+    conformance checking read it. Also defines the on-disk `.seexpl` JSON format and
+    the graph renderers (Mermaid / DOT / HTML).
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>Sek.Core</RootNamespace>
+    <AssemblyName>Sek.Core</AssemblyName>
+  </PropertyGroup>
+
+</Project>

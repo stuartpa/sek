@@ -1,0 +1,41 @@
+schema_version: "1.0"
+
+extension:
+  id: "spec-kit-sek"
+  name: "SpecExplorerKit (SEK)"
+  version: "0.1.0"
+  description: "Model-based testing for spec-driven development: model, explore, and verify with SpecExplorerKit."
+  author: "stuartpa"
+  repository: "https://github.com/stuartpa_microsoft/sek"
+  license: "MIT"
+  homepage: "https://github.com/stuartpa_microsoft/sek"
+  category: "code"
+  effect: "read-write"
+
+requires:
+  speckit_version: ">=0.1.0"
+  tools:
+    - name: "dotnet"
+      version: ">=8.0"
+      required: true
+    - name: "sek"
+      required: true
+
+provides:
+  commands:
+    - name: "speckit.sek.model"
+      file: "commands/model.md"
+      description: "Generate a SEK model program and Cord scenarios from the feature spec."
+    - name: "speckit.sek.explore"
+      file: "commands/explore.md"
+      description: "Explore the model into a transition system and summarize behavior coverage."
+    - name: "speckit.sek.verify"
+      file: "commands/verify.md"
+      description: "Replay the exploration against the implementation and report conformance."
+
+tags:
+  - testing
+  - model-based-testing
+  - dotnet
+  - conformance
+  - documentation

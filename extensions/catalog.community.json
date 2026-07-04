@@ -1,0 +1,46 @@
+﻿{
+    "$comment":  "Ready-to-submit Spec Kit community catalog entry for SpecExplorerKit. Per the Extension Publishing Guide, do NOT open a PR against spec-kit\u0027s catalog.community.json directly â€” submit this metadata via the Extension Submission issue template: https://github.com/github/spec-kit/issues/new?template=extension_submission.yml . The \u0027sha256\u0027 is filled in by scripts/pack-extension.ps1 when the release asset is built.",
+    "extensions":  [
+                       {
+                           "name":  "SpecExplorerKit (SEK)",
+                           "id":  "spec-kit-sek",
+                           "description":  "Model-based testing for spec-driven development: turn acceptance criteria into an explorable model, explore edge cases with Z3, and verify implementation conformance.",
+                           "author":  "stuartpa",
+                           "version":  "0.1.0",
+                           "download_url":  "https://github.com/stuartpa_microsoft/sek/releases/download/v0.1.0/spec-kit-sek.zip",
+                           "sha256":  "42bd75eaa4ba7147301362ec100ad27618fe536831ff1aaa74f5cf6def61cee2",
+                           "repository":  "https://github.com/stuartpa_microsoft/sek",
+                           "homepage":  "https://github.com/stuartpa_microsoft/sek",
+                           "documentation":  "https://github.com/stuartpa_microsoft/sek/tree/main/extensions/spec-kit-sek/README.md",
+                           "changelog":  "https://github.com/stuartpa_microsoft/sek/blob/main/extensions/spec-kit-sek/CHANGELOG.md",
+                           "license":  "MIT",
+                           "category":  "code",
+                           "effect":  "read-write",
+                           "requires":  {
+                                            "speckit_version":  "\u003e=0.1.0",
+                                            "tools":  [
+                                                          {
+                                                              "name":  "dotnet",
+                                                              "version":  "\u003e=8.0",
+                                                              "required":  true
+                                                          },
+                                                          {
+                                                              "name":  "sek",
+                                                              "required":  true
+                                                          }
+                                                      ]
+                                        },
+                           "provides":  {
+                                            "commands":  3,
+                                            "hooks":  0
+                                        },
+                           "tags":  [
+                                        "testing",
+                                        "model-based-testing",
+                                        "dotnet",
+                                        "conformance",
+                                        "documentation"
+                                    ]
+                       }
+                   ]
+}

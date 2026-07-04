@@ -1,0 +1,111 @@
+<html>
+
+<head>
+<meta http-equiv=Content-Type content="text/html; charset=gb2312">
+</head>
+
+<body lang=EN-US link=blue vlink=purple style='tab-interval:.5in'>
+
+<div class=Section1>
+
+<h1><a name="_Toc176008489">Spec Explorer 2010</a>
+Samples</h1>
+
+<p class=MsoNormal style='mso-margin-top-alt:auto;mso-margin-bottom-alt:auto;
+line-height:normal'><span style='font-size:12.0pt;font-family:"Times New Roman","serif"'>For
+Version 3.5.3146.0 <o:p></o:p></span></p>
+
+<p class=MsoNormal style='mso-margin-top-alt:auto;mso-margin-bottom-alt:auto;
+line-height:normal'><span style='font-size:12.0pt;font-family:"Times New Roman","serif"'>2013-6-27
+<o:p></o:p></span></p>
+
+<p class=MsoNormal>This is a collection of samples for SE 2010.
+ <span
+class=GramE>Every sample has a README available as a solution item which
+includes for running the sample.</span> </p>
+
+
+<p class=MsoNormal>Click on the sample header to navigate to the samples
+directory, and open the solution file to run the sample.</p>
+
+<h2><a href="Account"><span class=SpellE>Account</span></a></h2>
+
+<p class=MsoNormal>This sample demonstrates how to use reference types as parameters of static actions. The TypeBinding attribute is used to establish the mapping between a modeling type and an implementation type. Spec Explorer handles the mapping between model instances and implementation instances automatically at test runtime. </p>
+<p>For an example of how to declare instance-based method as actions, select the corresponding option in the Spec Explorer model project wizard (visual Studio File menu -> New -> Project -> Visual C# -> Test -> Spec Explorer Model).</p>
+
+<h2><a href="ATSVC">ATSVC</a></h2>
+
+<p class=MsoNormal>This sample demonstrates:</p>
+
+<p class=MsoListParagraphCxSpLast style='text-indent:-.25in;mso-list:l0 level1 lfo2'><span
+style='mso-ascii-font-family:Calibri;mso-fareast-font-family:Calibri;
+mso-hansi-font-family:Calibri;mso-bidi-font-family:Calibri'><span
+style='mso-list:Ignore'>-<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+</span></span></span>Modeling of a simple system service</p>
+
+<p class=MsoNormal><i style='mso-bidi-font-style:normal'>Note</i>: you must run
+VS with administrator privileges to successfully execute the test suites in
+this sample.</p>
+
+<h2><a href="CHAT">CHAT</a></h2>
+
+<p class=MsoNormal>This sample represents a &quot;fake&quot; protocol, called
+MS-CHAT. It demonstrates some modeling patterns and the usage of BinaryFormatter to automatically marshal and <span class=SpellE>unmarshal</span> bits
+to the wire. The protocol is a simple chat server which allows user to logon,
+logoff, gets a list of logged-on users, and finally to publish a message which
+will be broadcasted to all logged-on users. The protocol is block-oriented and
+runs over TCP. A fake server is provided as well.
+<p>
+This sample also shows how to use
+Requirement Coverage Machine with combination of switches, RequirementsToCover(set of requirements) and MinimumRequirementsCount(minimun requirements covered in the generated graph)
+</p>
+</p>
+
+
+<h2><a href="Operators">Operators</a></h2>
+
+<p class=MsoNormal>This is a simple sample to show the usages of all operators in Cord.</p>
+
+<h2><a href="ParameterGeneration">Parameter Generation</a></h2>
+
+<p class=MsoNormal>
+This solution contains some samples how to use new parameter combination features. 
+The samples match the ones used in the Parameter Generation Guide. 
+
+<p>Note that the samples are not representing any real system or protocol, and no
+implementation or test suite is generated. The samples just serve for demonstrating 
+features of parameter generation.</p>
+
+
+<h2><a href="PubSub"><span class=SpellE>PubSub</span></a></h2>
+
+<p class=MsoNormal>This is an SE sample which demonstrates
+instance based modeling using the simple pattern of a publish-<span
+class=SpellE>subscriber</span> managed API.</p>
+
+<h2><a href="RequirementReport">Requirement Report</a></h2>
+
+<p class=MsoNormal>This is a simple sample to show the usages of customized post-processing.</p>
+<p class=MsoNormal>Users can copy RequirementReport.dll into Extensions folder under Spec Explorer installation path, and launch this processing from Exploration Manager to generate requirement report for any machine. The default output folder is the model project directory</p>
+
+<h2><a href="Sailboat">Sailboat</a></h2>
+
+<p class=MsoNormal>This is a sample for the Point & Shoot exploration strategy.</p>
+<p>See the Point & Shoot user guide in help file for explanations.</p>
+
+
+<h2><a href="SMB2">SMB2</a></h2>
+
+<p class=MsoNormal>This is a SIMPLIFIED version of model and adapter for SMB2 which
+captures some aspects of the protocol. This model is not intended to solve the
+SMB2 test suite problem, but only for demonstrating certain concepts. The sample
+is of larger complexity and shows various modeling patterns and adapter
+implementation patterns.</p>
+
+
+
+</div>
+
+</body>
+
+</html>

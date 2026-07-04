@@ -1,0 +1,4 @@
+- name: Community
+  href: index.md
+- name: Using SEK as a Spec Kit extension
+  href: spec-kit-extension.md

@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Sek.Engine: the exploration engine.
+
+    Loads a model program (a Sek.Modeling.ModelProgram subclass) via reflection,
+    performs a deterministic breadth-first exploration of its reachable states, and
+    produces the Sek.Core transition-system IR (ExplorationGraph). State snapshotting
+    and de-duplication use canonical JSON hashing so set-equal states collapse.
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>Sek.Engine</RootNamespace>
+    <AssemblyName>Sek.Engine</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Sek.Core\Sek.Core.csproj" />
+    <ProjectReference Include="..\Sek.Cord\Sek.Cord.csproj" />
+    <ProjectReference Include="..\Sek.Modeling\Sek.Modeling.csproj" />
+    <ProjectReference Include="..\Sek.Solver\Sek.Solver.csproj" />
+  </ItemGroup>
+
+</Project>

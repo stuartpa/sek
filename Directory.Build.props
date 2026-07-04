@@ -1,0 +1,21 @@
+<Project>
+
+  <!--
+    Shared build settings for SpecExplorerKit (SEK).
+
+    SEK is the modern, cross-platform revival of Spec Explorer as a CLI-first,
+    model-based testing toolkit. Unlike the classic tooling (net48 + the Visual
+    Studio extension), SEK targets modern .NET and has no Visual Studio dependency.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+
+</Project>

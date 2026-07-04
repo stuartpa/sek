@@ -1,0 +1,42 @@
+﻿using TypeBindingSample;
+using Microsoft.Modeling;
+
+config Main 
+{
+    action all AccountImpl;
+    switch StateBound = 12800;
+    switch StepBound = 12800;
+    switch PathDepthBound = 12800;
+    switch TestClassBase = "vs";
+    switch GeneratedTestPath = "..\\TestSuite";
+    switch GeneratedTestNamespace = "TypeBindingSample";
+    switch TestEnabled = false;
+}
+
+// We do not need to indicate the domain for account because Spec Explorer will use all
+// instances created during the whole exploration as the domain
+// DomainGenerator is not supported for object instances
+config ParameterCombinationConfig : Main
+{
+    action static void AccountImpl.SetBalance(Account account, float balance)
+    where {. Condition.In(balance, 10, 100); .};
+
+    action static Set<Account> AccountImpl.SearchAccounts(float balance)
+    where {. Condition.In(balance, 20, 100); .};
+}
+
+machine ModelProgram() : Main
+{
+    construct model program from ParameterCombinationConfig
+}
+
+machine SlicedModelProgram() : Main
+{
+    (CreateAccount;(SetBalance|GetBalance|SearchAccounts)*; Clear) || ModelProgram
+}
+
+machine TestSuite() : Main where TestEnabled = true
+{
+    construct test cases for SlicedModelProgram
+}
+

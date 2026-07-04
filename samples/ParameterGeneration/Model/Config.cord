@@ -1,0 +1,75 @@
+using PG;
+
+// ParameterGeneration (SEK port) — demonstrates Z3-backed parameter generation driven
+// entirely by Cord `where` blocks. Each machine explores the single AddJob action; the
+// number of transitions is the number of parameter combinations the strategy yields.
+
+config Base
+{
+    action static void SUT.AddJob(string name, int time, Frequency frequency);
+
+    switch StepBound = 10000;
+    switch PathDepthBound = 1;
+    switch TestEnabled = false;
+}
+
+// Interaction (== full cartesian product): 3 names x 3 times x 3 frequencies = 27.
+config Product : Base
+{
+    action static void SUT.AddJob(string name, int time, Frequency frequency)
+      where {.
+                Condition.In(name, "@$^", "t.cmd", "t.exe");
+                Condition.In(time, -1, 60, 3600);
+          .};
+}
+machine Product() : Product
+{
+    construct model program from Product
+}
+
+// Explicit Interaction combination on subsets — still the full product here.
+config Interaction : Base
+{
+    action static void SUT.AddJob(string name, int time, Frequency frequency)
+      where {.
+                Condition.In(name, "@$^", "t.cmd", "t.exe");
+                Condition.In(time, -1, 60, 3600);
+                Combination.Interaction(name);
+                Combination.Interaction(time, frequency);
+          .};
+}
+machine Interaction() : Interaction
+{
+    construct model program from Interaction
+}
+
+// Pairwise: every value-pair across (name, time, frequency) appears at least once.
+config Pairwise : Base
+{
+    action static void SUT.AddJob(string name, int time, Frequency frequency)
+      where {.
+                Condition.In(name, "@$^", "t.cmd", "t.exe");
+                Condition.In(time, -1, 60, 3600);
+                Combination.Pairwise(name, time, frequency);
+          .};
+}
+machine Pairwise() : Pairwise
+{
+    construct model program from Pairwise
+}
+
+// Constraint: a Z3 predicate (Condition.IsTrue) prunes combinations.
+// Keep only combinations where NOT (name == "t.cmd" AND frequency != Daily).
+config Constraint : Base
+{
+    action static void SUT.AddJob(string name, int time, Frequency frequency)
+      where {.
+                Condition.In(name, "@$^", "t.cmd", "t.exe");
+                Condition.In(time, -1, 60, 3600);
+                Condition.IsTrue(!(name == "t.cmd" & frequency != Frequency.Daily));
+          .};
+}
+machine Constraint() : Constraint
+{
+    construct model program from Constraint
+}

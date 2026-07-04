@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Sek.Solver: constraint-solving backend for parameter generation.
+
+    Defines an IParameterSolver seam with two implementations:
+      * Z3Solver         - uses Microsoft.Z3 (the Z3 Theorem Prover) to enumerate
+                           satisfying parameter assignments from constraints.
+      * EnumerativeSolver - a dependency-free fallback (cartesian product + filter).
+
+    Z3 is the default and is what "powers" exploration: domains and Cord `where`
+    constraints become SMT constraints, and the solver generates the value combinations.
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>Sek.Solver</RootNamespace>
+    <AssemblyName>Sek.Solver</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Z3" Version="4.12.2" />
+  </ItemGroup>
+
+</Project>
