@@ -10,18 +10,23 @@ Write-Host '== Building SEK toolkit =='
 dotnet build (Join-Path $root 'src/Sek.Cli/Sek.Cli.csproj') -v q
 
 # On Linux, the OS may carry an older system libz3.so (e.g. pulled in by LLVM) that
-# lacks entry points the Microsoft.Z3 managed wrapper needs. Copy the NuGet-provided
-# linux-x64 native next to sek.dll so the correct, app-local library is loaded first.
+# lacks entry points the Microsoft.Z3 managed wrapper needs, and the NuGet package has
+# no linux-x64 native. Copy a matching libz3.so next to sek.dll so the correct,
+# app-local library is loaded first. CI provides one via $env:SEK_Z3_LIB.
 if ($IsLinux) {
     $nativeDir = Split-Path $sek
-    $z3 = Get-ChildItem "$HOME/.nuget/packages/microsoft.z3" -Recurse -Filter 'libz3.so' -ErrorAction SilentlyContinue |
-          Where-Object { $_.FullName -match 'linux-x64' } | Select-Object -First 1
-    if ($z3) {
-        Copy-Item $z3.FullName $nativeDir -Force
-        Write-Host "Copied Z3 native: $($z3.FullName) -> $nativeDir"
+    $lib = $env:SEK_Z3_LIB
+    if (-not ($lib -and (Test-Path $lib))) {
+        $found = Get-ChildItem "$HOME/.nuget/packages/microsoft.z3" -Recurse -Filter 'libz3.so' -ErrorAction SilentlyContinue |
+                 Where-Object { $_.FullName -match 'linux' } | Select-Object -First 1
+        if ($found) { $lib = $found.FullName }
+    }
+    if ($lib -and (Test-Path $lib)) {
+        Copy-Item $lib $nativeDir -Force
+        Write-Host "Copied Z3 native: $lib -> $nativeDir"
     }
     else {
-        Write-Warning 'Could not locate the Microsoft.Z3 linux-x64 libz3.so in the NuGet cache.'
+        Write-Warning 'No linux libz3.so found. Set $env:SEK_Z3_LIB to a matching Microsoft.Z3 native, or install Z3 4.12.x.'
     }
 }
 
