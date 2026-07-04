@@ -19,6 +19,7 @@ sek <command> [options]
 | [`explore`](#sek-explore) | Explore a machine into a `.seexpl` graph |
 | [`view`](#sek-view) | Render a `.seexpl` graph |
 | [`test`](#sek-test) | Explore, then replay against the SUT (conformance) |
+| [`generate`](#sek-generate) | Generate an xUnit test project from the exploration |
 | [`z3`](#sek-z3) | Self-test the Z3 backend |
 | [`version`](#sek-version) | Print the version |
 
@@ -108,6 +109,41 @@ sek test <machine> [--project <dir>] [--solver z3|enum]
 Requires a `binding` block in the project config. Prints transitions replayed,
 succeeded, failed, actions covered, and a `TEST PASSED` / `TEST FAILED` verdict.
 Exit code is non-zero on failure. `sek run` is an alias.
+
+---
+
+## `sek generate`
+
+Generate a runnable **xUnit** test project from a machine's exploration. SEK selects
+witness paths that cover the model's transitions (each path starts at the initial state
+and ends at an accepting state where reachable), then emits a test project whose tests
+replay each action sequence against the configured SUT binding.
+
+```bash
+sek generate <machine> [--project <dir>] [--out <dir>] [--namespace <ns>] [--max <n>] [--solver z3|enum]
+```
+
+| Option | Default | Meaning |
+|---|---|---|
+| `<machine>` | — | the machine to generate tests for (required) |
+| `--project <dir>` | current dir | project directory |
+| `--out <dir>` | `.specexplorerkit/out/<machine>Tests` | output test-project directory |
+| `--namespace <ns>` | `<binding-namespace>.Tests` | namespace for the generated tests |
+| `--max <n>` | `50` | maximum number of test paths to emit |
+| `--solver z3\|enum` | `z3` | parameter solver used during exploration |
+
+Requires a `binding` in the project config (the generated tests drive the SUT). The
+command writes a `<Machine>Tests.csproj` and `<Machine>Tests.cs`, then prints how to run
+them:
+
+```bash
+sek generate TpccExploration --project ./MyProject
+# Generated 50 xUnit test(s) covering 667/12706 transitions.
+# Run with: dotnet test ".../TpccExplorationTests"
+```
+
+The generated tests load the binding assembly from a baked-in path; override it at run
+time with the `SEK_BINDING` environment variable (useful in CI).
 
 ---
 

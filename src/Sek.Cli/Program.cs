@@ -36,6 +36,8 @@ try
         "explore" => CmdExplore(args.Skip(1).ToArray()),
         "test" => CmdTest(args.Skip(1).ToArray()),
         "run" => CmdTest(args.Skip(1).ToArray()),
+        "generate" => CmdGenerate(args.Skip(1).ToArray()),
+        "gen" => CmdGenerate(args.Skip(1).ToArray()),
         _ => Unknown(args[0]),
     };
 }
@@ -364,6 +366,58 @@ int CmdTest(string[] rest)
     return 0;
 }
 
+// --- generate (test-case generation) -------------------------------------------
+
+int CmdGenerate(string[] rest)
+{
+    if (rest.Length == 0 || IsHelp(rest[0]))
+    {
+        Console.WriteLine("Usage: sek generate <machine> [--project <dir>] [--out <dir>] [--namespace <ns>] [--max <n>] [--solver z3|enum]");
+        return rest.Length == 0 ? 1 : 0;
+    }
+
+    var machine = rest[0];
+    var solverName = GetOption(rest, "--solver") ?? "z3";
+    var (config, dir, cord) = LoadProject(rest);
+
+    if (cord.GetMachine(machine) is null)
+    {
+        Console.Error.WriteLine($"sek: error: machine '{machine}' not found. Available: {string.Join(", ", cord.Script.Machines.Select(m => m.Name))}");
+        return 1;
+    }
+
+    if (config.Binding is null)
+    {
+        Console.Error.WriteLine("sek: error: test generation needs a 'binding' in .specexplorerkit/config.json (generated tests replay against the SUT).");
+        return 1;
+    }
+
+    var maxTests = int.TryParse(GetOption(rest, "--max"), out var m) && m > 0 ? m : 50;
+
+    var result = ExploreMachine(config, dir, cord, machine, solverName);
+    var graph = result.Graph;
+    Console.WriteLine($"Explored '{machine}': {graph.States.Count} states, {graph.Transitions.Count} transitions.");
+
+    var paths = TestGen.SelectPaths(graph, maxTests);
+    if (paths.Count == 0)
+    {
+        Console.Error.WriteLine("sek: error: no test paths could be derived from the exploration.");
+        return 1;
+    }
+
+    var outDir = GetOption(rest, "--out") ?? Path.Combine(config.ResolveOutDir(dir), machine + "Tests");
+    var testNs = GetOption(rest, "--namespace")
+                 ?? (string.IsNullOrWhiteSpace(config.Binding.Namespace) ? "SpecExplorerKit.GeneratedTests" : config.Binding.Namespace + ".Tests");
+    var bindingAsm = Path.GetFullPath(Path.Combine(dir, config.Binding.Assembly));
+
+    var gen = TestGen.EmitXunit(graph, paths, outDir, testNs, bindingAsm, config.Binding.Namespace);
+
+    Console.WriteLine($"Generated {gen.TestCount} xUnit test(s) covering {gen.CoveredTransitions}/{gen.TotalTransitions} transitions.");
+    Console.WriteLine($"Wrote {gen.TestFile}");
+    Console.WriteLine($"Run with: dotnet test \"{gen.ProjectDir}\"");
+    return 0;
+}
+
 int Unknown(string command)
 {
     Console.Error.WriteLine($"sek: unknown command '{command}'.");
@@ -389,6 +443,10 @@ void PrintUsage()
                                       --format mermaid|dot|html   (default: mermaid)
                                       --out <file>                (default: stdout)
       test <machine>                Explore, then replay against the SUT (conformance)
+      generate <machine>            Generate an xUnit test project from the exploration
+                                      --out <dir>       (default: .specexplorerkit/out/<machine>Tests)
+                                      --namespace <ns>  (default: <binding-namespace>.Tests)
+                                      --max <n>         (max test paths; default 50)
       version                       Print version
     """);
 }

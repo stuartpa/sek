@@ -41,6 +41,7 @@ flowchart LR
     B --> D[.seexpl<br/>transition system]
     D --> E[sek view<br/>Mermaid / DOT / HTML]
     D --> F[sek test<br/>conformance vs SUT]
+    D --> G[sek generate<br/>xUnit test project]
 ```
 
 1. **Author a model.** Derive from `ModelProgram`, hold state in public
@@ -54,6 +55,8 @@ flowchart LR
    self-contained HTML page.
 5. **Verify.** `sek test` replays every explored transition against a binding
    to your real implementation and reports conformance.
+6. **Generate tests.** `sek generate` emits a runnable xUnit test project whose
+   tests replay covering scenarios against your implementation.
 
 ## Proven on the classic samples
 

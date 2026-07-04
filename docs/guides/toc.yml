@@ -8,5 +8,7 @@
   href: writing-cord.md
 - name: Running conformance
   href: conformance.md
+- name: Generating tests
+  href: generating-tests.md
 - name: Migrating from Spec Explorer
   href: migrating-from-spec-explorer.md
