@@ -32,6 +32,44 @@ public sealed class BehaviorExplorer
         return ToGraph(machineName, dfa);
     }
 
+    /// <summary>
+    /// Compiles a Cord behavior into a steppable deterministic automaton over the action
+    /// alphabet — used to <em>slice</em> a model program (a scenario restricts which action
+    /// sequences the model may take). Machine references inside the behavior are resolved.
+    /// </summary>
+    public CompiledScenario Compile(Behavior body)
+    {
+        var dfa = ToDfa(body);
+        var on = dfa.On.Select(d => new Dictionary<string, int>(d, StringComparer.Ordinal)).ToArray();
+        return new CompiledScenario(dfa.Start, dfa.Accept.ToArray(), on);
+    }
+
+    /// <summary>A determinized scenario automaton over action labels.</summary>
+    public sealed class CompiledScenario
+    {
+        private readonly bool[] _accept;
+        private readonly Dictionary<string, int>[] _on;
+
+        public CompiledScenario(int start, bool[] accept, Dictionary<string, int>[] on)
+        {
+            Start = start;
+            _accept = accept;
+            _on = on;
+        }
+
+        public int Start { get; }
+
+        public bool IsAccepting(int state) => state >= 0 && state < _accept.Length && _accept[state];
+
+        /// <summary>True if the scenario permits <paramref name="label"/> from <paramref name="state"/>,
+        /// yielding the next scenario state.</summary>
+        public bool TryStep(int state, string label, out int next)
+        {
+            next = -1;
+            return state >= 0 && state < _on.Length && _on[state].TryGetValue(label, out next);
+        }
+    }
+
     // ---- NFA ----------------------------------------------------------------
 
     private sealed class NState

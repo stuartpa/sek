@@ -28,3 +28,17 @@ machine JobScheduler() : ConfigWithParameters
 {
     construct model program from ConfigWithParameters
 }
+
+// Scenario slicing: restrict the model to runs that start with an AddJob and then only
+// query or delete jobs (never add a second job). `AddManageScenario` is a pure Cord
+// behavior over the action alphabet; `ManagedJobs` slices the model program with it.
+machine AddManageScenario() : ConfigWithParameters
+{
+    AddJob; (GetJobInfo | DeleteJob)*
+}
+
+machine ManagedJobs() : ConfigWithParameters
+{
+    AddManageScenario || JobScheduler
+}
+

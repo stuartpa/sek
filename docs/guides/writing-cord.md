@@ -98,6 +98,29 @@ machine Party() : PartyActivities
 
 The [Operators sample](../samples/operators.md) demonstrates every one.
 
+## Scenario slicing
+
+Compose a scenario with a model program to **slice** it — explore only the model
+behaviors whose action sequence the scenario permits:
+
+```text
+machine AddManageScenario() : Config
+{
+    AddJob; (GetJobInfo | DeleteJob)*
+}
+
+machine ManagedJobs() : Config
+{
+    AddManageScenario || construct model program from Config
+}
+```
+
+`sek explore ManagedJobs` explores the model but keeps only runs that start with an
+`AddJob` and then only query or delete — the scenario acts as a filter over the full
+model. A combined state is accepting when the model state is accepting **and** the
+scenario has completed. Matching is by action label; argument-pattern matching inside
+scenarios is on the roadmap. See the [atsvc sample](../samples/atsvc.md).
+
 ## Explore it
 
 ```bash

@@ -178,7 +178,55 @@ ExplorationResult ExploreMachine(ProjectConfig config, string dir, CordDocument 
     var introspector = new ModelIntrospector(modelType);
     var options = BoundsFor(cord, machine);
     var paramGen = BuildParamGen(cord, machine, solverName);
-    return new Explorer(introspector, options, paramGen).Explore(machine);
+    var explorer = new Explorer(introspector, options, paramGen);
+
+    // Scenario slicing: `Scenario || (construct model program ...)` restricts the model
+    // exploration to action sequences the scenario permits.
+    var scenario = TryGetSliceScenario(cord, machine);
+    if (scenario is not null)
+    {
+        var shortNames = introspector.Rules.Select(r => ShortLabel(r.ActionLabel)).ToHashSet(StringComparer.Ordinal);
+        var compiled = new BehaviorExplorer(name => cord.GetMachine(name)?.Body, shortNames).Compile(scenario);
+        return explorer.ExploreSliced(machine, compiled, ShortLabel);
+    }
+
+    return explorer.Explore(machine);
+}
+
+static string ShortLabel(string label)
+{
+    var i = label.LastIndexOf('.');
+    return i >= 0 ? label[(i + 1)..] : label;
+}
+
+// If the machine body is `A || B` where exactly one side constructs a model program,
+// returns the other side (the scenario behavior) for slicing; otherwise null.
+static Sek.Cord.Ast.Behavior? TryGetSliceScenario(CordDocument cord, string machine)
+{
+    var body = cord.GetMachine(machine)?.Body;
+    if (body is Sek.Cord.Ast.GroupBehavior outer) body = outer.Inner;
+    if (body is not Sek.Cord.Ast.ParallelBehavior par || par.Items.Count != 2) return null;
+
+    var b0 = ResolveSliceItem(cord, par.Items[0]);
+    var b1 = ResolveSliceItem(cord, par.Items[1]);
+    var m0 = b0?.FindConstruct()?.Kind == ConstructKind.ModelProgram;
+    var m1 = b1?.FindConstruct()?.Kind == ConstructKind.ModelProgram;
+
+    if (m0 && !m1) return b1;
+    if (m1 && !m0) return b0;
+    return null;
+}
+
+static Sek.Cord.Ast.Behavior? ResolveSliceItem(CordDocument cord, Sek.Cord.Ast.Behavior item)
+{
+    if (item is Sek.Cord.Ast.GroupBehavior g) item = g.Inner;
+    if (item is Sek.Cord.Ast.InvocationBehavior inv && (inv.Args is null || inv.Args.Count == 0))
+    {
+        var m = cord.GetMachine(inv.Target);
+        if (m?.Body is not null) return m.Body;
+    }
+
+    return item;
 }
 
 ParameterGeneration BuildParamGen(CordDocument cord, string machine, string solverName)
@@ -201,7 +249,11 @@ ParameterGeneration BuildParamGen(CordDocument cord, string machine, string solv
     foreach (var da in declared.Values)
     {
         var ac = CordConstraintExtractor.Extract(da);
-        if (ac.Constraints.Count > 0 || ac.Combination.Mode != CombinationSpec.Strategy.AllCombinations)
+        if (ac.Constraints.Count > 0
+            || ac.Combination.Mode != CombinationSpec.Strategy.AllCombinations
+            || ac.Combination.Isolated.Count > 0
+            || ac.Combination.Seeded.Count > 0
+            || ac.Combination.Expand.Count > 0)
         {
             byAction[da.Target] = new ActionParamSpec { Constraints = ac.Constraints, Combination = ac.Combination };
         }

@@ -116,6 +116,12 @@ Other Spec Explorer switches (e.g. `GeneratedTestPath`, `TestClassBase`,
 
 - `construct model program from <Config>` and the full behavior algebra are
   supported today.
+- **Scenario slicing** — `Scenario || construct model program from <Config>` — is
+  supported: the scenario restricts the model exploration to the action sequences it
+  permits. Matching is by action label (argument-pattern matching in scenarios is not
+  yet applied).
+- **Combination refinements** `Combination.Isolated`, `Combination.Seeded`, and
+  `Combination.Expand` are supported (in addition to `Interaction` and `Pairwise`).
 - Advanced scenario-control constructs (`bind`, `construct point shoot`,
   `construct bounded exploration`, `construct requirement coverage`) are on the
   roadmap; see [Migrating from Spec Explorer](../guides/migrating-from-spec-explorer.md).

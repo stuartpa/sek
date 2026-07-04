@@ -122,6 +122,85 @@ public sealed class Explorer
         return new ExplorationResult { Graph = graph, HitBound = hitBound };
     }
 
+    /// <summary>
+    /// Scenario slicing: explores the model program restricted to the action sequences a
+    /// Cord scenario permits (<c>Scenario || ModelProgram</c>). The combined state is
+    /// (model state, scenario-automaton state); a rule fires only if the scenario allows
+    /// its action from the current scenario state. A combined state is accepting when the
+    /// model state is accepting and the scenario is in an accepting state.
+    /// </summary>
+    public ExplorationResult ExploreSliced(string machineName, BehaviorExplorer.CompiledScenario scenario, Func<string, string> shortOf)
+    {
+        var graph = new ExplorationGraph { Machine = machineName };
+        var result = new ExplorationResult { Graph = graph };
+        var hashToId = new Dictionary<string, string>();
+        var queue = new Queue<(string Id, string Json, int Dfa, int Depth)>();
+        var hitBound = false;
+
+        var initialInstance = CreateInstance();
+        var initialJson = Serialize(initialInstance);
+        var initialHash = CanonicalJson.Hash(CanonicalJson.Canonicalize(initialJson));
+        var initialId = "S0";
+        hashToId[initialHash + "@" + scenario.Start] = initialId;
+        graph.InitialStateId = initialId;
+        graph.States.Add(new ModelState(initialId, initialHash, Label: null,
+            Accepting: IsAccepting(initialInstance) && scenario.IsAccepting(scenario.Start), Initial: true));
+        queue.Enqueue((initialId, initialJson, scenario.Start, 0));
+        var nextId = 1;
+
+        while (queue.Count > 0)
+        {
+            var (fromId, fromJson, dfaState, depth) = queue.Dequeue();
+            if (depth >= _options.MaxDepth) continue;
+
+            var domainInstance = Deserialize(fromJson);
+            foreach (var rule in _model.Rules)
+            {
+                if (!scenario.TryStep(dfaState, shortOf(rule.ActionLabel), out var ndfa))
+                {
+                    continue; // the scenario does not permit this action here
+                }
+
+                var domainValues = ResolveDomains(rule, domainInstance);
+                foreach (var argSet in GenerateArgSets(rule, domainValues))
+                {
+                    var target = Deserialize(fromJson);
+                    var invokeArgs = MaterializeArgs(rule, target, argSet);
+                    if (!TryInvoke(rule, target, invokeArgs, result.Diagnostics))
+                    {
+                        continue;
+                    }
+
+                    var toJson = Serialize(target);
+                    var toHash = CanonicalJson.Hash(CanonicalJson.Canonicalize(toJson));
+                    var toCombined = toHash + "@" + ndfa;
+
+                    if (!hashToId.TryGetValue(toCombined, out var toId))
+                    {
+                        if (graph.States.Count >= _options.MaxStates) { hitBound = true; continue; }
+                        toId = "S" + nextId++;
+                        hashToId[toCombined] = toId;
+                        graph.States.Add(new ModelState(toId, toHash, Label: null,
+                            Accepting: IsAccepting(target) && scenario.IsAccepting(ndfa)));
+                        queue.Enqueue((toId, toJson, ndfa, depth + 1));
+                    }
+
+                    if (graph.Transitions.Count >= _options.MaxTransitions) { hitBound = true; break; }
+                    var action = new ActionInvocation(rule.ActionLabel, invokeArgs.Select(Stringify).ToList());
+                    graph.Transitions.Add(new Transition(fromId, action, toId));
+                }
+            }
+        }
+
+        graph.Metadata["states"] = graph.States.Count.ToString();
+        graph.Metadata["transitions"] = graph.Transitions.Count.ToString();
+        graph.Metadata["accepting"] = graph.States.Count(s => s.Accepting).ToString();
+        graph.Metadata["hitBound"] = hitBound.ToString();
+        graph.Metadata["mode"] = "sliced";
+
+        return new ExplorationResult { Graph = graph, HitBound = hitBound };
+    }
+
     private ModelProgram CreateInstance() =>
         (ModelProgram)(Activator.CreateInstance(_model.ModelType)
                        ?? throw new InvalidOperationException($"Cannot instantiate '{_model.ModelType.Name}'."));
