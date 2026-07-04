@@ -9,6 +9,22 @@ $sek  = Join-Path $root 'src/Sek.Cli/bin/Debug/sek.dll'
 Write-Host '== Building SEK toolkit =='
 dotnet build (Join-Path $root 'src/Sek.Cli/Sek.Cli.csproj') -v q
 
+# On Linux, the OS may carry an older system libz3.so (e.g. pulled in by LLVM) that
+# lacks entry points the Microsoft.Z3 managed wrapper needs. Copy the NuGet-provided
+# linux-x64 native next to sek.dll so the correct, app-local library is loaded first.
+if ($IsLinux) {
+    $nativeDir = Split-Path $sek
+    $z3 = Get-ChildItem "$HOME/.nuget/packages/microsoft.z3" -Recurse -Filter 'libz3.so' -ErrorAction SilentlyContinue |
+          Where-Object { $_.FullName -match 'linux-x64' } | Select-Object -First 1
+    if ($z3) {
+        Copy-Item $z3.FullName $nativeDir -Force
+        Write-Host "Copied Z3 native: $($z3.FullName) -> $nativeDir"
+    }
+    else {
+        Write-Warning 'Could not locate the Microsoft.Z3 linux-x64 libz3.so in the NuGet cache.'
+    }
+}
+
 # sample dir -> @(machines...). Operators is behavior-mode (no model project).
 $samples = [ordered]@{
     'Operators'          = @('Party', 'SyncParallel', 'InterleavedParallel', 'Permutation', 'RepetitionOfAnyAction', 'Negation')
