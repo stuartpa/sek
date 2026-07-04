@@ -59,7 +59,49 @@ public static class CordConstraintExtractor
             {
                 result.Combination.Mode = CombinationSpec.Strategy.Pairwise;
             }
-            // Combination.Interaction => default (all combinations); Isolated/Seeded/Expand => not modeled yet.
+            else if (s.StartsWith("Combination.Expand", StringComparison.Ordinal))
+            {
+                foreach (var a in SplitArgs(ArgsInside(s)))
+                {
+                    var name = a.Trim();
+                    if (paramNames.Contains(name))
+                    {
+                        result.Combination.Expand.Add(name);
+                    }
+                }
+            }
+            else if (s.StartsWith("Combination.Isolated", StringComparison.Ordinal))
+            {
+                var (expr, refs, ok) = ExprParser.TryParse(ArgsInside(s));
+                if (ok && expr is not null && refs.All(r => r.Contains('.') || paramNames.Contains(r)))
+                {
+                    result.Combination.Isolated.Add(expr);
+                }
+            }
+            else if (s.StartsWith("Combination.Seeded", StringComparison.Ordinal))
+            {
+                var conj = new List<Sek.Solver.Expr>();
+                var okAll = true;
+                foreach (var a in SplitArgs(ArgsInside(s)))
+                {
+                    var (e, refs, ok) = ExprParser.TryParse(a);
+                    if (ok && e is not null && refs.All(r => r.Contains('.') || paramNames.Contains(r)))
+                    {
+                        conj.Add(e);
+                    }
+                    else
+                    {
+                        okAll = false;
+                        break;
+                    }
+                }
+
+                if (okAll && conj.Count > 0)
+                {
+                    result.Combination.Seeded.Add(conj);
+                }
+            }
+            // Combination.Interaction => default (full cartesian product).
         }
 
         return result;

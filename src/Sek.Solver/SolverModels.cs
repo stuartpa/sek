@@ -79,4 +79,16 @@ public sealed class CombinationSpec
     }
 
     public Strategy Mode { get; set; } = CombinationSpec.Strategy.AllCombinations;
+
+    /// <summary><c>Combination.Isolated(expr)</c>: keep only one representative combination
+    /// among those satisfying <c>expr</c> (test "special"/error values in isolation).</summary>
+    public List<Expr> Isolated { get; } = new();
+
+    /// <summary><c>Combination.Seeded(e1, e2, ...)</c>: guarantee at least one combination
+    /// satisfying the conjunction of the given predicates is included.</summary>
+    public List<IReadOnlyList<Expr>> Seeded { get; } = new();
+
+    /// <summary><c>Combination.Expand(p...)</c>: fully expand these parameters — every distinct
+    /// value tuple they take must be represented, even under a pairwise reduction.</summary>
+    public List<string> Expand { get; } = new();
 }

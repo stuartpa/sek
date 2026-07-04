@@ -141,11 +141,7 @@ public sealed class Z3Solver : IParameterSolver
             ? results
             : results.Where(a => postFilter.All(e => PredicateEval.Eval(e, a))).ToList();
 
-        var final = combination.Mode == CombinationSpec.Strategy.Pairwise
-            ? Combinatorics.Pairwise(parameters.Select(p => p.Name).ToList(), filtered)
-            : filtered;
-
-        return final.Take(limit).ToList();
+        return Combinatorics.Apply(parameters.Select(p => p.Name).ToList(), filtered, combination, limit);
     }
 
     private static object? MapBack(SolverParam p, List<object?> candidates, Dictionary<string, List<string>> stringIndex, long n)

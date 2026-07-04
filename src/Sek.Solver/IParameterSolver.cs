@@ -17,6 +17,63 @@ public interface IParameterSolver
 public static class Combinatorics
 {
     /// <summary>
+    /// Applies a <see cref="CombinationSpec"/> to the full set of satisfying combinations:
+    /// an optional pairwise reduction, then <c>Expand</c> (force full coverage of listed
+    /// params), <c>Isolated</c> (keep one representative per predicate), and <c>Seeded</c>
+    /// (guarantee specific combinations are present). Deterministic and order-stable.
+    /// </summary>
+    public static List<IReadOnlyDictionary<string, object?>> Apply(
+        IReadOnlyList<string> paramNames,
+        IReadOnlyList<IReadOnlyDictionary<string, object?>> all,
+        CombinationSpec spec,
+        int limit)
+    {
+        var work = spec.Mode == CombinationSpec.Strategy.Pairwise
+            ? Pairwise(paramNames, all)
+            : all.ToList();
+
+        // Expand: ensure every distinct value-tuple of the listed params (as seen across all
+        // satisfying combinations) is represented in the result.
+        var expand = spec.Expand.Where(paramNames.Contains).ToList();
+        if (expand.Count > 0)
+        {
+            string Key(IReadOnlyDictionary<string, object?> c) =>
+                string.Join("|", expand.Select(p => c.TryGetValue(p, out var v) ? (v?.ToString() ?? "null") : "null"));
+            var have = new HashSet<string>(work.Select(Key));
+            foreach (var c in all)
+            {
+                if (have.Add(Key(c))) work.Add(c);
+            }
+        }
+
+        // Isolated: keep only the first representative combination satisfying each predicate.
+        foreach (var pred in spec.Isolated)
+        {
+            var kept = false;
+            work = work.Where(c =>
+            {
+                if (!PredicateEval.Eval(pred, c)) return true;
+                if (kept) return false;
+                kept = true;
+                return true;
+            }).ToList();
+        }
+
+        // Seeded: ensure at least one combination satisfying each seed conjunction is present.
+        foreach (var seed in spec.Seeded)
+        {
+            bool Satisfies(IReadOnlyDictionary<string, object?> c) => seed.All(e => PredicateEval.Eval(e, c));
+            if (!work.Any(Satisfies))
+            {
+                var found = all.FirstOrDefault(Satisfies);
+                if (found is not null) work.Add(found);
+            }
+        }
+
+        return work.Take(limit).ToList();
+    }
+
+    /// <summary>
     /// Greedy pairwise selection: keep the smallest subset of <paramref name="allCombos"/>
     /// that still covers every value-pair (across parameter positions) present in the set.
     /// </summary>

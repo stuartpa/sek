@@ -306,7 +306,7 @@ public sealed class Explorer
         if (_paramGen.ByAction.TryGetValue(rule.ActionLabel, out var spec))
         {
             constraints = ResolveEnumLiterals(rule, spec.Constraints);
-            combination = spec.Combination;
+            combination = ResolveEnumLiterals(rule, spec.Combination);
         }
 
         // Object- and floating-point-typed parameters are not part of the SMT theory the
@@ -511,16 +511,7 @@ public sealed class Explorer
     /// </summary>
     private static IReadOnlyList<SolverConstraint> ResolveEnumLiterals(RuleInfo rule, IReadOnlyList<SolverConstraint> constraints)
     {
-        var enumTypes = new Dictionary<string, Type>(StringComparer.Ordinal);
-        foreach (var p in rule.Parameters)
-        {
-            var u = Underlying(p.Type);
-            if (u.IsEnum)
-            {
-                enumTypes[u.Name] = u;
-            }
-        }
-
+        var enumTypes = EnumTypes(rule);
         if (enumTypes.Count == 0)
         {
             return constraints;
@@ -535,6 +526,38 @@ public sealed class Explorer
         }
 
         return rewritten;
+    }
+
+    /// <summary>Resolves enum-qualified identifiers inside a combination spec's Isolated and
+    /// Seeded predicates (Expand/Mode are unaffected).</summary>
+    private static CombinationSpec ResolveEnumLiterals(RuleInfo rule, CombinationSpec c)
+    {
+        var enumTypes = EnumTypes(rule);
+        if (enumTypes.Count == 0 || (c.Isolated.Count == 0 && c.Seeded.Count == 0))
+        {
+            return c;
+        }
+
+        var res = new CombinationSpec { Mode = c.Mode };
+        res.Expand.AddRange(c.Expand);
+        foreach (var e in c.Isolated) res.Isolated.Add(RewriteEnum(e, enumTypes));
+        foreach (var seed in c.Seeded) res.Seeded.Add(seed.Select(e => RewriteEnum(e, enumTypes)).ToList());
+        return res;
+    }
+
+    private static Dictionary<string, Type> EnumTypes(RuleInfo rule)
+    {
+        var enumTypes = new Dictionary<string, Type>(StringComparer.Ordinal);
+        foreach (var p in rule.Parameters)
+        {
+            var u = Underlying(p.Type);
+            if (u.IsEnum)
+            {
+                enumTypes[u.Name] = u;
+            }
+        }
+
+        return enumTypes;
     }
 
     private static Expr RewriteEnum(Expr e, Dictionary<string, Type> enumTypes)

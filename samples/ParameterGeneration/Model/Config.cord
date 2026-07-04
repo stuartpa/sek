@@ -73,3 +73,55 @@ machine Constraint() : Constraint
 {
     construct model program from Constraint
 }
+
+// Isolated: "special" values are tested in isolation (one representative each) rather
+// than combined across the whole matrix, shrinking the suite. Full product is 27; the
+// two Isolated predicates collapse the name=="@$^" and time==-1 combinations to one each.
+config Isolated : Base
+{
+    action static void SUT.AddJob(string name, int time, Frequency frequency)
+      where {.
+                Condition.In(name, "@$^", "t.cmd", "t.exe");
+                Condition.In(time, -1, 60, 3600);
+                Combination.Isolated(name == "@$^");
+                Combination.Isolated(time == -1);
+          .};
+}
+machine Isolated() : Isolated
+{
+    construct model program from Isolated
+}
+
+// Seeded: pairwise reduction, but a specific important combination is guaranteed present.
+config Seeded : Base
+{
+    action static void SUT.AddJob(string name, int time, Frequency frequency)
+      where {.
+                Condition.In(name, "@$^", "t.cmd", "t.exe");
+                Condition.In(time, -1, 60, 3600);
+                Combination.Pairwise(name, time, frequency);
+                Combination.Seeded(name == "t.exe", time == 3600);
+          .};
+}
+machine Seeded() : Seeded
+{
+    construct model program from Seeded
+}
+
+// Expand: pairwise would reduce, but Expand forces the listed parameters to be fully
+// crossed — recovering the complete 27-combination product.
+config Expand : Base
+{
+    action static void SUT.AddJob(string name, int time, Frequency frequency)
+      where {.
+                Condition.In(name, "@$^", "t.cmd", "t.exe");
+                Condition.In(time, -1, 60, 3600);
+                Combination.Pairwise(name, time, frequency);
+                Combination.Expand(name, time, frequency);
+          .};
+}
+machine Expand() : Expand
+{
+    construct model program from Expand
+}
+

@@ -40,11 +40,7 @@ public sealed class EnumerativeSolver : IParameterSolver
             }
         }
 
-        var result = combination.Mode == CombinationSpec.Strategy.Pairwise
-            ? Combinatorics.Pairwise(parameters.Select(p => p.Name).ToList(), all)
-            : all;
-
-        return result.Take(limit).ToList();
+        return Combinatorics.Apply(parameters.Select(p => p.Name).ToList(), all, combination, limit);
     }
 
     private static IEnumerable<IReadOnlyDictionary<string, object?>> Cartesian(

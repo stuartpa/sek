@@ -61,17 +61,35 @@ Predicates support comparisons (`== != < <= > >=`), logical (`&& || !`), arithme
 | `Interaction` (default) | full product | the space is small enough to explore fully |
 | `Pairwise` | minimal 2-wise cover | many parameters; interaction is too large |
 | `+ Condition.IsTrue` | pruned by predicate | some combinations are invalid or uninteresting |
+| `Combination.Isolated(expr)` | one representative per predicate | test "special"/error values in isolation |
+| `Combination.Seeded(e1, e2, …)` | guarantees a combination is present | pin an important case into the suite |
+| `Combination.Expand(p…)` | forces full coverage of the listed params | override a pairwise reduction where needed |
+
+## Refinements: Isolated, Seeded, Expand
+
+Beyond `Interaction` and `Pairwise`, SEK supports Spec Explorer's refinements:
+
+- **`Combination.Isolated(expr)`** keeps only one representative combination among
+  those satisfying `expr`, so a rare/error value is tested without multiplying it
+  across the whole matrix.
+- **`Combination.Seeded(e1, e2, …)`** guarantees at least one combination satisfying
+  the conjunction of predicates is included (a required seed case).
+- **`Combination.Expand(p…)`** forces the listed parameters to be fully crossed even
+  under a pairwise reduction.
 
 ## Evidence
 
 The [ParameterGeneration sample](../samples/parameter-generation.md) demonstrates
-all three: `Product`/`Interaction` → 27, `Pairwise` → 11, `Constraint` → 21.
+each strategy on the same `AddJob(name, time, frequency)` action (full product = 27):
 
-## Roadmap
-
-Spec Explorer additionally offered `Isolated`, `Seeded`, and `Expand` refinements.
-SEK models `Interaction` and `Pairwise` today; the others are on the roadmap. When
-not yet modeled, they degrade to `Interaction` (a superset), so results remain sound.
+| Machine | Strategy | Combinations |
+|---|---|---|
+| `Product` / `Interaction` | full product | 27 |
+| `Pairwise` | pairwise | 11 |
+| `Constraint` | `Condition.IsTrue` prune | 21 |
+| `Isolated` | two `Isolated` predicates | 13 |
+| `Seeded` | pairwise + a seed | 11 |
+| `Expand` | pairwise + `Expand(all)` | 27 |
 
 ## Related
 
