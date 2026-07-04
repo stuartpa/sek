@@ -28,4 +28,18 @@
     <ProjectReference Include="..\Sek.Solver\Sek.Solver.csproj" />
   </ItemGroup>
 
+  <!--
+    Bundle the Linux x64 Z3 native. Microsoft.Z3 ships win-x64 and osx-x64 natives but
+    not linux-x64, so we place libz3.so next to sek.dll (the tool root) where the .NET
+    native loader finds it app-local first. Run scripts/fetch-z3-linux.ps1 to populate
+    native/linux-x64/libz3.so (git-ignored; fetched on demand by pack/validate).
+  -->
+  <ItemGroup Condition="Exists('$(MSBuildThisFileDirectory)..\..\native\linux-x64\libz3.so')">
+    <None Include="$(MSBuildThisFileDirectory)..\..\native\linux-x64\libz3.so">
+      <Link>libz3.so</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+
 </Project>

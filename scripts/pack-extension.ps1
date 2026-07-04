@@ -24,6 +24,9 @@ Write-Host "Extension archive : $extZip"
 Write-Host "SHA-256           : $sha"
 
 # 2) The `sek` .NET global tool package.
+# Ensure the Linux x64 Z3 native is cached so the packed tool bundles it (Microsoft.Z3
+# ships win-x64 + osx-x64 natives but no linux-x64); the tool then works on Linux too.
+& (Join-Path $PSScriptRoot 'fetch-z3-linux.ps1')
 $cli = Join-Path $root 'src/Sek.Cli/Sek.Cli.csproj'
 dotnet pack $cli -c $Configuration -o $dist /p:Version=$Version | Out-Null
 Get-ChildItem $dist -Filter '*.nupkg' | ForEach-Object { Write-Host "Tool package      : $($_.FullName)" }

@@ -29,20 +29,6 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
-      - name: Provision Z3 native (Linux)
-        shell: bash
-        run: |
-          # Microsoft.Z3 4.12.2 ships native libs for win-x64 and osx-x64 but NOT
-          # linux-x64, and the runner's system libz3 (from LLVM) is too old. Fetch the
-          # matching official Z3 4.12.2 libz3.so so exploration can use Z3 on Linux.
-          ver=4.12.2
-          curl -sSL -o /tmp/z3.zip "https://github.com/Z3Prover/z3/releases/download/z3-${ver}/z3-${ver}-x64-glibc-2.31.zip"
-          mkdir -p /tmp/z3 && unzip -q /tmp/z3.zip -d /tmp/z3
-          lib=$(find /tmp/z3 -name 'libz3.so' | head -1)
-          echo "SEK_Z3_LIB=$lib" >> "$GITHUB_ENV"
-          echo "LD_LIBRARY_PATH=$(dirname "$lib"):${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
-          echo "Provisioned Z3 native: $lib"
-
       - name: Determine version
         id: ver
         shell: bash

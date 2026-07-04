@@ -15,6 +15,9 @@ docs/api/
 # Release staging
 dist/
 
+# Vendored native (fetched on demand by scripts/fetch-z3-linux.ps1)
+native/
+
 # OS / editor
 .DS_Store
 Thumbs.db
