@@ -13,7 +13,7 @@ zero to an explored, rendered transition system in a few minutes.
 Follow [Install SEK](../install/index.md). To use the in-repo build directly:
 
 ```bash
-git clone https://github.com/stuartpa_microsoft/sek
+git clone https://github.com/stuartpa/sek
 cd sek
 dotnet build src/Sek.Cli/Sek.Cli.csproj
 ```

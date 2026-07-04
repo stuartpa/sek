@@ -6,9 +6,9 @@ extension:
   version: "0.1.0"
   description: "Model-based testing for spec-driven development: model, explore, and verify with SpecExplorerKit."
   author: "stuartpa"
-  repository: "https://github.com/stuartpa_microsoft/sek"
+  repository: "https://github.com/stuartpa/sek"
   license: "MIT"
-  homepage: "https://github.com/stuartpa_microsoft/sek"
+  homepage: "https://github.com/stuartpa/sek"
   category: "code"
   effect: "read-write"
 

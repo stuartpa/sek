@@ -23,7 +23,7 @@ acceptance criteria into an executable **model**, **explore** it for edge cases,
 
 ```bash
 specify extension add spec-kit-sek \
-  --from https://github.com/stuartpa_microsoft/sek/releases/latest/download/spec-kit-sek.zip
+  --from https://github.com/stuartpa/sek/releases/latest/download/spec-kit-sek.zip
 ```
 
 For local development against a checkout of this repo:
@@ -90,4 +90,4 @@ directly). The release provides the `spec-kit-sek.zip` asset that the catalog's
 
 - [Install SEK](../install/index.md)
 - [Running conformance](../guides/conformance.md)
-- Extension source: [`extensions/spec-kit-sek/`](https://github.com/stuartpa_microsoft/sek/tree/main/extensions/spec-kit-sek)
+- Extension source: [`extensions/spec-kit-sek/`](https://github.com/stuartpa/sek/tree/main/extensions/spec-kit-sek)

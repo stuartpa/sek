@@ -2,7 +2,7 @@
 
 **Model-based testing for spec-driven development.** This
 [Spec Kit](https://github.github.io/spec-kit/) community extension brings
-[SpecExplorerKit (SEK)](https://github.com/stuartpa_microsoft/sek) into the SDD
+[SpecExplorerKit (SEK)](https://github.com/stuartpa/sek) into the SDD
 lifecycle: turn a feature's acceptance criteria into an executable **model**,
 **explore** it into a finite-state transition system (Z3-powered), and **verify**
 that your implementation conforms.
@@ -20,7 +20,7 @@ that your implementation conforms.
 dotnet tool install -g sek
 
 # Add the extension to your Spec Kit project
-specify extension add spec-kit-sek --from https://github.com/stuartpa_microsoft/sek/releases/latest/download/spec-kit-sek.zip
+specify extension add spec-kit-sek --from https://github.com/stuartpa/sek/releases/latest/download/spec-kit-sek.zip
 ```
 
 Or, for local development against a checkout:
@@ -46,7 +46,7 @@ specify extension add --dev ./extensions/spec-kit-sek
 ```
 
 See each command's documentation under [`commands/`](commands/), and the full
-SEK documentation at <https://github.com/stuartpa_microsoft/sek>.
+SEK documentation at <https://github.com/stuartpa/sek>.
 
 ## Configuration
 
@@ -73,5 +73,5 @@ The commands operate on a `.specexplorerkit/config.json` in the feature folder:
 ## Contributing
 
 Issues and pull requests are welcome at
-<https://github.com/stuartpa_microsoft/sek>. This extension is released under the
+<https://github.com/stuartpa/sek>. This extension is released under the
 [MIT License](LICENSE).

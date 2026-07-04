@@ -13,9 +13,9 @@ extension, bringing model-based testing into spec-driven development.
 ## Contributing
 
 Issues and pull requests are welcome at
-<https://github.com/stuartpa_microsoft/sek>. SEK is MIT-licensed.
+<https://github.com/stuartpa/sek>. SEK is MIT-licensed.
 
 ## Support
 
-- **Issues:** <https://github.com/stuartpa_microsoft/sek/issues>
+- **Issues:** <https://github.com/stuartpa/sek/issues>
 - **Docs:** this site (build locally with `docfx docs/docfx.json --serve`).

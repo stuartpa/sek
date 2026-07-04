@@ -20,7 +20,7 @@ SEK is a .NET global tool named `sek`. It runs on Windows, macOS, and Linux.
 ### From a release package
 
 Download `SpecExplorerKit.Tool.<version>.nupkg` from the
-[latest release](https://github.com/stuartpa_microsoft/sek/releases/latest) and
+[latest release](https://github.com/stuartpa/sek/releases/latest) and
 install it from the folder that contains it:
 
 ```bash
@@ -37,7 +37,7 @@ sek z3        # self-test the Z3 backend (prints SATISFIABLE)
 ### From source
 
 ```bash
-git clone https://github.com/stuartpa_microsoft/sek
+git clone https://github.com/stuartpa/sek
 cd sek
 dotnet build src/Sek.Cli/Sek.Cli.csproj
 # invoke the freshly built tool:
@@ -50,7 +50,7 @@ If you use [Spec Kit](https://github.github.io/spec-kit/), add the SEK extension
 
 ```bash
 specify extension add spec-kit-sek \
-  --from https://github.com/stuartpa_microsoft/sek/releases/latest/download/spec-kit-sek.zip
+  --from https://github.com/stuartpa/sek/releases/latest/download/spec-kit-sek.zip
 ```
 
 See [Using SEK as a Spec Kit extension](../community/spec-kit-extension.md).
