@@ -1,14 +1,14 @@
 {
-  "$comment": "Ready-to-submit Spec Kit community catalog entry for SpecExplorerKit. Per the Extension Publishing Guide, do NOT open a PR against spec-kit's catalog.community.json directly Ã¢â‚¬â€ submit this metadata via the Extension Submission issue template: https://github.com/github/spec-kit/issues/new?template=extension_submission.yml . The 'sha256' is filled in by scripts/pack-extension.ps1 when the release asset is built.",
+  "$comment": "Ready-to-submit Spec Kit community catalog entry for SpecExplorerKit. Per the Extension Publishing Guide, do NOT open a PR against spec-kit's catalog.community.json directly ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â submit this metadata via the Extension Submission issue template: https://github.com/github/spec-kit/issues/new?template=extension_submission.yml . The 'sha256' is filled in by scripts/pack-extension.ps1 when the release asset is built.",
   "extensions": [
     {
       "name": "SpecExplorerKit (SEK)",
       "id": "spec-kit-sek",
       "description": "Model-based testing for spec-driven development: turn acceptance criteria into an explorable model, explore edge cases with Z3, and verify implementation conformance.",
       "author": "stuartpa",
-      "version": "0.1.0",
-      "download_url": "https://github.com/stuartpa/sek/releases/download/v0.1.0/spec-kit-sek.zip",
-      "sha256": "d934f211b35e2601e2322e7e0ed589438795658a5400a485984584aec456ed80",
+      "version": "0.1.1",
+      "download_url": "https://github.com/stuartpa/sek/releases/download/v0.1.1/spec-kit-sek.zip",
+      "sha256": "b980a45d3b55b8f3b28bd6a00c119b2ce43a30bcb518aae705b326f50d59984e",
       "repository": "https://github.com/stuartpa/sek",
       "homepage": "https://github.com/stuartpa/sek",
       "documentation": "https://github.com/stuartpa/sek/tree/main/extensions/spec-kit-sek/README.md",
