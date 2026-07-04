@@ -26,3 +26,11 @@ machine AccountExploration() : ParameterCombinationConfig
 {
     construct model program from ParameterCombinationConfig
 }
+
+// Scenario slicing (as in the classic sample's SlicedModelProgram): restrict the model
+// to runs that create an account, use it (set/get its balance) any number of times, then
+// clear. The scenario composes with the model program via `||`.
+machine SlicedAccount() : ParameterCombinationConfig
+{
+    (CreateAccount; (SetBalance | GetBalance)* ; Clear) || construct model program from ParameterCombinationConfig
+}

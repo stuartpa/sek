@@ -24,7 +24,7 @@ config Product : Base
 }
 machine Product() : Product
 {
-    construct model program from Product
+    AddJob || construct model program from Product
 }
 
 // Explicit Interaction combination on subsets — still the full product here.
@@ -40,7 +40,7 @@ config Interaction : Base
 }
 machine Interaction() : Interaction
 {
-    construct model program from Interaction
+    AddJob || construct model program from Interaction
 }
 
 // Pairwise: every value-pair across (name, time, frequency) appears at least once.
@@ -55,7 +55,7 @@ config Pairwise : Base
 }
 machine Pairwise() : Pairwise
 {
-    construct model program from Pairwise
+    AddJob || construct model program from Pairwise
 }
 
 // Constraint: a Z3 predicate (Condition.IsTrue) prunes combinations.
@@ -71,7 +71,7 @@ config Constraint : Base
 }
 machine Constraint() : Constraint
 {
-    construct model program from Constraint
+    AddJob || construct model program from Constraint
 }
 
 // Isolated: "special" values are tested in isolation (one representative each) rather
@@ -89,7 +89,7 @@ config Isolated : Base
 }
 machine Isolated() : Isolated
 {
-    construct model program from Isolated
+    AddJob || construct model program from Isolated
 }
 
 // Seeded: pairwise reduction, but a specific important combination is guaranteed present.
@@ -105,7 +105,7 @@ config Seeded : Base
 }
 machine Seeded() : Seeded
 {
-    construct model program from Seeded
+    AddJob || construct model program from Seeded
 }
 
 // Expand: pairwise would reduce, but Expand forces the listed parameters to be fully
@@ -122,6 +122,6 @@ config Expand : Base
 }
 machine Expand() : Expand
 {
-    construct model program from Expand
+    AddJob || construct model program from Expand
 }
 

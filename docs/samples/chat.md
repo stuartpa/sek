@@ -34,6 +34,16 @@ sek explore ChatProtocol --project samples/chat
 Like PubSub, broadcast queues are unbounded, so exploration reports `(bound hit)`.
 Tighten the Cord scenario to focus on a finite conversation.
 
+## Scenario slicing
+
+Like the classic sample's `LogOnOffListSlice`, `ChatSlice` composes a logon/broadcast/
+logoff scenario with the model via `||`. The full model is unbounded (hits the bound at
+1000 states); the slice is a finite 14 states / 16 transitions.
+
+```bash
+sek explore ChatSlice --project samples/chat
+```
+
 ## Related
 
 - [Accepting conditions](../concepts/accepting-conditions.md)

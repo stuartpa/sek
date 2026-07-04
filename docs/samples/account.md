@@ -41,6 +41,17 @@ objects, and that the object index is *materialized against the mutated state* s
 that `account.Balance = balance` actually changes the successor state — producing
 distinct states rather than self-loops.
 
+## Scenario slicing
+
+As in the classic sample's `SlicedModelProgram`, `SlicedAccount` composes a scenario
+with the model via `||`: `(CreateAccount; (SetBalance | GetBalance)* ; Clear) || construct
+model program from ParameterCombinationConfig`. It restricts the full model (10 states /
+58 transitions) to that lifecycle (8 states / 25 transitions).
+
+```bash
+sek explore SlicedAccount --project samples/Account
+```
+
 ## Related
 
 - [Object domains](../concepts/object-domains.md)

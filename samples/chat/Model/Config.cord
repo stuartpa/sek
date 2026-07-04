@@ -30,3 +30,15 @@ machine ChatProtocol() : Parameters
 {
     construct model program from Parameters
 }
+
+// Scenario slicing (as in the classic sample's LogOnOffListSlice): log a user on, let them
+// broadcast and receive acknowledgements, then log off. The scenario slices the model.
+machine LogonBroadcastScenario() : Parameters
+{
+    LogonRequest; LogonResponse; BroadcastRequest; BroadcastAck* ; LogoffRequest; LogoffResponse
+}
+
+machine ChatSlice() : Parameters
+{
+    LogonBroadcastScenario || construct model program from Parameters
+}

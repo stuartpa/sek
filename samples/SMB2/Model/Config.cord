@@ -23,3 +23,16 @@ machine Smb2Lifecycle() : Actions
 {
     construct model program from Actions
 }
+
+// Scenario slicing (as in the classic sample's AllSync): a synchronous session that sets
+// up, connects a tree, creates a file, reads/writes it, then tears down. The scenario
+// slices the model program.
+machine SyncSessionScenario() : Actions
+{
+    SetupConnectionAndSession; TreeConnect; Create; (Write | Close)* ; TreeDisconnect; LogOff
+}
+
+machine SyncSession() : Actions
+{
+    SyncSessionScenario || construct model program from Actions
+}

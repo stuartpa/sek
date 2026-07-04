@@ -28,3 +28,15 @@ machine PubSubExploration() : Params
 {
     construct model program from Params
 }
+
+// Scenario slicing (as in the classic sample's TwoSubscribersSlice): a publisher with two
+// subscribers publishes, then messages are acknowledged. The scenario slices the model.
+machine TwoSubscribersScenario() : Params
+{
+    Publisher; Subscriber; Subscriber; Publish; Publish; Received*
+}
+
+machine TwoSubscribersSlice() : Params
+{
+    TwoSubscribersScenario || construct model program from Params
+}

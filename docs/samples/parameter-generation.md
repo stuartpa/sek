@@ -22,12 +22,21 @@ parameter combinations:
 | `Interaction` | explicit interaction | 27 |
 | `Pairwise` | `Combination.Pairwise` | 11 |
 | `Constraint` | `Condition.IsTrue` predicate pruning | 21 |
+| `Isolated` | `Combination.Isolated` (×2) | 13 |
+| `Seeded` | pairwise + `Combination.Seeded` | 11 |
+| `Expand` | pairwise + `Combination.Expand` | 27 |
+
+Each machine uses the classic sample's form `AddJob || construct model program from <Cfg>`
+— combining a one-action scenario (slicing) with the model, so both parameter generation
+and scenario slicing are exercised together.
 
 - `name` ∈ 3 values, `time` ∈ 3 values, `frequency` ∈ `{Once, Daily, Weekly}` →
   27 for the full product.
 - Pairwise reduces 27 → 11 while covering every value-pair.
 - The predicate `!(name == "t.cmd" & frequency != Frequency.Daily)` prunes 6
   combinations → 21, with the enum literal `Frequency.Daily` resolved by the engine.
+- `Isolated` tests special values in isolation (27 → 13); `Expand` forces the full
+  cross-product despite a pairwise reduction (→ 27).
 
 ## Run it
 

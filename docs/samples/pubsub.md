@@ -34,6 +34,17 @@ is infinite; exploration reports `(bound hit)` when `StateBound` truncates it â€
 classic PubSub sample notes the same "infinite, pruned" behavior. Tighten the Cord
 scenario to explore a specific finite slice.
 
+## Scenario slicing
+
+The unbounded full model becomes finite when sliced by a scenario, as in the classic
+sample's `TwoSubscribersSlice`: `TwoSubscribersScenario || construct model program from
+Params`. Full exploration hits the bound (500 states); the slice is a finite 20 states /
+30 transitions.
+
+```bash
+sek explore TwoSubscribersSlice --project samples/PubSub
+```
+
 ## Related
 
 - [Object domains](../concepts/object-domains.md)

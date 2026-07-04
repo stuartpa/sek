@@ -35,6 +35,16 @@ sequence ids, and message types. The SEK port keeps the session/tree/file lifecy
 shape using object domains and lifecycle guards; adapter message types (SUT-side)
 are out of scope for model exploration.
 
+## Scenario slicing
+
+As in the classic sample's `AllSync`, `SyncSession` composes a synchronous session
+scenario with the model via `||`: setup → tree connect → create → read/write → teardown.
+It restricts the full lifecycle (17 states / 32 transitions) to 9 states / 9 transitions.
+
+```bash
+sek explore SyncSession --project samples/SMB2
+```
+
 ## Related
 
 - [Object domains](../concepts/object-domains.md)
