@@ -57,8 +57,8 @@ public static class CordConstraintExtractor
                 continue;
             }
 
-            // Probabilistic branch: `if (Probability.IsTrue(p)) <then>` / `else <else>`. (p >= 0.5 takes the `then` branch) — Spec Explorer
-            // uses a seeded RNG; SEK approximates with the majority branch for reproducibility.
+            // Probabilistic branch: `if (Probability.IsTrue(p)) <then>` / `else <else>`. The
+            // branch is chosen by the seeded gate (reproducible for a given `switch RandomSeed`).
             if (s.StartsWith("if ", StringComparison.Ordinal) || s.StartsWith("if(", StringComparison.Ordinal))
             {
                 var open = s.IndexOf('(');
