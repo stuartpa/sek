@@ -108,4 +108,33 @@ public sealed class CordDocument
         }
 
         return result;
-    }}
+    }
+
+    /// <summary>Adapter types imported via <c>action all T</c> across a config and its bases.</summary>
+    public List<string> ResolveImportedActionTypes(string configName)
+    {
+        var result = new List<string>();
+        var visited = new HashSet<string>();
+        void Walk(string name)
+        {
+            if (!visited.Add(name)) return;
+            var cfg = GetConfiguration(name);
+            if (cfg is null) return;
+            foreach (var b in cfg.BaseConfigs) Walk(b);
+            foreach (var t in cfg.ImportedActionTypes) result.Add(t);
+        }
+
+        Walk(configName);
+        return result;
+    }
+
+    /// <summary>Adapter types imported via <c>action all T</c> visible to a machine.</summary>
+    public List<string> ResolveMachineImportedActionTypes(string machineName)
+    {
+        var result = new List<string>();
+        var machine = GetMachine(machineName);
+        if (machine is null) return result;
+        foreach (var baseCfg in machine.BaseConfigs) result.AddRange(ResolveImportedActionTypes(baseCfg));
+        return result;
+    }
+}

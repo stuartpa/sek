@@ -182,6 +182,12 @@ ExplorationResult ExploreMachine(ProjectConfig config, string dir, CordDocument 
     var modelType = ModelLoader.LoadModelTypeInScope(config.ResolveModelAssembly(dir), scope, config.Model.Type);
     var introspector = new ModelIntrospector(modelType);
     var options = BoundsFor(cord, machine);
+    // Consume `action all <Adapter>` / explicit `action` declarations: restrict the model's
+    // action universe to the imported actions (resolves to all rules for single-adapter models).
+    options.AllowedActionLabels = ActionImportResolver.Resolve(
+        cord.ResolveMachineImportedActionTypes(machine),
+        cord.ResolveMachineDeclaredActions(machine).Keys,
+        introspector.Rules.Select(r => r.ActionLabel));
     var binds = new Dictionary<string, List<List<string>>>(StringComparer.Ordinal);
     return Interpret(introspector, cord, machine, cord.GetMachine(machine)?.Body, options, solverName, binds);
 }

@@ -20,4 +20,9 @@ public sealed class ExplorationOptions
     /// with (. expr .)</c>). Evaluated against each explored model instance; matching state ids
     /// are recorded in <c>graph.Metadata["goals"]</c> so the caller can prune to reaching paths.</summary>
     public Func<object, bool>? GoalPredicate { get; set; }
+
+    /// <summary>Optional restriction of the model's action universe to the rule labels imported by
+    /// a Cord config (<c>action all</c> / explicit <c>action</c> declarations). Null means every
+    /// rule is enabled.</summary>
+    public IReadOnlySet<string>? AllowedActionLabels { get; set; }
 }

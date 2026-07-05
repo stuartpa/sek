@@ -85,6 +85,7 @@ public sealed class Explorer
 
             foreach (var rule in _model.Rules)
             {
+                if (_options.AllowedActionLabels is { } allowed && !allowed.Contains(rule.ActionLabel)) continue;
                 var domainValues = ResolveDomains(rule, domainInstance);
                 foreach (var argSet in GenerateArgSets(rule, domainValues))
                 {
@@ -175,6 +176,7 @@ public sealed class Explorer
             var domainInstance = Deserialize(fromJson);
             foreach (var rule in _model.Rules)
             {
+                if (_options.AllowedActionLabels is { } allowed && !allowed.Contains(rule.ActionLabel)) continue;
                 var bareLabel = shortOf(rule.ActionLabel);
                 // An instance action `Type.Method(...)` has an implicit receiver: its first
                 // parameter is the target object (its domain is the reachable objects). Scenario
