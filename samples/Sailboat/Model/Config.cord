@@ -1,9 +1,11 @@
+using Sailboat.Implementation;
 using Sailboat.Model;
 
-// Sailboat (SEK port). The classic sample's `bind`, `construct point shoot` and
-// `construct bounded exploration` constructs are Spec Explorer scenario-control features;
-// here we explore the model program directly. Sail's heading/hours/knots domains and the
-// pairwise strategy come from Cord and are solved by Z3.
+// Sailboat (SEK port) — faithful to the classic sample's Cord, exercising bind, bounded
+// exploration, accept completion, point shoot and test-case construction. (`scope` selects
+// a model sub-namespace in Spec Explorer; SEK loads a single model type, so it is a no-op.
+// The point-shoot / accept-completion steering heuristics are approximated by exploring the
+// referenced target machine; bind and bounded exploration are exact.)
 
 config MovementActions
 {
@@ -11,24 +13,81 @@ config MovementActions
     action event static void SailboatController.RunAground(int atx, int aty);
     action static void SailboatController.Rescue();
 
-    switch StateBound = 4000;
     switch StepBound = 4000;
+    switch StateBound = 4000;
     switch PathDepthBound = 100;
+    switch TestClassBase = "vs";
     switch TestEnabled = false;
 }
 
 config AllDirections : MovementActions
 {
     action static void SailboatController.Sail(Heading heading, int hours, int knots)
-      where {.
-                Condition.In(hours, 5, 10);
-                Condition.In(knots, 20, 30);
-                Combination.Pairwise(heading, hours, knots);
-          .};
+        where
+        {.
+            Condition.In(hours, 5, 10);
+            Condition.In(knots, 20, 30);
+            Combination.Pairwise(heading, hours, knots);
+        .};
 }
 
-// Full voyage: sail (pairwise over all headings), run aground, rescue, repeat.
-machine Voyage() : AllDirections
+machine ShootCompleter() : MovementActions
+{
+    bind Sail(Heading.NE, 30, 20)
+    in
+    construct model program from MovementActions
+                where scope = "Sailboat.Model"
+}
+
+machine Point() : MovementActions
+{
+    bind Sail(Heading.NE, {30, 15}, 10)
+    in
+    construct model program from MovementActions
+    where scope = "Sailboat.Model"
+}
+
+machine Shoot() : MovementActions where ForExploration = false
 {
     construct model program from AllDirections
+    where scope = "Sailboat.Model"
+}
+
+machine BoundedShoot() : MovementActions
+{
+    construct accept completion where Completer = "ShootCompleter" for
+       construct bounded exploration where PathDepth = 2 for
+            Shoot
+}
+
+machine BoundedShoot1() : MovementActions
+{
+    construct bounded exploration where PathDepth = 2 for Shoot
+}
+
+machine BoundedShoot2() : MovementActions
+{
+        construct bounded exploration where
+                PathDepth = 2, Completer = "ShootCompleter" for
+                        Shoot
+}
+
+machine PointAndShoot() : MovementActions
+{
+    construct point shoot where Shoot = "BoundedShoot" with
+                (. Sailboat.Model.SailboatModel.AwayFromTheShore .) for
+          Point
+}
+
+machine PointAndShoot2() : MovementActions
+{
+    construct point shoot where
+                PathDepth = 2, Shoot = "Shoot", Completer = "ShootCompleter" with
+                        (. SailboatModel.AwayFromTheShore .) for
+                                Point
+}
+
+machine TestSuite() : MovementActions where TestEnabled = true
+{
+     construct test cases where Strategy = "longtests" for PointAndShoot
 }

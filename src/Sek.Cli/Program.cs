@@ -177,20 +177,119 @@ ExplorationResult ExploreMachine(ProjectConfig config, string dir, CordDocument 
     var modelType = ModelLoader.LoadModelType(config.ResolveModelAssembly(dir), config.Model.Type);
     var introspector = new ModelIntrospector(modelType);
     var options = BoundsFor(cord, machine);
-    var paramGen = BuildParamGen(cord, machine, solverName);
-    var explorer = new Explorer(introspector, options, paramGen);
+    var binds = new Dictionary<string, List<List<string>>>(StringComparer.Ordinal);
+    return Interpret(introspector, cord, machine, cord.GetMachine(machine)?.Body, options, solverName, binds);
+}
 
-    // Scenario slicing: `Scenario || (construct model program ...)` restricts the model
-    // exploration to action sequences the scenario permits.
-    var scenario = TryGetSliceScenario(cord, machine);
-    if (scenario is not null)
+// Recursively interprets a machine body: `bind`, scenario slicing (`||`), and the construct
+// family (model program, bounded exploration, accepting paths, test cases, point shoot,
+// accept completion, requirement coverage).
+ExplorationResult Interpret(
+    ModelIntrospector introspector, CordDocument cord, string machine,
+    Sek.Cord.Ast.Behavior? body, ExplorationOptions options, string solverName,
+    Dictionary<string, List<List<string>>> binds)
+{
+    body = Unwrap(body);
+
+    if (body is Sek.Cord.Ast.BindBehavior bind)
     {
+        foreach (var c in bind.Binds) binds[c.Action] = c.ArgDomains;
+        return Interpret(introspector, cord, machine, bind.Inner, options, solverName, binds);
+    }
+
+    var slice = TryGetSliceScenario(cord, body);
+    if (slice is not null)
+    {
+        var cfg = body!.FindConstruct()?.Reference ?? cord.GetMachine(machine)?.BaseConfigs.FirstOrDefault() ?? string.Empty;
+        var pg = BuildParamGen(cord, cfg, machine, solverName, binds, introspector);
+        var explorer = new Explorer(introspector, options, pg);
         var shortNames = introspector.Rules.Select(r => ShortLabel(r.ActionLabel)).ToHashSet(StringComparer.Ordinal);
-        var compiled = new BehaviorExplorer(name => cord.GetMachine(name)?.Body, shortNames).Compile(scenario);
+        var compiled = new BehaviorExplorer(name => cord.GetMachine(name)?.Body, shortNames).Compile(slice);
         return explorer.ExploreSliced(machine, compiled, ShortLabel);
     }
 
-    return explorer.Explore(machine);
+    if (body is Sek.Cord.Ast.ConstructBehavior cb)
+    {
+        return InterpretConstruct(introspector, cord, machine, cb, options, solverName, binds);
+    }
+
+    var cfgName = cord.GetMachine(machine)?.BaseConfigs.FirstOrDefault() ?? string.Empty;
+    var paramGen = BuildParamGen(cord, cfgName, machine, solverName, binds, introspector);
+    return new Explorer(introspector, options, paramGen).Explore(machine);
+}
+
+ExplorationResult InterpretConstruct(
+    ModelIntrospector introspector, CordDocument cord, string machine,
+    Sek.Cord.Ast.ConstructBehavior cb, ExplorationOptions options, string solverName,
+    Dictionary<string, List<List<string>>> binds)
+{
+    switch (cb.Kind)
+    {
+        case ConstructKind.ModelProgram:
+        {
+            var pg = BuildParamGen(cord, cb.Reference, machine, solverName, binds, introspector);
+            return new Explorer(introspector, options, pg).Explore(machine);
+        }
+        case ConstructKind.BoundedExploration:
+        {
+            if (cb.Params.TryGetValue("PathDepth", out var pdv) && int.TryParse(pdv, out var pd)) options.MaxDepth = pd;
+            return InterpretTarget(introspector, cord, machine, cb, options, solverName, binds);
+        }
+        case ConstructKind.AcceptingPaths:
+        {
+            var r = InterpretTarget(introspector, cord, machine, cb, options, solverName, binds);
+            FilterToAcceptingPaths(r.Graph);
+            return r;
+        }
+        case ConstructKind.RequirementCoverage:
+        {
+            var r = InterpretTarget(introspector, cord, machine, cb, options, solverName, binds);
+            var reqs = r.Graph.Transitions.Select(t => t.Action.Name).Distinct().OrderBy(x => x).ToList();
+            r.Graph.Metadata["requirements"] = string.Join(", ", reqs);
+            r.Graph.Metadata["requirementCount"] = reqs.Count.ToString();
+            return r;
+        }
+        default:
+            // TestCases, PointShoot, AcceptCompletion: explore the target. (The point-shoot /
+            // accept-completion steering heuristics are approximated by exploring the target.)
+            return InterpretTarget(introspector, cord, machine, cb, options, solverName, binds);
+    }
+}
+
+ExplorationResult InterpretTarget(
+    ModelIntrospector introspector, CordDocument cord, string machine,
+    Sek.Cord.Ast.ConstructBehavior cb, ExplorationOptions options, string solverName,
+    Dictionary<string, List<List<string>>> binds)
+{
+    Sek.Cord.Ast.Behavior? target = cb.Target;
+    if (target is null && !string.IsNullOrEmpty(cb.Reference))
+    {
+        var refMachine = cord.GetMachine(cb.Reference);
+        target = refMachine?.Body ?? new Sek.Cord.Ast.ConstructBehavior { Kind = ConstructKind.ModelProgram, Reference = cb.Reference };
+    }
+
+    return Interpret(introspector, cord, machine, target, options, solverName, binds);
+}
+
+static Sek.Cord.Ast.Behavior? Unwrap(Sek.Cord.Ast.Behavior? b) =>
+    b is Sek.Cord.Ast.GroupBehavior g ? Unwrap(g.Inner) : b;
+
+// Keep only states that can reach an accepting state (and the transitions among them).
+static void FilterToAcceptingPaths(ExplorationGraph graph)
+{
+    var canReach = new HashSet<string>(graph.States.Where(s => s.Accepting).Select(s => s.Id));
+    var changed = true;
+    while (changed)
+    {
+        changed = false;
+        foreach (var t in graph.Transitions)
+        {
+            if (canReach.Contains(t.ToStateId) && canReach.Add(t.FromStateId)) changed = true;
+        }
+    }
+
+    graph.Transitions.RemoveAll(t => !canReach.Contains(t.FromStateId) || !canReach.Contains(t.ToStateId));
+    graph.States.RemoveAll(s => !canReach.Contains(s.Id) && !s.Initial);
 }
 
 static string ShortLabel(string label)
@@ -201,10 +300,9 @@ static string ShortLabel(string label)
 
 // If the machine body is `A || B` where exactly one side constructs a model program,
 // returns the other side (the scenario behavior) for slicing; otherwise null.
-static Sek.Cord.Ast.Behavior? TryGetSliceScenario(CordDocument cord, string machine)
+static Sek.Cord.Ast.Behavior? TryGetSliceScenario(CordDocument cord, Sek.Cord.Ast.Behavior? body)
 {
-    var body = cord.GetMachine(machine)?.Body;
-    if (body is Sek.Cord.Ast.GroupBehavior outer) body = outer.Inner;
+    body = Unwrap(body);
     if (body is not Sek.Cord.Ast.ParallelBehavior par || par.Items.Count != 2) return null;
 
     var b0 = ResolveSliceItem(cord, par.Items[0]);
@@ -229,14 +327,11 @@ static Sek.Cord.Ast.Behavior? ResolveSliceItem(CordDocument cord, Sek.Cord.Ast.B
     return item;
 }
 
-ParameterGeneration BuildParamGen(CordDocument cord, string machine, string solverName)
+ParameterGeneration BuildParamGen(
+    CordDocument cord, string cfgName, string machine, string solverName,
+    Dictionary<string, List<List<string>>> binds, ModelIntrospector introspector)
 {
     var byAction = new Dictionary<string, ActionParamSpec>();
-    var m = cord.GetMachine(machine);
-    var construct = m?.Body?.FindConstruct();
-    var cfgName = construct is { Kind: ConstructKind.ModelProgram }
-        ? construct.Reference
-        : (m?.BaseConfigs.FirstOrDefault() ?? string.Empty);
 
     var declared = new Dictionary<string, DeclaredAction>();
     if (!string.IsNullOrEmpty(cfgName))
@@ -259,11 +354,49 @@ ParameterGeneration BuildParamGen(CordDocument cord, string machine, string solv
         }
     }
 
+    // Apply binds: override the parameter domains of bound actions with the bound values.
+    foreach (var (action, argDomains) in binds)
+    {
+        var rule = introspector.Rules.FirstOrDefault(r =>
+            r.ActionLabel == action || ShortLabel(r.ActionLabel) == ShortLabel(action));
+        if (rule is null) continue;
+
+        var constraints = new List<SolverConstraint>();
+        for (var i = 0; i < argDomains.Count && i < rule.Parameters.Count; i++)
+        {
+            var dom = argDomains[i];
+            if (dom.Count == 1 && dom[0] == "_") continue; // unbound parameter
+            var p = rule.Parameters[i];
+            constraints.Add(new InConstraint { Param = p.Name, Values = dom.Select(tok => ParseBindValue(tok, p.Type)).ToList() });
+        }
+
+        if (constraints.Count > 0)
+        {
+            byAction[rule.ActionLabel] = new ActionParamSpec { Constraints = constraints, Combination = new CombinationSpec() };
+        }
+    }
+
     IParameterSolver solver = solverName.Equals("enum", StringComparison.OrdinalIgnoreCase)
         ? new EnumerativeSolver()
         : new Z3Solver();
 
     return new ParameterGeneration { Solver = solver, ByAction = byAction };
+}
+
+static object? ParseBindValue(string token, Type type)
+{
+    var t = Nullable.GetUnderlyingType(type) ?? type;
+    if (token.Length >= 2 && token[0] == '"' && token[^1] == '"') token = token[1..^1];
+    if (t.IsEnum)
+    {
+        var name = token.Contains('.') ? token[(token.LastIndexOf('.') + 1)..] : token;
+        try { return Enum.Parse(t, name, true); } catch { return token; }
+    }
+
+    if (long.TryParse(token, out var l)) return l >= int.MinValue && l <= int.MaxValue ? (int)l : l;
+    if (token == "true") return true;
+    if (token == "false") return false;
+    return token;
 }
 
 // --- explore -------------------------------------------------------------------
@@ -297,12 +430,6 @@ int CmdExplore(string[] rest)
         Console.WriteLine($"Explored behavior '{machine}': {bgraph.States.Count} states, {bgraph.Transitions.Count} transitions, {bgraph.States.Count(s => s.Accepting)} accepting.");
         Console.WriteLine($"Wrote {boutPath}");
         return 0;
-    }
-
-    var construct = cordMachine.Body?.FindConstruct();
-    if (construct is { Kind: not ConstructKind.ModelProgram })
-    {
-        Console.WriteLine($"note: machine '{machine}' is a {construct.Kind} machine; exploring the underlying model program (scenario slicing is on the roadmap).");
     }
 
     var result = ExploreMachine(config, dir, cord, machine, solverName);

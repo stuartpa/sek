@@ -86,6 +86,12 @@ public abstract class Behavior
             case LetBehavior l:
                 foreach (var r in l.Inner.ReferencedTargets()) yield return r;
                 break;
+            case BindBehavior b:
+                foreach (var r in b.Inner.ReferencedTargets()) yield return r;
+                break;
+            case ConstructBehavior cb when cb.Target is not null:
+                foreach (var r in cb.Target.ReferencedTargets()) yield return r;
+                break;
         }
     }
 
@@ -104,6 +110,7 @@ public abstract class Behavior
             case GroupBehavior g: return g.Inner.FindConstruct();
             case PreconstraintBehavior pc: return pc.Inner.FindConstruct();
             case LetBehavior l: return l.Inner.FindConstruct();
+            case BindBehavior b: return b.Inner.FindConstruct();
             default: return null;
         }
     }
@@ -144,11 +151,33 @@ public sealed class LetBehavior : Behavior
     public Behavior Inner { get; set; } = null!;
 }
 
-public enum ConstructKind { ModelProgram, AcceptingPaths, TestCases }
+public enum ConstructKind { ModelProgram, AcceptingPaths, TestCases, BoundedExploration, PointShoot, AcceptCompletion, RequirementCoverage }
 
 public sealed class ConstructBehavior : Behavior
 {
     public ConstructKind Kind { get; set; }
     public string Reference { get; set; } = string.Empty; // config (model program) or machine (paths/tests)
     public string? Where { get; set; }
+
+    /// <summary>Parsed <c>where key = value</c> options (e.g. PathDepth, Shoot, Completer).</summary>
+    public Dictionary<string, string> Params { get; } = new();
+
+    /// <summary>When the <c>for</c> target is itself a behavior/construct rather than a named machine.</summary>
+    public Behavior? Target { get; set; }
+}
+
+/// <summary><c>bind Action(argDomains), ... in Behavior</c>: binds parameter domains for the
+/// named actions within the inner behavior.</summary>
+public sealed class BindBehavior : Behavior
+{
+    public List<BindClause> Binds { get; } = new();
+    public Behavior Inner { get; set; } = null!;
+}
+
+public sealed class BindClause
+{
+    public string Action { get; set; } = string.Empty;
+    /// <summary>Per-parameter bound domain (each entry is a list of candidate value tokens; a
+    /// single <c>_</c> means "unbound / any").</summary>
+    public List<List<string>> ArgDomains { get; } = new();
 }

@@ -355,6 +355,7 @@ public sealed class Parser
 
         if (IsId("construct")) return ParseConstruct();
         if (IsId("let")) return ParseLet();
+        if (IsId("bind")) return ParseBind();
 
         if (Is(TokenKind.Ellipsis))
         {
@@ -368,59 +369,190 @@ public sealed class Parser
 
     private Behavior ParseConstruct()
     {
-        Take();
+        Take(); // 'construct'
+
         if (AcceptId("model"))
         {
             RequireId("program");
             RequireId("from");
-            var reference = ParseQualIdent();
-            if (AcceptId("where"))
-            {
-                while (!Is(TokenKind.RParen) && !Is(TokenKind.RBrace) && !Is(TokenKind.EndOfFile)
-                       && !Is(TokenKind.Semicolon) && !Is(TokenKind.Bar) && !Is(TokenKind.BarBar))
-                {
-                    Take();
-                }
-            }
-
-            return new ConstructBehavior { Kind = ConstructKind.ModelProgram, Reference = reference };
+            var cb = new ConstructBehavior { Kind = ConstructKind.ModelProgram, Reference = ParseQualIdent() };
+            if (AcceptId("where")) ParseWhereOpts(cb);
+            return cb;
         }
 
         if (AcceptId("accepting"))
         {
             RequireId("paths");
+            var cb = new ConstructBehavior { Kind = ConstructKind.AcceptingPaths };
+            if (AcceptId("where")) ParseWhereOpts(cb);
             RequireId("for");
-            return new ConstructBehavior { Kind = ConstructKind.AcceptingPaths, Reference = ParseConstructTargetOrBehavior() };
+            return WithTarget(cb);
         }
 
         if (AcceptId("test"))
         {
             RequireId("cases");
-            if (AcceptId("where"))
-            {
-                while (!IsId("for") && !Is(TokenKind.EndOfFile)) Take();
-            }
-
+            var cb = new ConstructBehavior { Kind = ConstructKind.TestCases };
+            if (AcceptId("where")) ParseWhereOpts(cb);
             RequireId("for");
-            return new ConstructBehavior { Kind = ConstructKind.TestCases, Reference = ParseConstructTargetOrBehavior() };
+            return WithTarget(cb);
+        }
+
+        if (AcceptId("bounded"))
+        {
+            RequireId("exploration");
+            var cb = new ConstructBehavior { Kind = ConstructKind.BoundedExploration };
+            if (AcceptId("where")) ParseWhereOpts(cb);
+            RequireId("for");
+            return WithTarget(cb);
+        }
+
+        if (AcceptId("point"))
+        {
+            RequireId("shoot");
+            var cb = new ConstructBehavior { Kind = ConstructKind.PointShoot };
+            if (AcceptId("where")) ParseWhereOpts(cb);
+            RequireId("for");
+            return WithTarget(cb);
+        }
+
+        if (AcceptId("accept"))
+        {
+            RequireId("completion");
+            var cb = new ConstructBehavior { Kind = ConstructKind.AcceptCompletion };
+            if (AcceptId("where")) ParseWhereOpts(cb);
+            RequireId("for");
+            return WithTarget(cb);
+        }
+
+        if (AcceptId("requirement"))
+        {
+            RequireId("coverage");
+            var cb = new ConstructBehavior { Kind = ConstructKind.RequirementCoverage };
+            if (AcceptId("where")) ParseWhereOpts(cb);
+            RequireId("for");
+            return WithTarget(cb);
         }
 
         throw new CordSyntaxException($"Unknown construct form '{Cur.Text}'", Cur.Line, Cur.Column);
     }
 
-    private string ParseConstructTargetOrBehavior()
+    /// <summary>Parses the <c>for</c> target: a named machine, a parenthesised behavior, or a
+    /// nested <c>construct</c>.</summary>
+    private ConstructBehavior WithTarget(ConstructBehavior cb)
     {
-        if (Is(TokenKind.Identifier))
+        if (IsId("construct"))
         {
-            return ParseQualIdent();
+            cb.Target = ParseConstruct();
+        }
+        else if (Accept(TokenKind.LParen))
+        {
+            cb.Target = ParseBehavior();
+            Expect(TokenKind.RParen);
+        }
+        else if (Is(TokenKind.Identifier))
+        {
+            cb.Reference = ParseQualIdent();
         }
 
+        return cb;
+    }
+
+    /// <summary>Parses <c>where key = value {, key = value}</c> plus an optional
+    /// <c>with (. expr .)</c>, stopping before <c>for</c>.</summary>
+    private void ParseWhereOpts(ConstructBehavior cb)
+    {
+        do
+        {
+            if (!Is(TokenKind.Identifier)) break;
+            var key = Take().Text;
+            if (!Accept(TokenKind.Equals)) { cb.Params[key] = "true"; }
+            else { cb.Params[key] = ParseOptValue(); }
+        }
+        while (Accept(TokenKind.Comma));
+
+        if (AcceptId("with"))
+        {
+            if (Is(TokenKind.EmbeddedExpr) || Is(TokenKind.EmbeddedStmt)) cb.Params["with"] = Take().Text;
+            else if (Is(TokenKind.LParen)) { SkipBalancedParens(); cb.Params["with"] = "(inline)"; }
+        }
+    }
+
+    private string ParseOptValue()
+    {
+        return Cur.Kind switch
+        {
+            TokenKind.StringLiteral => Take().Text,
+            TokenKind.IntLiteral => Take().Text,
+            TokenKind.Identifier => ParseQualIdent(),
+            _ => Take().Text,
+        };
+    }
+
+    private Behavior ParseBind()
+    {
+        Take(); // 'bind'
+        var bind = new BindBehavior();
+        do
+        {
+            var clause = new BindClause { Action = ParseQualIdent() };
+            if (Accept(TokenKind.LParen))
+            {
+                while (!Is(TokenKind.RParen) && !Is(TokenKind.EndOfFile))
+                {
+                    AcceptId("out"); AcceptId("ref");
+                    clause.ArgDomains.Add(ParseArgDomain());
+                    if (!Accept(TokenKind.Comma)) break;
+                }
+
+                Expect(TokenKind.RParen);
+            }
+
+            bind.Binds.Add(clause);
+        }
+        while (Accept(TokenKind.Comma));
+
+        RequireId("in");
+        bind.Inner = ParseBehavior();
+        return bind;
+    }
+
+    /// <summary>Parses one bound-parameter domain: <c>_</c> (unbound), a set <c>{a, b}</c>,
+    /// a single literal/qualident, or a structured value (captured as unbound).</summary>
+    private List<string> ParseArgDomain()
+    {
+        var vals = new List<string>();
+        if (Is(TokenKind.Underscore)) { Take(); vals.Add("_"); return vals; }
+
+        if (Accept(TokenKind.LBrace))
+        {
+            while (!Is(TokenKind.RBrace) && !Is(TokenKind.EndOfFile))
+            {
+                vals.Add(ParseValueToken());
+                if (!Accept(TokenKind.Comma)) break;
+            }
+
+            Expect(TokenKind.RBrace);
+            return vals;
+        }
+
+        var v = ParseValueToken();
         if (Is(TokenKind.LParen))
         {
+            // structured value, e.g. JobInfo(Command={...}, Time={...}) — captured as unbound.
             SkipBalancedParens();
+            return new List<string> { "_" };
         }
 
-        return "(inline)";
+        vals.Add(v);
+        return vals;
+    }
+
+    private string ParseValueToken()
+    {
+        if (Is(TokenKind.StringLiteral) || Is(TokenKind.IntLiteral)) return Take().Text;
+        if (Is(TokenKind.Identifier)) return ParseQualIdent();
+        return Take().Text;
     }
 
     private Behavior ParseLet()
