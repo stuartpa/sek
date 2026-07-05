@@ -33,7 +33,11 @@ public sealed class Explorer
     private readonly ExplorationOptions _options;
     private readonly ParameterGeneration? _paramGen;
     private readonly Dictionary<string, List<object?[]>> _argSetCache = new();
-    private readonly JsonSerializerOptions _json = new() { WriteIndented = false };
+    private readonly JsonSerializerOptions _json = new()
+    {
+        WriteIndented = false,
+        Converters = { new Sek.Modeling.ContainerJsonConverterFactory() },
+    };
 
     public Explorer(ModelIntrospector model, ExplorationOptions? options = null, ParameterGeneration? parameterGeneration = null)
     {

@@ -66,7 +66,18 @@ namespace Sek.Modeling
 
         public T this[int index] => _items[index];
 
+        public bool Contains(T item) => _items.Contains(item);
+
         public Sequence<T> Add(T item) { var l = new List<T>(_items) { item }; return new Sequence<T>(l); }
+
+        /// <summary>Returns a new sequence with the first occurrence of <paramref name="item"/>
+        /// removed (or an equal sequence when it is absent).</summary>
+        public Sequence<T> Remove(T item)
+        {
+            var l = new List<T>(_items);
+            l.Remove(item);
+            return new Sequence<T>(l);
+        }
 
         public IEnumerator<T> GetEnumerator() => _items.GetEnumerator();
 

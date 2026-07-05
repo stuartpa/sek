@@ -68,10 +68,11 @@ the *visible* parameters (so `Publish("object1")` matches on `data`). No cord ch
 
 ### 2.6 Container value types
 `Set<T>` / `Sequence<T>` / `Map<K,V>` are provided by `Sek.Modeling` with value (structural)
-equality. Return‑typed observations keep the original type (`Set<Account>` for
-`AccountImpl.SearchAccounts`, `Set<int>` for chat `ListResponse`). **Model state fields must use a
-serializable collection** (`List<T>`) — the value containers are for parameter/return values, not
-JSON‑serialized state.
+equality. They work as return‑typed observations (`Set<Account>` for `AccountImpl.SearchAccounts`,
+`Set<int>` for chat `ListResponse`) **and as model state fields** — dedicated JSON converters
+round‑trip them and serialize sets/maps in a canonical (sorted) order, so the state hash is
+order‑independent for sets/maps and order‑sensitive for sequences. The SMB2 `Pending` outstanding‑
+request list is a `Sequence<int>` state field.
 
 ### 2.7 State‑slice qualifier
 `{. ModelProgram.JobBound = 2; .}:` and `{. Parameters.maxNoOfFiles = 2; .}:` set a static member

@@ -43,16 +43,17 @@ namespace SMB2.Model
         public int Window { get; set; }
         public bool TreeConnected { get; set; }
         public int OpenFiles { get; set; }
-        /// <summary>Outstanding request message ids, in arrival order.</summary>
-        public List<int> Pending { get; set; } = new List<int>();
+        /// <summary>Outstanding request message ids, in arrival order (a value-typed ordered
+        /// container used directly as model state — round-tripped via the container converters).</summary>
+        public Sequence<int> Pending { get; set; } = new Sequence<int>();
 
         private int[] MsgIds() => new[] { 1, 2 };
         private int[] Zero() => new[] { 0 };
         private int[] Windows() => new[] { 1, 2 };
 
         private bool IsOutstanding(int msgId) => Pending.Contains(msgId);
-        private void Track(int msgId) => Pending.Add(msgId);
-        private void Complete(int msgId) => Pending.Remove(msgId);
+        private void Track(int msgId) => Pending = Pending.Add(msgId);
+        private void Complete(int msgId) => Pending = Pending.Remove(msgId);
 
         // ---- Setup adapter ----
 
