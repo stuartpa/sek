@@ -87,19 +87,32 @@ public class ProbabilityTests
     }
 
     [Fact]
-    public void Extract_Probability_SeedSelectsBranch()
+    public void Extract_Probability_UnionsBothBranches()
     {
-        // Find a seed that takes the `then` branch (foo/bar) and one that takes `else` (@^@\).
-        string? thenBranch = null, elseBranch = null;
-        for (var seed = 0; seed < 60 && (thenBranch is null || elseBranch is null); seed++)
+        // Both branches are reachable, so the parameter domain is their union (no missed states).
+        var vals = CordConstraintExtractor.Extract(ProbabilityAction(), randomSeed: 2)
+            .Constraints.OfType<InConstraint>().Single().Values.Select(v => v?.ToString()).ToList();
+        Assert.Equal(3, vals.Count);                       // foo, bar (then) + @^@ (else)
+        Assert.Contains("foo", vals);
+        Assert.Contains("bar", vals);
+        Assert.Contains(vals, v => v is not null && v.StartsWith("@^@")); // else-branch value
+    }
+
+    [Fact]
+    public void Extract_Probability_SeedControlsBranchOrder()
+    {
+        // The seeded gate orders the union so the more-likely branch's values come first; some
+        // seeds put the `then` (foo/bar) branch first, others the `else` (@^@) branch first.
+        string? thenFirst = null, elseFirst = null;
+        for (var seed = 0; seed < 60 && (thenFirst is null || elseFirst is null); seed++)
         {
-            var vals = CordConstraintExtractor.Extract(ProbabilityAction(), seed)
-                .Constraints.OfType<InConstraint>().Single().Values;
-            if (vals.Contains("foo")) thenBranch = $"seed {seed}";
-            else elseBranch = $"seed {seed}";
+            var first = CordConstraintExtractor.Extract(ProbabilityAction(), seed)
+                .Constraints.OfType<InConstraint>().Single().Values.First()?.ToString();
+            if (first is "foo" or "bar") thenFirst = $"seed {seed}";
+            else elseFirst = $"seed {seed}";
         }
 
-        Assert.NotNull(thenBranch); // some seed selects the 80% branch
-        Assert.NotNull(elseBranch); // some seed selects the 20% branch
+        Assert.NotNull(thenFirst);
+        Assert.NotNull(elseFirst);
     }
 }

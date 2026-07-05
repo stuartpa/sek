@@ -48,7 +48,9 @@ public static class CordConstraintExtractor
             }
         }
 
-        var takeElse = false;
+        var probThenFirst = true;            // seeded order of a probabilistic parameter's values
+        var probParams = new HashSet<string>(StringComparer.Ordinal);
+        string? curBranch = null;            // "then" / "else" while inside a probabilistic branch
         foreach (var stmt in SplitStatements(whereCode))
         {
             var s = stmt.Trim();
@@ -57,26 +59,26 @@ public static class CordConstraintExtractor
                 continue;
             }
 
-            // Probabilistic branch: `if (Probability.IsTrue(p)) <then>` / `else <else>`. The
-            // branch is chosen by the seeded gate (reproducible for a given `switch RandomSeed`).
+            curBranch = null;
+
+            // Probabilistic branch: `if (Probability.IsTrue(p)) <then>` / `else <else>`. Both
+            // branches' values are reachable, so the parameter's domain is their union; the seeded
+            // gate only chooses the reproducible order (the more-likely branch's values first),
+            // which matters when a bounded generation samples a prefix of the domain.
             if (s.StartsWith("if ", StringComparison.Ordinal) || s.StartsWith("if(", StringComparison.Ordinal))
             {
                 var open = s.IndexOf('(');
                 var close = MatchParen(s, open);
                 var cond = open >= 0 && close > open ? s[(open + 1)..close] : string.Empty;
                 var thenStmt = close >= 0 && close + 1 <= s.Length ? s[(close + 1)..].Trim() : string.Empty;
-                var taken = EvalProbability(cond, probability);
-                takeElse = !taken;
-                if (!taken) continue;
+                probThenFirst = EvalProbability(cond, probability);
+                curBranch = "then";
                 s = thenStmt;
             }
             else if (s.StartsWith("else", StringComparison.Ordinal))
             {
-                var elseStmt = s[4..].Trim();
-                var run = takeElse;
-                takeElse = false;
-                if (!run) continue;
-                s = elseStmt;
+                curBranch = "else";
+                s = s[4..].Trim();
             }
 
             if (s.StartsWith("Condition.In", StringComparison.Ordinal))
@@ -86,6 +88,7 @@ public static class CordConstraintExtractor
                 // (e.g. Condition.In(info.Command, ...) where `info` is a struct parameter).
                 if (inC is not null && (paramNames.Contains(inC.Param) || IsFieldOfParam(inC.Param, paramNames)))
                 {
+                    if (curBranch is not null) probParams.Add(inC.Param);
                     result.Constraints.Add(inC);
                 }
             }
@@ -177,7 +180,43 @@ public static class CordConstraintExtractor
             // Combination.Interaction => default (full cartesian product).
         }
 
+        // Merge duplicate `Condition.In` domains for the same parameter into one (the solvers key
+        // domains by parameter). A parameter split across a probabilistic if/else gets the union
+        // of both branches, ordered so the seeded-preferred branch's values come first.
+        MergeInConstraints(result, probParams, probThenFirst);
+
         return result;
+    }
+
+    /// <summary>Collapses multiple <see cref="InConstraint"/>s for the same parameter into a single
+    /// one whose values are the (distinct) union. For a probabilistic parameter the values are
+    /// ordered by <paramref name="probThenFirst"/> — the gate-preferred branch first.</summary>
+    private static void MergeInConstraints(ActionConstraints result, HashSet<string> probParams, bool probThenFirst)
+    {
+        var ins = result.Constraints.OfType<InConstraint>().ToList();
+        var byParam = ins.GroupBy(c => c.Param, StringComparer.Ordinal).Where(g => g.Count() > 1).ToList();
+        if (byParam.Count == 0) return;
+
+        foreach (var group in byParam)
+        {
+            var ordered = group.AsEnumerable();
+            // For a probabilistic param, `else` values were added after `then`; reverse the branch
+            // order when the gate prefers the `else` branch.
+            if (!probThenFirst && probParams.Contains(group.Key)) ordered = group.Reverse();
+
+            var merged = new InConstraint { Param = group.Key };
+            foreach (var c in ordered)
+            {
+                foreach (var v in c.Values)
+                {
+                    if (!merged.Values.Any(x => Equals(x, v))) merged.Values.Add(v);
+                }
+            }
+
+            var firstIndex = result.Constraints.IndexOf(group.First());
+            foreach (var c in group) result.Constraints.Remove(c);
+            result.Constraints.Insert(Math.Min(firstIndex, result.Constraints.Count), merged);
+        }
     }
 
     /// <summary>True if <paramref name="token"/> is a struct field access <c>param.field</c>
