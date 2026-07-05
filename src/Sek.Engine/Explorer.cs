@@ -13,6 +13,10 @@ public sealed class ExplorationResult
     public required ExplorationGraph Graph { get; init; }
     public bool HitBound { get; init; }
     public List<string> Diagnostics { get; } = new();
+
+    /// <summary>Distinct requirement ids captured (via <see cref="Sek.Modeling.Requirement.Capture"/>)
+    /// anywhere in the exploration — the raw material for requirement-coverage reporting.</summary>
+    public SortedSet<string> CapturedRequirements { get; } = new(StringComparer.Ordinal);
 }
 
 /// <summary>
@@ -47,6 +51,7 @@ public sealed class Explorer
         var queue = new Queue<(string Id, string Json, int Depth)>();
         var hitBound = false;
         var goals = new List<string>();
+        var capturedReqs = new SortedSet<string>(StringComparer.Ordinal);
 
         // Initial state.
         var initialInstance = CreateInstance();
@@ -86,6 +91,8 @@ public sealed class Explorer
                         continue; // guard disabled or error -> action not enabled
                     }
 
+                    foreach (var req in Requirement.Captured) capturedReqs.Add(req);
+
                     var toJson = Serialize(target);
                     var toCanonical = CanonicalJson.Canonicalize(toJson);
                     var toHash = CanonicalJson.Hash(toCanonical);
@@ -122,8 +129,11 @@ public sealed class Explorer
         graph.Metadata["accepting"] = graph.States.Count(s => s.Accepting).ToString();
         graph.Metadata["hitBound"] = hitBound.ToString();
         if (_options.GoalPredicate is not null) graph.Metadata["goals"] = string.Join(",", goals);
+        if (capturedReqs.Count > 0) graph.Metadata["requirementsCaptured"] = string.Join(",", capturedReqs);
 
-        return new ExplorationResult { Graph = graph, HitBound = hitBound };
+        var explored = new ExplorationResult { Graph = graph, HitBound = hitBound };
+        foreach (var r in capturedReqs) explored.CapturedRequirements.Add(r);
+        return explored;
     }
 
     /// <summary>
@@ -140,6 +150,7 @@ public sealed class Explorer
         var hashToId = new Dictionary<string, string>();
         var queue = new Queue<(string Id, string Json, int Dfa, int Depth)>();
         var hitBound = false;
+        var capturedReqs = new SortedSet<string>(StringComparer.Ordinal);
 
         var initialInstance = CreateInstance();
         var initialJson = Serialize(initialInstance);
@@ -215,6 +226,8 @@ public sealed class Explorer
                         continue;
                     }
 
+                    foreach (var req in Requirement.Captured) capturedReqs.Add(req);
+
                     var toJson = Serialize(target);
                     var toHash = CanonicalJson.Hash(CanonicalJson.Canonicalize(toJson));
                     var toCombined = toHash + "@" + ndfa;
@@ -257,7 +270,10 @@ public sealed class Explorer
             graph.Metadata["modelCheck"] = "true";
         }
 
-        return new ExplorationResult { Graph = graph, HitBound = hitBound };
+        if (capturedReqs.Count > 0) graph.Metadata["requirementsCaptured"] = string.Join(",", capturedReqs);
+        var sliced = new ExplorationResult { Graph = graph, HitBound = hitBound };
+        foreach (var r in capturedReqs) sliced.CapturedRequirements.Add(r);
+        return sliced;
     }
 
     /// <summary>Whether a combined (model, scenario) state is a goal state. For a model-checking
@@ -385,6 +401,7 @@ public sealed class Explorer
     {
         try
         {
+            Requirement.Reset(); // capture requirement ids raised by this invocation
             if (rule.Method.IsStatic)
             {
                 rule.Method.Invoke(null, args);

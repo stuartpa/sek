@@ -299,9 +299,41 @@ ExplorationResult InterpretConstruct(
         case ConstructKind.RequirementCoverage:
         {
             var r = InterpretTarget(introspector, cord, machine, cb, options, solverName, binds);
-            var reqs = r.Graph.Transitions.Select(t => t.Action.Name).Distinct().OrderBy(x => x).ToList();
-            r.Graph.Metadata["requirements"] = string.Join(", ", reqs);
-            r.Graph.Metadata["requirementCount"] = reqs.Count.ToString();
+            var covered = r.CapturedRequirements.ToList();
+            if (covered.Count > 0)
+            {
+                // Real requirement coverage: report the captured requirement ids, and (when the
+                // machine names them) the required set, which of those were covered/missing, and
+                // whether the MinimumRequirementCount threshold was met.
+                r.Graph.Metadata["requirementsCovered"] = string.Join(", ", covered);
+                r.Graph.Metadata["requirementCount"] = covered.Count.ToString();
+
+                var toCover = (cb.Params.GetValueOrDefault("RequirementsToCover") ?? string.Empty)
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+                if (toCover.Count > 0)
+                {
+                    var hit = toCover.Where(covered.Contains).ToList();
+                    var missing = toCover.Where(x => !covered.Contains(x)).ToList();
+                    r.Graph.Metadata["requirementsToCover"] = string.Join(", ", toCover);
+                    r.Graph.Metadata["requirementsMissing"] = string.Join(", ", missing);
+                    r.Graph.Metadata["requirementsCoverageComplete"] = (missing.Count == 0).ToString();
+                }
+
+                if (cb.Params.TryGetValue("MinimumRequirementCount", out var minText) && int.TryParse(minText, out var min))
+                {
+                    var basis = toCover.Count > 0 ? toCover.Count(covered.Contains) : covered.Count;
+                    r.Graph.Metadata["minimumRequirementCount"] = min.ToString();
+                    r.Graph.Metadata["minimumRequirementCountMet"] = (basis >= min).ToString();
+                }
+            }
+            else
+            {
+                // No Requirement.Capture calls in the model: fall back to the covered action set.
+                var reqs = r.Graph.Transitions.Select(t => t.Action.Name).Distinct().OrderBy(x => x).ToList();
+                r.Graph.Metadata["requirements"] = string.Join(", ", reqs);
+                r.Graph.Metadata["requirementCount"] = reqs.Count.ToString();
+            }
+
             return r;
         }
         case ConstructKind.PointShoot:

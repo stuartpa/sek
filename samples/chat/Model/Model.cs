@@ -89,6 +89,13 @@ namespace Chat.Model
         {
             Require(receiver.Inbox.Count > 0, "nothing to acknowledge");
             receiver.Inbox.RemoveAt(0);
+            // R6: a receiver acknowledges pending broadcasts in order (the inbox is FIFO).
+            Requirement.Capture("ms-chat_R6");
+            // R5: once every logged-on user's inbox is drained, all users received the broadcast.
+            if (Users.Where(u => u.State == UserState.LoggedOn).All(u => u.Inbox.Count == 0))
+            {
+                Requirement.Capture("ms-chat_R5");
+            }
         }
 
         [Rule("LogoffRequest")]
