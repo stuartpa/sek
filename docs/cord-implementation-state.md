@@ -10,8 +10,8 @@ It is the authoritative "where are we" reference for the engine. For the histori
 see [cord-parity-and-sample-audit.md](cord-parity-and-sample-audit.md); for reference deltas when
 porting from Spec Explorer see [porting-from-spec-explorer.md](porting-from-spec-explorer.md).
 
-Legend: ✅ implemented (systems-engineering quality, unit-tested) · 🟡 implemented to sample
-depth, deeper edge-semantics simplified · ❌ not implemented (no sample uses it).
+Legend: ✅ implemented (systems-engineering quality, unit-tested) · ❌ not implemented (no
+sample uses it).
 
 ---
 
@@ -20,13 +20,13 @@ depth, deeper edge-semantics simplified · ❌ not implemented (no sample uses i
 - All nine sample ports use **byte-identical Cord** to the Spec Explorer 2010 originals and
   explore correctly in seconds (including the SMB2 model-checks at the full `id ∈ 1..8` range).
 - The full behavior algebra, scenario slicing, parameter generation, constructs, model checking,
-  and the eight "proper-engineering" features are implemented and covered by a **43-test xUnit
+  and the eight "proper-engineering" features are implemented and covered by a **49-test xUnit
   suite** (`tests/Sek.Tests`).
 - Baselines held throughout, including **TPC-C (2446 states / 12706 transitions / 1054
   accepting)**.
-- The remaining gaps are **niche constructs no sample uses** and **two features implemented to
-  sample depth** (documented below). There are **no misleading shortcuts** in the advertised
-  feature set.
+- The three previously sample-deep areas (point-shoot phases, return-binding dataflow,
+  Probability) are now **fully composed** (§2.4). The only remaining gaps are **niche constructs
+  no sample uses** (§3). There are **no shortcuts** in the advertised feature set.
 
 ---
 
@@ -80,7 +80,23 @@ depth, deeper edge-semantics simplified · ❌ not implemented (no sample uses i
 - Action kind (`call` / `return` / `event`) parsed and tracked; event transitions tagged as
   observations (`ActionInvocation.Kind`) and emitted as `Observe` (vs `Step`) in generated tests.
 - Return-binding `Action(args) / var` — parsed and retained; return values captured onto the
-  transition (`ActionInvocation.Result`).
+  transition (`ActionInvocation.Result`) **and substituted into downstream consumers during
+  slicing** (see §2.4).
+
+### 2.4 Fully-composed constructs (previously simplified, now complete)
+- **point-shoot** — a genuine 3-phase composition: explore the Point target; from each launch
+  state resume the `Shoot` machine (bounded by `PathDepth`) to the `with (. expr .)` goal; from
+  each goal resume the `Completer` machine to an accepting state. Phases are stitched by
+  model-state hash (`GraphAnalysis.MergeByHash`) and pruned to root→goal→accepting
+  (`GraphAnalysis.FilterToGoalThenAccepting`). Backed by `Explorer` resume-from-state
+  (`Explore(machine, startJson)`) + per-state JSON.
+- **accept-completion** — prunes to accepting-reaching paths.
+- **Return-binding dataflow** — `ExploreSliced` carries a per-state binding environment; a
+  producer transition (`… / var`) captures the model return value and a later consumer that
+  references `var` matches only that value (`CompiledScenario.TryStepBinding`).
+- **Probability** — both branches are unioned (all reachable values explored, no missed states);
+  the seeded `ProbabilityGate` orders the union (more-likely branch first) for reproducible
+  bounded generation.
 
 ---
 
@@ -97,41 +113,19 @@ depth, deeper edge-semantics simplified · ❌ not implemented (no sample uses i
 
 ---
 
-## 4. Implemented to sample depth, deeper semantics simplified 🟡
+## 4. Test coverage
 
-### 4.1 point-shoot / accept-completion
-The goal-directed **steering** is real: the `with (. expr .)` state predicate marks goal states
-and the graph is pruned to goal-reaching paths (`GraphAnalysis.FilterToReaching`);
-accept-completion prunes to accepting-reaching paths. **Simplified:** the `Shoot = "…"` /
-`Completer = "…"` machines are **not separately explored and appended as distinct continuation
-phases** the way classic Spec Explorer composes them. The goal predicate + prune captures the
-essential result and matches the samples.
-
-### 4.2 Return-binding dataflow
-Parsing, return-value capture, and the producer→consumer substitution component
-(`ReturnBindingResolver`, unit-tested) all exist. **Simplified:** the resolver is **not yet wired
-into the slice-exploration dataflow**, so `Producer()/h; Use(h)` in a live scenario slice does not
-substitute `h` mid-exploration. No sample uses `/var`, so it is not exercised end-to-end.
-
-### 4.3 Probability
-Seeded and reproducible, but a **single branch draw per `where` block**, not a per-test-case
-probabilistic *distribution*. Correct for exploration; not a randomized-sampling generator.
-
----
-
-## 5. Test coverage
-
-`tests/Sek.Tests` (xUnit) — **43 tests, all green**:
+`tests/Sek.Tests` (xUnit) — **49 tests, all green**:
 
 | Area | Tests |
 |---|---|
-| Probability seeded gate + branch selection | 7 |
-| point-shoot steering + `GraphAnalysis.FilterToReaching` | 5 |
+| Probability gate + union/ordering | 7 |
+| point-shoot steering, `MergeByHash`, `FilterToReaching`, `FilterToGoalThenAccepting`, resume-from-state | 9 |
 | Requirement capture + coverage aggregation | 4 |
 | Containers as state fields (round-trip + structural hashing) | 6 |
 | `action all` resolution + action-universe filtering | 6 |
 | Test strategies (short/long) | 8 |
-| Action kinds + return-binding resolver | 9 (+ smoke) |
+| Action kinds + return-binding (incl. end-to-end slice) | 10 (+ smoke) |
 
 Core algorithms live in libraries (`Sek.Core`, `Sek.Engine`, `Sek.Solver`, `Sek.Modeling`) with
 public APIs so they are unit-testable, rather than in the CLI executable.
@@ -140,13 +134,13 @@ Run: `dotnet test tests/Sek.Tests/Sek.Tests.csproj`.
 
 ---
 
-## 6. Path to full-grammar completeness
+## 5. Path to full-grammar completeness
 
-None of these are needed by the current samples:
+The three previously-simplified areas (point-shoot phases, return-binding dataflow, Probability)
+are now fully implemented (§2.4). The only remaining gaps are the niche constructs in §3, none of
+which is used by any sample:
 
-1. Wire return-binding (§4.2) into the slice-exploration dataflow.
-2. Compose the `Shoot` / `Completer` machines as explicit point-shoot phases (§4.1).
-3. Implement `T[n..m]` collection-by-size domains and maplets `{k -> v}`.
-4. Consume the invocation-level `call`/`return`/`event` qualifier.
-5. Model `TypeBinding`.
-6. Honor the codegen switches in `sek generate` (or document the CLI equivalents).
+1. Implement `T[n..m]` collection-by-size domains and maplets `{k -> v}`.
+2. Consume the invocation-level `call`/`return`/`event` qualifier.
+3. Model `TypeBinding`.
+4. Honor the codegen switches in `sek generate` (or document the CLI equivalents).
