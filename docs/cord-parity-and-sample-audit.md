@@ -45,9 +45,9 @@ Legend: ✅ implemented · ⚠️ approximated · ❌ not implemented.
 
 | Feature | Status | Notes |
 |---|---|---|
-| `action all <Adapter>` (import every action from a type) | ❌ | Parsed into `Configuration.ImportedActionTypes` but **never consumed** by the engine. Ports enumerate actions explicitly. |
-| `construct model program … where scope = "Ns.Sub"` | ❌ (no-op) | SEK loads one model type per project; sub-namespace scopes are ignored. Blocks the original PG multi-scope layout. |
-| Action return types (`action static Set<Account> …`, `bool …`) | ⚠️ | Return type is parsed but not modeled. `bool` is harmless; `Set<T>`/`Sequence<T>`/`Map<,>` returns are not first-class. |
+| `action all <Adapter>` (import every action from a type) | ✅ | `ActionImportResolver` resolves the action universe from `action all` / explicit `action` declarations (matches rules by label qualifier; bare-labelled models import all). |
+| `construct model program … where scope = "Ns.Sub"` | ✅ | `ModelLoader.LoadModelTypeInScope` selects the model program whose namespace equals the scope. |
+| Action return types (`action static Set<Account> …`, `bool …`) | ✅ | Return values are captured onto the transition (`ActionInvocation.Result`); `Set<T>`/`Sequence<T>`/`Map<,>` are first-class value types. |
 | `static` / `abstract` action modifiers | ✅ parsed / ignored | Cosmetic — SEK rules are instance methods. |
 | Switches: `GeneratedTestPath`, `GeneratedTestNamespace`, `TestClassBase`, `RecommendedViews`, `ProceedControlTimeout`, `DefaultParameterExpansionLimit`, `ForExploration` | ⚠️ | Parsed but ignored. `PathDepthBound` **is** honored (maps to max depth); `StateBound`/`StepBound` honored. |
 
@@ -62,7 +62,7 @@ Legend: ✅ implemented · ⚠️ approximated · ❌ not implemented.
 | `[Flags]` enum flag columns (`days & DaysOfWeek.Mon`) | ✅ | |
 | Native domains: ranges `a..b`, union `+`, `instances T`, `new T`, `{set}` | ✅ | |
 | `T[n..m]` collection-by-size domains, maplets `{k -> v}` | ❌ | Not needed by any sample; not implemented. |
-| `Probability.IsTrue(p)` with `if/else` | ⚠️ | Evaluated **deterministically** (majority branch, `p ≥ 0.5`). The `RandomSeed` switch is ignored; probabilistic sampling is not reproduced. |
+| `Probability.IsTrue(p)` with `if/else` | ✅ | Seeded via `switch RandomSeed` (`ProbabilityGate`): branch selection is reproducible and seed-sensitive. |
 | `let vars where {…} in Behavior` | ✅ | Predicate-only bounds use Z3; `Condition.In`/`Combination` bounds use the enumerative solver. |
 
 ### 2.3 Behavior algebra & scenarios
@@ -76,25 +76,25 @@ Legend: ✅ implemented · ⚠️ approximated · ❌ not implemented.
 | Nested-slice composition (`X \|\| (Y \|\| model)`) | ✅ | Flattened to `(X \|\| Y) \|\| model`. |
 | State-slice preconstraint (`{. Type.Field = v; .}: M`) | ✅ | Sets a static field/property on a model-assembly type. |
 | `: fail` model checking | ✅ | Fail states tracked NFA→DFA→product; reachable fail state = violation. |
-| `StopAtError` (stop at first violation, return single trace) | ⚠️ | SEK reports *all* reachable fail states rather than halting at the first. |
-| **Parameterized machines** with argument substitution (`machine AnyRequest(int id) { …(id)… }` used as `AnyRequest(5)`) | ❌ | Machine parameters are **not** substituted into the body. The SMB2 port inlines these. |
-| `call` / `return` / `event` as **separate** atoms (call+return pair) | ⚠️ | `action event` parsed; events are single atoms. `_ ; _` works as two any-actions but not true call/return semantics. |
-| Return-binding `X(args) / expr` | ⚠️ | The `/expr` is parsed and discarded; the return value is not bound. |
+| `StopAtError` (stop at first violation, return single trace) | ✅ | Halts the exploration at the first reached failure state. |
+| **Parameterized machines** with argument substitution (`machine AnyRequest(int id) { …(id)… }` used as `AnyRequest(5)`) | ✅ | `ExpandParamMachines` substitutes machine parameters into the body. |
+| `call` / `return` / `event` as **separate** atoms (call+return pair) | ✅ | The action kind (call/return/event) is parsed and tracked; event transitions are tagged as observations (`ActionInvocation.Kind`) and emitted as `Observe` in generated tests. |
+| Return-binding `X(args) / expr` | ✅ | The `/var` binding is retained; the return value is captured (`ActionInvocation.Result`) and substituted into downstream references (`ReturnBindingResolver`). |
 
 ### 2.4 Constructs & reporting
 
 | Feature | Status | Notes |
 |---|---|---|
 | `construct model program / accepting paths / bounded exploration / test cases` | ✅ | |
-| `construct point shoot / accept completion` | ⚠️ | Steering approximated by exploring the target machine. |
-| `construct requirement coverage where strategy / RequirementsToCover / MinimumRequirementCount` | ⚠️ | Reports the covered action set; requirement ids and `MinimumRequirementCount` are not tracked, so `ReqCoverage` and `MinimumReqCoverage` are not distinct. |
-| Test strategies (`strategy = "shorttests" / "longtests"`) | ⚠️ | Parsed but ignored; `sek generate` uses its own transition-covering path. |
+| `construct point shoot / accept completion` | ✅ | Goal-directed steering: the `with (. expr .)` state predicate marks goal states and the graph is pruned to goal-reaching paths (accept-completion prunes to accepting-reaching paths). |
+| `construct requirement coverage where strategy / RequirementsToCover / MinimumRequirementCount` | ✅ | Tracks `Requirement.Capture(id)` calls; reports covered ids, `RequirementsToCover` hit/missing, and whether `MinimumRequirementCount` is met. |
+| Test strategies (`strategy = "shorttests" / "longtests"`) | ✅ | `shorttests` emits many short witnesses; `longtests` emits few long covering tours. |
 
 ### 2.5 Microsoft.Modeling runtime types
 
 | Feature | Status | Notes |
 |---|---|---|
-| `Set<T>` / `Sequence<T>` / `Map<K,V>` value semantics (structural equality for state hashing) | ❌ | SEK uses plain C# collections serialized to JSON for the state hash; there is no value-typed container runtime. |
+| `Set<T>` / `Sequence<T>` / `Map<K,V>` value semantics (structural equality for state hashing) | ✅ | Value types in `Sek.Modeling` with structural equality; JSON converters round-trip them as **state fields** (sets/maps canonicalised to a sorted order so the state hash is order-independent). |
 | `TypeBinding` | ❌ | Not modeled. |
 | `byte[]` / structured message payloads | ⚠️ | Represented as ordinary fields; no message-buffer modeling. |
 
