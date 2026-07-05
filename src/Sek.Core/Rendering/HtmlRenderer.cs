@@ -32,10 +32,17 @@ public static class HtmlRenderer
         sb.AppendLine("<body>");
         sb.AppendLine($"  <h1>{Html(title)}</h1>");
         sb.AppendLine($"  <div class=\"meta\">{graph.States.Count} states, {graph.Transitions.Count} transitions</div>");
+        if (graph.Transitions.Count > 2000)
+        {
+            sb.AppendLine("  <div class=\"meta\">Large graph — Mermaid may take a while to lay out; the Graphviz DOT output (<code>--format dot</code>) scales better for graphs this size.</div>");
+        }
+
         sb.AppendLine("  <pre class=\"mermaid\">");
         sb.Append(Html(mermaid));
         sb.AppendLine("  </pre>");
-        sb.AppendLine("  <script>mermaid.initialize({ startOnLoad: true });</script>");
+        // Raise Mermaid's default caps (maxTextSize 50k / maxEdges 500) so large exploration
+        // graphs render instead of failing with "Maximum text size in diagram exceeded".
+        sb.AppendLine("  <script>mermaid.initialize({ startOnLoad: true, securityLevel: 'loose', maxTextSize: 90000000, maxEdges: 500000 });</script>");
         sb.AppendLine("</body>");
         sb.AppendLine("</html>");
         return sb.ToString();
