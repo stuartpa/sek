@@ -9,7 +9,7 @@ config Base
     action static void SUT.AddJob(string name, int time, Frequency frequency);
 
     switch StepBound = 10000;
-    switch PathDepthBound = 1;
+    switch PathDepthBound = 128;
     switch TestEnabled = false;
 }
 
@@ -123,5 +123,53 @@ config Expand : Base
 machine Expand() : Expand
 {
     AddJob || construct model program from Expand
+}
+
+// Struct: parameters carried in a JobInfo struct + a scalar priority.
+config Struct : Base
+{
+    action static void SUT.AddJobStruct(JobInfo info, int priority)
+      where {.
+                Condition.In(info.Name, "t.cmd", "t.exe");
+                Condition.In(info.Time, 60, 3600);
+                Condition.IsTrue(priority >= 0 & priority < 3);
+                Combination.Interaction(info.Name, priority);
+                Combination.Interaction(info.Time, info.Frequency);
+          .};
+}
+machine Struct() : Struct
+{
+    AddJobStruct || construct model program from Struct
+}
+
+// EquivalenceClass: name/time domains; the DaysOfWeek enum ranges over its natural domain.
+config EquivalenceClass : Base
+{
+    action static void SUT.AddJobEC(string name, int time, DaysOfWeek days)
+      where {.
+                Condition.In(name, "t.cmd", "t.exe");
+                Condition.In(time, 60, 3600);
+          .};
+}
+machine EquivalenceClass() : EquivalenceClass
+{
+    AddJobEC || construct model program from EquivalenceClass
+}
+
+// Let: bound variables combined pairwise then fully expanded, threaded through A;B;C.
+// (Sliced against the model so only A/B/C fire with the let-bound values.)
+machine Let() : Base
+{
+    ( let int x, int y, int z
+        where {.
+            Condition.In(x, 1, 2);
+            Condition.In(y, 2, 3);
+            Condition.In(z, 4, 5);
+            Combination.Pairwise(x, y, z);
+            Combination.Expand(x, y, z);
+        .}
+      in
+      A(x); B(y); C(z) )
+    || construct model program from Base
 }
 

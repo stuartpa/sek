@@ -459,8 +459,7 @@ public sealed class Explorer
         return constraints.OfType<InConstraint>().Any(c => c.Param.StartsWith(prefix, StringComparison.Ordinal));
     }
 
-    private static IEnumerable<(string Name, Type Type)> StructMembers(Type t)
-    {
+    private static IEnumerable<(string Name, Type Type)> StructMembers(Type t)    {
         foreach (var prop in t.GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
             if (prop.CanWrite && prop.GetIndexParameters().Length == 0) yield return (prop.Name, prop.PropertyType);
@@ -479,6 +478,16 @@ public sealed class Explorer
         if (prop is not null && prop.CanWrite) { prop.SetValue(instance, value); return; }
         var field = t.GetField(name, BindingFlags.Public | BindingFlags.Instance);
         field?.SetValue(instance, value);
+    }
+
+    /// <summary>The natural candidate domain for an enum (all members) or bool ({false,true});
+    /// null for other types (which require an explicit Cord domain).</summary>
+    private static IReadOnlyList<object?>? NaturalDomain(Type type)
+    {
+        var u = Underlying(type);
+        if (u.IsEnum) return Enum.GetValues(u).Cast<object?>().Distinct().ToList();
+        if (u == typeof(bool)) return new object?[] { false, true };
+        return null;
     }
 
     /// <summary>
@@ -507,8 +516,13 @@ public sealed class Explorer
                 foreach (var (fieldName, memberType) in StructMembers(u))
                 {
                     var vname = p.Name + "." + fieldName;
-                    if (!inByName.ContainsKey(vname)) continue; // only fields with a Cord domain
-                    virtualParams.Add(new SolverParam { Name = vname, Kind = Kind(memberType), Domain = inByName[vname] });
+                    // A field's domain is its Cord Condition.In values, or the natural domain
+                    // for an enum/bool field; scalar fields with neither are left at default.
+                    IReadOnlyList<object?>? dom = inByName.TryGetValue(vname, out var vals)
+                        ? vals
+                        : NaturalDomain(memberType);
+                    if (dom is null) continue;
+                    virtualParams.Add(new SolverParam { Name = vname, Kind = Kind(memberType), Domain = dom });
                     slots.Add((i, fieldName, memberType));
                 }
             }
