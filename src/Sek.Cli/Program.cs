@@ -468,6 +468,10 @@ ParameterGeneration BuildParamGen(
         {
             var dom = argDomains[i];
             if (dom.Count == 1 && dom[0] == "_") continue; // unbound parameter
+            // `instances T` and structured `Field=val` domains fall back to the default
+            // (reachable-object / model-driven) domain; struct field binds are applied by
+            // the struct-aware path, not here.
+            if (dom.Any(t => t.StartsWith("instances:", StringComparison.Ordinal) || t.Contains('='))) continue;
             var p = rule.Parameters[i];
             constraints.Add(new InConstraint { Param = p.Name, Values = dom.Select(tok => ParseBindValue(tok, p.Type)).ToList() });
         }

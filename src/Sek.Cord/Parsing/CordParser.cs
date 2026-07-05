@@ -518,11 +518,30 @@ public sealed class Parser
     }
 
     /// <summary>Parses one bound-parameter domain: <c>_</c> (unbound), a set <c>{a, b}</c>,
-    /// a single literal/qualident, or a structured value (captured as unbound).</summary>
+    /// a single literal/qualident, a range <c>a..b</c>, an <c>instances T</c> domain, or a
+    /// union of these via <c>+</c>. A structured value <c>T(F={..})</c> is expanded by field.</summary>
     private List<string> ParseArgDomain()
+    {
+        var dom = ParseArgDomainAtom();
+        while (Accept(TokenKind.Plus))
+        {
+            var more = ParseArgDomainAtom();
+            // Union: drop the "unbound" marker if a concrete side is present.
+            if (dom.Count == 1 && dom[0] == "_") { dom = more; }
+            else if (!(more.Count == 1 && more[0] == "_")) { dom.AddRange(more); }
+        }
+
+        return dom;
+    }
+
+    private List<string> ParseArgDomainAtom()
     {
         var vals = new List<string>();
         if (Is(TokenKind.Underscore)) { Take(); vals.Add("_"); return vals; }
+
+        // `instances T` — the set of all reachable instances of type T (the default object
+        // domain in SEK), captured as a marker the parameter generator resolves.
+        if (IsId("instances")) { Take(); vals.Add("instances:" + ParseTypeName()); return vals; }
 
         if (Accept(TokenKind.LBrace))
         {
@@ -537,14 +556,52 @@ public sealed class Parser
         }
 
         var v = ParseValueToken();
+
+        // Range a..b over integers, expanded to the inclusive set (bounded to avoid blow-up).
+        if (Accept(TokenKind.DotDot))
+        {
+            var hi = ParseValueToken();
+            if (int.TryParse(v, out var lo) && int.TryParse(hi, out var h))
+            {
+                for (var i = lo; i <= h && vals.Count < 4096; i++) vals.Add(i.ToString());
+                return vals;
+            }
+
+            vals.Add(v);
+            vals.Add(hi);
+            return vals;
+        }
+
         if (Is(TokenKind.LParen))
         {
-            // structured value, e.g. JobInfo(Command={...}, Time={...}) — captured as unbound.
-            SkipBalancedParens();
-            return new List<string> { "_" };
+            // structured value, e.g. JobInfo(Command={...}, Time={...}) — expand by field.
+            return ParseStructuredDomain(v);
         }
 
         vals.Add(v);
+        return vals;
+    }
+
+    /// <summary>Parses a structured domain <c>Type(Field={..}, Field2=val, ...)</c> and returns
+    /// per-field domain markers of the form <c>Field=token</c> (one entry per field value).</summary>
+    private List<string> ParseStructuredDomain(string typeName)
+    {
+        var vals = new List<string>();
+        Expect(TokenKind.LParen);
+        while (!Is(TokenKind.RParen) && !Is(TokenKind.EndOfFile))
+        {
+            var field = Expect(TokenKind.Identifier).Text;
+            Expect(TokenKind.Equals);
+            foreach (var t in ParseArgDomainAtom())
+            {
+                if (t != "_") vals.Add(field + "=" + t);
+            }
+
+            if (!Accept(TokenKind.Comma)) break;
+        }
+
+        Expect(TokenKind.RParen);
+        if (vals.Count == 0) vals.Add("_");
         return vals;
     }
 
@@ -590,6 +647,10 @@ public sealed class Parser
     {
         var inv = new InvocationBehavior();
         if (Accept(TokenKind.Bang)) inv.Negated = true;
+
+        // `new T` / `new T(_)` — a constructor invocation. SEK models a constructor as an
+        // action named after the type, so the `new` keyword is simply consumed.
+        AcceptId("new");
 
         if ((IsId("call") || IsId("return") || IsId("event")) && Ahead().Kind == TokenKind.Identifier)
         {
