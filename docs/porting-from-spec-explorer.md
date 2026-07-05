@@ -105,30 +105,42 @@ approximation rather than a bit‑for‑bit match of the Spec Explorer runtime:
 
 ---
 
-## 4. Known scalability limit — SMB2 model checking
+## 4. SMB2 model checking
 
 `SMB2`'s `CheckAllSyncForNoAsync` / `CheckAsyncCreateCloseForNoAsync` use the anti‑scenario
 
 ```
-let int id, int otherId where {. id ∈ 1..8; otherId ∈ 2..8; id ≠ otherId; .}
+let int id, int otherId where {.
+    // bounding ids to a reasonable range
+    id ∈ 1..8; otherId ∈ 2..8;
+    // imposing requirement for asynchronicity
+    id ≠ otherId;
+.}
 in ...; AnyRequest(id); AnyResponse(otherId) : fail
 ```
 
-The leading `...` (`_*`) makes this an **unanchored search** over **56** argument‑pinned
-alternatives. SEK slices via subset‑construction (NFA→DFA), which is exponential for this
-unanchored/alternation pattern, so exploration at the full `id ∈ 1..8` range is compute‑bound.
+Two engine behaviors make this port work with the **byte‑identical** cord:
 
-- The **cord is byte‑identical** and every machine parses and compiles.
-- The **logic is correct**: validated at a reduced id range the same machines give
-  `CheckAllSync = 0` violations (sync mode has no out‑of‑order pair) and `CheckAsyncCreateClose > 0`
-  violations (async mode does). `StopAtError` halts at the first violation.
-- The **lifecycle** machines (`AllSync`, `AsyncCreateClose`, `AllSyncTwoFiles`,
-  `AllSyncRequirementReduction`, `TestSuite`) explore within the sample's `StateBound = 4096`.
+- **Comments in `where` blocks.** C# line (`// …`) and block (`/* … */`) comments are stripped
+  before the block is split into statements, so a comment preceding a `Condition.IsTrue`
+  bound never swallows it. All three bounds are kept, so the `let` enumerates the intended
+  ~49 `(id, otherId)` combinations rather than leaving a variable unbounded.
+- **Scenario values as a parameter source.** A scenario‑pinned concrete argument (a `let` id,
+  or a setup pin like `AssumeShareExists(1, ShareType.DISK)`) seeds the corresponding model
+  parameter's domain; the scenario's own argument filter still admits only the pinned value.
+  This is Spec Explorer's scenario‑as‑parameter‑source semantics.
 
-The clean fix (future work) is **on‑the‑fly / lazy subset construction** during slicing — track a
-set of NFA states in the combined exploration state instead of pre‑determinizing — so only the
-reachable subsets (bounded by `StateBound`) are materialized. This removes the determinization
-blow‑up without any cord change.
+Results match the original's expectations and complete in seconds:
+
+- `CheckAllSyncForNoAsync` → **empty** (0 violations): sync mode (window = 1) has no
+  out‑of‑order request/response pair.
+- `CheckAsyncCreateCloseForNoAsync` → a **trace to a failure state** (> 0 violations): async
+  mode (window = 2) admits an out‑of‑order pair. `StopAtError` halts at the first violation.
+
+The `AllSync` / `AsyncCreateClose` lifecycle machines explore within the sample's bounds.
+Slicing uses **lazy (on‑the‑fly) subset construction** — DFA states are materialized only as
+the model‑driven exploration queries them — so the unanchored `...` prefix does not force a
+full up‑front determinization.
 
 ---
 

@@ -5,9 +5,9 @@
 > `ParameterGeneration`, `SMB2` are 0-diff; `RequirementReport` has no Cord). The differences
 > below have been eliminated by implementing the engine features cleanly; the only remaining
 > deltas are *references* (usings/config/model type names) documented in
-> [porting-from-spec-explorer.md](porting-from-spec-explorer.md). One runtime scalability limit
-> remains (SMB2 model-check at the full `id∈1..8` range) — see that guide §4. The sections below
-> are retained as the historical audit that drove the work.
+> [porting-from-spec-explorer.md](porting-from-spec-explorer.md). Every machine — including the
+> SMB2 model-checks at the full `id∈1..8` range — explores correctly in seconds (see that guide
+> §4). The sections below are retained as the historical audit that drove the work.
 
 _Generated 2026-07-05. Audits the SEK sample ports (`samples/`) against the original
 Spec Explorer 2010 samples (`samples-source/`) and enumerates the remaining Cord language
@@ -165,6 +165,12 @@ The original is an XSLT/C# post-processor with no Cord. No SEK analog.
 - `new`, `let`, and the parametrized slice + test suite are faithful.
 
 ### 3.9 SMB2 — ⚠️ faithful model-checking; protocol simplified + bounded
+
+> **Resolved:** the current port uses the **byte-identical** cord — full `let id ∈ 1..8` range,
+> original `AnyRequest`/`AnyResponse` parameterized machines, and full message arities. Both
+> model-checks explore correctly in seconds. The bullets below describe the earlier simplified
+> port and are kept for history.
+
 - `action all Smb2SetupAdapter; action all Smb2Adapter` → explicit action list; `scope` dropped.
 - **Message fields simplified:** `CreateRequest(_,_,_,CreateType.Create,_)` (5 fields) →
   `CreateRequest(int msgId, CreateType type)`; `Read*`/`Write*` request/response actions dropped
