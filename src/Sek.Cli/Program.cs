@@ -226,6 +226,33 @@ static string? ResolveModelScope(CordDocument cord, Sek.Cord.Ast.Behavior? body)
     }
 }
 
+// Finds the test-generation strategy for a machine: the first `construct test cases where
+// Strategy = "…"` reachable through machine references (case-insensitive key), or null.
+static string? FindTestStrategy(CordDocument cord, string machine) =>
+    FindTestStrategyIn(cord, cord.GetMachine(machine)?.Body, new HashSet<string>(StringComparer.Ordinal));
+
+static string? FindTestStrategyIn(CordDocument cord, Sek.Cord.Ast.Behavior? body, HashSet<string> seen)
+{
+    body = Unwrap(body);
+    switch (body)
+    {
+        case Sek.Cord.Ast.ConstructBehavior { Kind: ConstructKind.TestCases } cb:
+            var key = cb.Params.Keys.FirstOrDefault(k => string.Equals(k, "Strategy", StringComparison.OrdinalIgnoreCase));
+            return key is not null ? cb.Params[key]
+                : cb.Target is not null ? FindTestStrategyIn(cord, cb.Target, seen) : null;
+        case Sek.Cord.Ast.ConstructBehavior { Target: not null } cbt:
+            return FindTestStrategyIn(cord, cbt.Target, seen);
+        case Sek.Cord.Ast.InvocationBehavior inv when (inv.Args is null || inv.Args.Count == 0) && seen.Add(inv.Target) && cord.GetMachine(inv.Target) is { } m:
+            return FindTestStrategyIn(cord, m.Body, seen);
+        case Sek.Cord.Ast.ParallelBehavior p: return p.Items.Select(i => FindTestStrategyIn(cord, i, seen)).FirstOrDefault(x => x is not null);
+        case Sek.Cord.Ast.SequenceBehavior sq: return sq.Items.Select(i => FindTestStrategyIn(cord, i, seen)).FirstOrDefault(x => x is not null);
+        case Sek.Cord.Ast.ChoiceBehavior ch: return ch.Items.Select(i => FindTestStrategyIn(cord, i, seen)).FirstOrDefault(x => x is not null);
+        case Sek.Cord.Ast.GroupBehavior g: return FindTestStrategyIn(cord, g.Inner, seen);
+        case Sek.Cord.Ast.BindBehavior b: return FindTestStrategyIn(cord, b.Inner, seen);
+        default: return null;
+    }
+}
+
 // Recursively interprets a machine body: `bind`, scenario slicing (`||`), and the construct
 // family (model program, bounded exploration, accepting paths, test cases, point shoot,
 // accept completion, requirement coverage).
@@ -1064,12 +1091,16 @@ int CmdGenerate(string[] rest)
     var graph = result.Graph;
     Console.WriteLine($"Explored '{machine}': {graph.States.Count} states, {graph.Transitions.Count} transitions.");
 
-    var paths = TestGen.SelectPaths(graph, maxTests);
+    // Strategy: `--strategy` overrides the machine's `construct test cases where Strategy = "…"`.
+    var strategyName = GetOption(rest, "--strategy") ?? FindTestStrategy(cord, machine);
+    var strategy = TestGen.ParseStrategy(strategyName);
+    var paths = TestGen.SelectPaths(graph, maxTests, strategy);
     if (paths.Count == 0)
     {
         Console.Error.WriteLine("sek: error: no test paths could be derived from the exploration.");
         return 1;
     }
+    Console.WriteLine($"Strategy: {strategy} ({paths.Count} test path(s)).");
 
     var outDir = GetOption(rest, "--out") ?? Path.Combine(config.ResolveOutDir(dir), machine + "Tests");
     var testNs = GetOption(rest, "--namespace")

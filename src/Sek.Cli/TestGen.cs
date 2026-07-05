@@ -16,13 +16,35 @@ public static class TestGen
 
     public sealed record GenResult(int TestCount, int CoveredTransitions, int TotalTransitions, string ProjectDir, string TestFile);
 
+    /// <summary>Cord test-generation strategy (<c>construct test cases where Strategy = "…"</c>).</summary>
+    public enum TestStrategy
+    {
+        /// <summary>Many short tests: each covers one still-uncovered transition then ends at the
+        /// nearest accepting state (shortest witnesses).</summary>
+        Short,
+
+        /// <summary>Few long tests: each greedily chains many uncovered transitions into a single
+        /// covering tour before ending at an accepting state.</summary>
+        Long,
+    }
+
+    /// <summary>Maps a Cord strategy name (<c>shorttests</c>/<c>longtests</c>) to a
+    /// <see cref="TestStrategy"/>; unknown/empty names default to <see cref="TestStrategy.Long"/>.</summary>
+    public static TestStrategy ParseStrategy(string? name) =>
+        name?.Trim().ToLowerInvariant() switch
+        {
+            "shorttests" or "short" => TestStrategy.Short,
+            _ => TestStrategy.Long,
+        };
+
     /// <summary>
     /// Selects witness paths covering the graph's transitions (up to <paramref name="maxTests"/>
-    /// paths, each at most <paramref name="maxSteps"/> long). Each path navigates from the
-    /// initial state to an uncovered transition, then greedily walks a chain of still-uncovered
-    /// transitions, and finally routes to the nearest accepting state so the test ends cleanly.
+    /// paths, each at most <paramref name="maxSteps"/> long). With <see cref="TestStrategy.Long"/>
+    /// each path greedily chains uncovered transitions into a long covering tour; with
+    /// <see cref="TestStrategy.Short"/> each path covers a single uncovered transition and then
+    /// routes to the nearest accepting state, yielding many short tests.
     /// </summary>
-    public static List<TestPath> SelectPaths(ExplorationGraph graph, int maxTests, int maxSteps = 500)
+    public static List<TestPath> SelectPaths(ExplorationGraph graph, int maxTests, TestStrategy strategy = TestStrategy.Long, int maxSteps = 500)
     {
         var init = graph.InitialStateId ?? graph.States.FirstOrDefault(s => s.Initial)?.Id ?? "S0";
         var prefix = ShortestFromInit(graph, init);
@@ -50,31 +72,41 @@ public static class TestGen
             var steps = new List<Transition>(PathFromInit(prefix, seed.FromStateId));
             var current = seed.FromStateId;
 
-            // Build a covering tour: take uncovered outgoing transitions; when the current
-            // state has none, navigate (over already-covered edges) to the nearest state that
-            // still has an uncovered outgoing transition, and continue — until the step budget
-            // is reached or no uncovered transition is reachable.
-            while (steps.Count < maxSteps)
+            if (strategy == TestStrategy.Short)
             {
-                var nextT = outgoing.TryGetValue(current, out var outs)
-                    ? outs.FirstOrDefault(t => !covered.Contains(t))
-                    : null;
-
-                if (nextT is not null)
+                // Short test: cover exactly the seed transition, then stop at an accepting state.
+                steps.Add(seed);
+                covered.Add(seed);
+                current = seed.ToStateId;
+            }
+            else
+            {
+                // Build a covering tour: take uncovered outgoing transitions; when the current
+                // state has none, navigate (over already-covered edges) to the nearest state that
+                // still has an uncovered outgoing transition, and continue — until the step budget
+                // is reached or no uncovered transition is reachable.
+                while (steps.Count < maxSteps)
                 {
-                    steps.Add(nextT);
-                    covered.Add(nextT);
-                    current = nextT.ToStateId;
-                    continue;
-                }
+                    var nextT = outgoing.TryGetValue(current, out var outs)
+                        ? outs.FirstOrDefault(t => !covered.Contains(t))
+                        : null;
 
-                var nav = NavigateToUncovered(graph, outgoing, current, covered, maxSteps - steps.Count);
-                if (nav is null || nav.Count == 0) break;
-                foreach (var t in nav)
-                {
-                    steps.Add(t);
-                    covered.Add(t);
-                    current = t.ToStateId;
+                    if (nextT is not null)
+                    {
+                        steps.Add(nextT);
+                        covered.Add(nextT);
+                        current = nextT.ToStateId;
+                        continue;
+                    }
+
+                    var nav = NavigateToUncovered(graph, outgoing, current, covered, maxSteps - steps.Count);
+                    if (nav is null || nav.Count == 0) break;
+                    foreach (var t in nav)
+                    {
+                        steps.Add(t);
+                        covered.Add(t);
+                        current = t.ToStateId;
+                    }
                 }
             }
 
