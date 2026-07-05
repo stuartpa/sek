@@ -6,6 +6,7 @@ using Sek.Core.Rendering;
 using Sek.Core.Seexpl;
 using Sek.Engine;
 using Sek.Solver;
+using System.Reflection;
 
 // SpecExplorerKit (sek) — CLI entry point.
 //
@@ -191,6 +192,21 @@ ExplorationResult Interpret(
 {
     body = Unwrap(body);
 
+    if (body is Sek.Cord.Ast.PreconstraintBehavior pc)
+    {
+        // State slicing: `{. Type.Field = value; .}: M` sets model-level state (a static
+        // field/property) before exploring M (e.g. bounding the number of jobs/files).
+        ApplyStateSlice(introspector, pc.Code);
+        if (pc.Inner is Sek.Cord.Ast.InvocationBehavior invp
+            && (invp.Args is null || invp.Args.Count == 0)
+            && cord.GetMachine(invp.Target) is { } innerMachine)
+        {
+            return Interpret(introspector, cord, invp.Target, innerMachine.Body, options, solverName, binds);
+        }
+
+        return Interpret(introspector, cord, machine, pc.Inner, options, solverName, binds);
+    }
+
     if (body is Sek.Cord.Ast.BindBehavior bind)
     {
         foreach (var c in bind.Binds) binds[c.Action] = c.ArgDomains;
@@ -296,6 +312,43 @@ static string ShortLabel(string label)
 {
     var i = label.LastIndexOf('.');
     return i >= 0 ? label[(i + 1)..] : label;
+}
+
+// Executes a Cord state-slice preconstraint `{. Left = literal; ... .}` by setting the named
+// static field/property on a type in the model assembly. The left-hand qualifier (e.g.
+// `ModelProgram.` / `Parameters.`) is a namespace hint; the last segment is the member name.
+static void ApplyStateSlice(ModelIntrospector introspector, string code)
+{
+    if (string.IsNullOrWhiteSpace(code)) return;
+    var types = introspector.ModelType.Assembly.GetTypes();
+    foreach (var stmt in code.Split(';'))
+    {
+        var s = stmt.Trim();
+        var eq = s.IndexOf('=');
+        if (eq <= 0) continue;
+        var lhs = s[..eq].Trim();
+        var rhs = s[(eq + 1)..].Trim();
+        var member = lhs.Contains('.') ? lhs[(lhs.LastIndexOf('.') + 1)..] : lhs;
+
+        foreach (var t in types)
+        {
+            var f = t.GetField(member, BindingFlags.Public | BindingFlags.Static);
+            if (f is not null) { try { f.SetValue(null, ConvertLiteral(rhs, f.FieldType)); } catch { } }
+            var p = t.GetProperty(member, BindingFlags.Public | BindingFlags.Static);
+            if (p is not null && p.CanWrite) { try { p.SetValue(null, ConvertLiteral(rhs, p.PropertyType)); } catch { } }
+        }
+    }
+}
+
+static object? ConvertLiteral(string token, Type type)
+{
+    var t = Nullable.GetUnderlyingType(type) ?? type;
+    if (token.Length >= 2 && token[0] == '"' && token[^1] == '"') token = token[1..^1];
+    if (t == typeof(bool)) return token == "true";
+    if (t == typeof(string)) return token;
+    if (t.IsEnum) { try { return Enum.Parse(t, token.Contains('.') ? token[(token.LastIndexOf('.') + 1)..] : token, true); } catch { return null; } }
+    if (long.TryParse(token, out var l)) return Convert.ChangeType(l, t);
+    return token;
 }
 
 // If the machine body is `A || B` where exactly one side constructs a model program,

@@ -17,12 +17,16 @@ namespace ATSvc.Model
     /// </summary>
     public sealed class AtsvcModel : ModelProgram
     {
+        /// <summary>Model-level bound on the number of jobs (settable via a Cord state slice
+        /// `{. AtsvcModel.JobBound = n; .}:`). Defaults to 2.</summary>
+        public static int JobBound = 2;
+
         public List<Job> Jobs { get; set; } = new List<Job>();
 
         [Rule("ATService.AddJob")]
         public void AddJob(string command, int time)
         {
-            Require(Jobs.Count < 2, "bound the number of jobs");
+            Require(Jobs.Count < JobBound, "bound the number of jobs");
             Jobs.Add(new Job { Command = command, Time = time });
         }
 

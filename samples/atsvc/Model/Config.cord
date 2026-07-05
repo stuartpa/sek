@@ -87,3 +87,11 @@ machine LetJobRuns() : ConfigWithParameters
     LetJobScenario || JobScheduler
 }
 
+// Item 4 validation: state slicing. The preconstraint sets the model-level JobBound to 1
+// before exploring, so at most one job may be added (compare with JobScheduler at the
+// default bound of 2).
+machine OneJobBounded() : ConfigWithParameters
+{
+    {. AtsvcModel.JobBound = 1; .}: JobScheduler
+}
+
