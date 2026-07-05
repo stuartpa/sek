@@ -16,6 +16,7 @@ public sealed class EnumerativeSolver : IParameterSolver
         int limit)
     {
         var predicates = constraints.OfType<PredicateConstraint>().ToList();
+        var compiled = constraints.OfType<CompiledPredicateConstraint>().ToList();
         var inByParam = constraints.OfType<InConstraint>().ToDictionary(c => c.Param, c => c.Values);
 
         var domains = new List<List<object?>>();
@@ -30,7 +31,8 @@ public sealed class EnumerativeSolver : IParameterSolver
         var all = new List<IReadOnlyDictionary<string, object?>>();
         foreach (var combo in Cartesian(parameters, domains))
         {
-            if (predicates.All(pred => PredicateEval.Eval(pred.Expr, combo)))
+            if (predicates.All(pred => PredicateEval.Eval(pred.Expr, combo))
+                && compiled.All(c => c.Predicate(combo)))
             {
                 all.Add(combo);
                 if (all.Count >= 200000)

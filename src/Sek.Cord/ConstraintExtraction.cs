@@ -54,6 +54,17 @@ public static class CordConstraintExtractor
                 {
                     result.Constraints.Add(new PredicateConstraint { Expr = expr });
                 }
+                else if (MentionsParam(inner, paramNames))
+                {
+                    // The expression is outside the mini-parser's grammar (method calls,
+                    // Math.*, string members, %, ternary, ...). Execute it as embedded C#
+                    // via Roslyn; if it compiles, keep it as a compiled post-filter.
+                    var pred = RoslynPredicate.TryCompile(inner, SolverParamsOf(action));
+                    if (pred is not null)
+                    {
+                        result.Constraints.Add(new CompiledPredicateConstraint { Source = inner, Predicate = pred });
+                    }
+                }
             }
             else if (s.StartsWith("Combination.Pairwise", StringComparison.Ordinal))
             {
@@ -105,6 +116,45 @@ public static class CordConstraintExtractor
         }
 
         return result;
+    }
+
+    /// <summary>True if any whole-word identifier in the code names a known parameter.</summary>
+    private static bool MentionsParam(string code, HashSet<string> paramNames)
+    {
+        foreach (var name in paramNames)
+        {
+            var idx = code.IndexOf(name, StringComparison.Ordinal);
+            while (idx >= 0)
+            {
+                var before = idx == 0 || (!char.IsLetterOrDigit(code[idx - 1]) && code[idx - 1] != '_' && code[idx - 1] != '.');
+                var afterPos = idx + name.Length;
+                var after = afterPos >= code.Length || (!char.IsLetterOrDigit(code[afterPos]) && code[afterPos] != '_');
+                if (before && after)
+                {
+                    return true;
+                }
+
+                idx = code.IndexOf(name, idx + 1, StringComparison.Ordinal);
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>Builds solver parameters (name + value kind) from a declared action.</summary>
+    private static List<SolverParam> SolverParamsOf(DeclaredAction action) =>
+        action.Parameters.Select(p => new SolverParam { Name = p.Name, Kind = KindOf(p.Type) }).ToList();
+
+    private static ValueKind KindOf(string type)
+    {
+        var t = (type ?? string.Empty).Trim().ToLowerInvariant();
+        return t switch
+        {
+            "string" => ValueKind.String,
+            "bool" => ValueKind.Bool,
+            "long" or "ulong" => ValueKind.Long,
+            _ => ValueKind.Int,
+        };
     }
 
     private static InConstraint? ParseIn(string stmt)

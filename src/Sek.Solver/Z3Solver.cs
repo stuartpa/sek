@@ -23,6 +23,7 @@ public sealed class Z3Solver : IParameterSolver
     {
         var inByParam = constraints.OfType<InConstraint>().ToDictionary(c => c.Param, c => c.Values);
         var predicates = constraints.OfType<PredicateConstraint>().Select(p => p.Expr).ToList();
+        var compiled = constraints.OfType<CompiledPredicateConstraint>().ToList();
 
         // Effective candidate values per parameter.
         var candidates = new Dictionary<string, List<object?>>();
@@ -140,6 +141,11 @@ public sealed class Z3Solver : IParameterSolver
         var filtered = postFilter.Count == 0
             ? results
             : results.Where(a => postFilter.All(e => PredicateEval.Eval(e, a))).ToList();
+
+        if (compiled.Count > 0)
+        {
+            filtered = filtered.Where(a => compiled.All(c => c.Predicate(a))).ToList();
+        }
 
         return Combinatorics.Apply(parameters.Select(p => p.Name).ToList(), filtered, combination, limit);
     }

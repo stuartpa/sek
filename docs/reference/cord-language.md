@@ -134,9 +134,13 @@ Other Spec Explorer switches (e.g. `GeneratedTestPath`, `TestClassBase`,
 - **`let vars where {. … .} in Behavior`** parameter generation is supported: each binding
   of the `let` variables (constrained by the `where` block) is substituted into the inner
   behavior and the resulting argument-matched behaviors are unioned before slicing.
+- **Embedded C# in `Condition.IsTrue(...)`** is executed: predicates within the mini-parser's
+  grammar are translated to Z3, and anything beyond it (method calls, `System.Math.*`, string
+  members such as `command.StartsWith("z")`, ternaries, casts) is compiled and run via Roslyn
+  as a post-filter over the candidate assignments.
 - On the roadmap: native domain expressions (`instances T`, `T[n..m]`, ranges), and
-  execution of arbitrary embedded C# in `{. … .}` / `(. … .)` blocks (beyond the
-  recognized `Condition.*`/`Combination.*` patterns).
+  execution of embedded C# outside the recognized `Condition.*`/`Combination.*` call
+  patterns (custom domain generators, `Probability.IsTrue`, `Requirement.Capture`).
 
 ## Related
 

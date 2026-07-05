@@ -19,6 +19,12 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Z3" Version="4.12.2" />
+    <!--
+      Roslyn scripting powers execution of arbitrary embedded C# in Cord `where {. .}`
+      blocks (Condition.IsTrue predicates the mini-parser can't represent, e.g. Math.*,
+      string methods, %, ternary). Compiled once per (expression, signature) and reused.
+    -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.8.0" />
   </ItemGroup>
 
 </Project>

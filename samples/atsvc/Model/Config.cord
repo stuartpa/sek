@@ -29,6 +29,24 @@ machine JobScheduler() : ConfigWithParameters
     construct model program from ConfigWithParameters
 }
 
+// Phase 4 validation: the predicate uses embedded C# the mini-parser cannot represent —
+// a string method call (`command.StartsWith`) and `System.Math.Abs`. SEK compiles and
+// executes it via Roslyn as a post-filter over the candidate assignments.
+config ConfigRoslyn : Config
+{
+    action static void ATService.AddJob(string command, int time)
+      where {.
+        Condition.In(command, "x", "y", "zzz");
+        Condition.In(time, 340000, 600000, 15);
+        Condition.IsTrue(command.StartsWith("z") || System.Math.Abs(time - 600000) < 1000);
+      .};
+}
+
+machine RoslynJobScheduler() : ConfigRoslyn
+{
+    construct model program from ConfigRoslyn
+}
+
 // Scenario slicing: restrict the model to runs that start with an AddJob and then only
 // query or delete jobs (never add a second job). `AddManageScenario` is a pure Cord
 // behavior over the action alphabet; `ManagedJobs` slices the model program with it.

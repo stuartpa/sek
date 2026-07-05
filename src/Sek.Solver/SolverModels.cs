@@ -36,6 +36,18 @@ public sealed class PredicateConstraint : SolverConstraint
     public Expr Expr { get; init; } = null!;
 }
 
+/// <summary>
+/// A boolean predicate over the parameters compiled from arbitrary embedded C# (via
+/// Roslyn). Used when the expression is outside the mini-parser's grammar (e.g. uses
+/// <c>Math.Abs</c>, string methods, <c>%</c>, or a ternary). Applied as a C# post-filter
+/// by both solvers.
+/// </summary>
+public sealed class CompiledPredicateConstraint : SolverConstraint
+{
+    public string Source { get; init; } = string.Empty;
+    public Func<IReadOnlyDictionary<string, object?>, bool> Predicate { get; init; } = _ => true;
+}
+
 // ---- Tiny expression tree for predicate constraints ---------------------------
 
 public abstract class Expr
