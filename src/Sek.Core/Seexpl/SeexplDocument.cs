@@ -69,6 +69,8 @@ public sealed class SeexplDocument
                 To = t.ToStateId,
                 Action = t.Action.Name,
                 Arguments = t.Action.Arguments.ToList(),
+                Kind = t.Action.Kind == "call" ? null : t.Action.Kind,
+                Result = t.Action.Result,
             });
         }
 
@@ -92,7 +94,7 @@ public sealed class SeexplDocument
         {
             graph.Transitions.Add(new Transition(
                 t.From,
-                new ActionInvocation(t.Action, t.Arguments ?? new List<string>()),
+                new ActionInvocation(t.Action, t.Arguments ?? new List<string>(), t.Kind ?? "call", t.Result),
                 t.To));
         }
 
@@ -126,4 +128,6 @@ public sealed class SeexplTransition
     [JsonPropertyName("to")] public string To { get; set; } = string.Empty;
     [JsonPropertyName("action")] public string Action { get; set; } = string.Empty;
     [JsonPropertyName("arguments")] public List<string>? Arguments { get; set; }
+    [JsonPropertyName("kind")] public string? Kind { get; set; }
+    [JsonPropertyName("result")] public string? Result { get; set; }
 }

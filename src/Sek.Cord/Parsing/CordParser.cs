@@ -99,7 +99,13 @@ public sealed class Parser
             }
             else
             {
-                AcceptId("exclude"); AcceptId("abstract"); AcceptId("event");
+                AcceptId("exclude");
+                AcceptId("abstract");
+                // Action kind modifier: `event` (observable) / `return` (completion) / `call` (default).
+                var kind = ActionKind.Call;
+                if (AcceptId("event")) kind = ActionKind.Event;
+                else if (AcceptId("return")) kind = ActionKind.Return;
+                else if (AcceptId("call")) kind = ActionKind.Call;
 
                 var lastQual = new List<string>();
                 while (!Is(TokenKind.LParen) && !Is(TokenKind.Semicolon) && !Is(TokenKind.EndOfFile) && !IsId("where"))
@@ -115,7 +121,7 @@ public sealed class Parser
                     }
                 }
 
-                var declared = new DeclaredAction { Target = string.Join(".", lastQual) };
+                var declared = new DeclaredAction { Target = string.Join(".", lastQual), Kind = kind };
 
                 if (Accept(TokenKind.LParen))
                 {
@@ -688,7 +694,9 @@ public sealed class Parser
 
         if (Accept(TokenKind.Slash))
         {
-            ParseArg();
+            // The return-binding target is a variable name (e.g. `/ handle`), not a full argument
+            // expression, so read a single (qualified) identifier and stop before `;`/operators.
+            inv.ReturnBinding = Is(TokenKind.Identifier) ? ParseQualIdent() : ParseArg();
         }
 
         return inv;

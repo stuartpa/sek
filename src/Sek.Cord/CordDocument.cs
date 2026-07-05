@@ -137,4 +137,19 @@ public sealed class CordDocument
         foreach (var baseCfg in machine.BaseConfigs) result.AddRange(ResolveImportedActionTypes(baseCfg));
         return result;
     }
+
+    /// <summary>Short labels (last segment) of actions a machine declares as <c>event</c>
+    /// (Cord <c>action event …</c>) — uncontrollable observations raised by the SUT.</summary>
+    public HashSet<string> ResolveMachineEventActions(string machineName)
+    {
+        var result = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var da in ResolveMachineDeclaredActions(machineName).Values)
+        {
+            if (da.Kind != ActionKind.Event) continue;
+            var i = da.Target.LastIndexOf('.');
+            result.Add(i >= 0 ? da.Target[(i + 1)..] : da.Target);
+        }
+
+        return result;
+    }
 }

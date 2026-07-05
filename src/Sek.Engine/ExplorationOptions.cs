@@ -25,4 +25,9 @@ public sealed class ExplorationOptions
     /// a Cord config (<c>action all</c> / explicit <c>action</c> declarations). Null means every
     /// rule is enabled.</summary>
     public IReadOnlySet<string>? AllowedActionLabels { get; set; }
+
+    /// <summary>Short labels of actions declared <c>event</c> (Cord <c>action event …</c>). A
+    /// transition on one of these is tagged as an observation (<c>ActionInvocation.Kind =
+    /// "event"</c>) rather than a controllable call.</summary>
+    public IReadOnlySet<string>? EventActionLabels { get; set; }
 }

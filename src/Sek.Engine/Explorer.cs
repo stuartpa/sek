@@ -91,7 +91,7 @@ public sealed class Explorer
                 {
                     var target = Deserialize(fromJson);
                     var invokeArgs = MaterializeArgs(rule, target, argSet);
-                    if (!TryInvoke(rule, target, invokeArgs, result.Diagnostics))
+                    if (!TryInvoke(rule, target, invokeArgs, result.Diagnostics, out var retVal))
                     {
                         continue; // guard disabled or error -> action not enabled
                     }
@@ -123,7 +123,7 @@ public sealed class Explorer
                         break;
                     }
 
-                    var action = new ActionInvocation(rule.ActionLabel, invokeArgs.Select(Stringify).ToList());
+                    var action = new ActionInvocation(rule.ActionLabel, invokeArgs.Select(Stringify).ToList(), ActionKindOf(rule.ActionLabel), ResultOf(rule, retVal));
                     graph.Transitions.Add(new Transition(fromId, action, toId));
                 }
             }
@@ -227,7 +227,7 @@ public sealed class Explorer
                         continue; // the scenario does not permit this action with these arguments
                     }
 
-                    if (!TryInvoke(rule, target, invokeArgs, result.Diagnostics))
+                    if (!TryInvoke(rule, target, invokeArgs, result.Diagnostics, out var retVal))
                     {
                         continue;
                     }
@@ -253,7 +253,7 @@ public sealed class Explorer
                     }
 
                     if (graph.Transitions.Count >= _options.MaxTransitions) { hitBound = true; break; }
-                    var action = new ActionInvocation(rule.ActionLabel, invokeArgs.Select(Stringify).ToList());
+                    var action = new ActionInvocation(rule.ActionLabel, invokeArgs.Select(Stringify).ToList(), ActionKindOf(bareLabel), ResultOf(rule, retVal));
                     graph.Transitions.Add(new Transition(fromId, action, toId));
 
                     // StopAtError (model checking): halt at the first failure state reached.
@@ -307,6 +307,21 @@ public sealed class Explorer
         try { return _options.GoalPredicate is { } g && g(instance); }
         catch { return false; }
     }
+
+    /// <summary>The action kind for a transition label: <c>"event"</c> when the label (or its
+    /// last segment) is declared as a Cord <c>event</c> action, otherwise <c>"call"</c>.</summary>
+    private string ActionKindOf(string label)
+    {
+        if (_options.EventActionLabels is not { } events) return "call";
+        var i = label.LastIndexOf('.');
+        var shortLabel = i >= 0 ? label[(i + 1)..] : label;
+        return events.Contains(shortLabel) || events.Contains(label) ? "event" : "call";
+    }
+
+    /// <summary>The stringified return value of a rule invocation (the value a Cord
+    /// <c>Action(args) / var</c> return-binding captures), or null for a <c>void</c> action.</summary>
+    private string? ResultOf(RuleInfo rule, object? returnValue) =>
+        rule.Method.ReturnType == typeof(void) || returnValue is null ? null : Stringify(returnValue);
 
     private bool IsAccepting(object instance)
     {
@@ -405,18 +420,18 @@ public sealed class Explorer
 
     private static bool TryInvoke(RuleInfo rule, ModelProgram target, object?[] args, List<string> diagnostics)
     {
+        return TryInvoke(rule, target, args, diagnostics, out _);
+    }
+
+    private static bool TryInvoke(RuleInfo rule, ModelProgram target, object?[] args, List<string> diagnostics, out object? returnValue)
+    {
+        returnValue = null;
         try
         {
             Requirement.Reset(); // capture requirement ids raised by this invocation
-            if (rule.Method.IsStatic)
-            {
-                rule.Method.Invoke(null, args);
-            }
-            else
-            {
-                rule.Method.Invoke(target, args);
-            }
-
+            returnValue = rule.Method.IsStatic
+                ? rule.Method.Invoke(null, args)
+                : rule.Method.Invoke(target, args);
             return true;
         }
         catch (TargetInvocationException tie) when (tie.InnerException is GuardDisabledException)

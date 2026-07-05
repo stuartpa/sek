@@ -188,6 +188,9 @@ ExplorationResult ExploreMachine(ProjectConfig config, string dir, CordDocument 
         cord.ResolveMachineImportedActionTypes(machine),
         cord.ResolveMachineDeclaredActions(machine).Keys,
         introspector.Rules.Select(r => r.ActionLabel));
+    // Tag `action event` actions as observations so exploration/test-gen can distinguish them
+    // from controllable calls.
+    options.EventActionLabels = cord.ResolveMachineEventActions(machine);
     var binds = new Dictionary<string, List<List<string>>>(StringComparer.Ordinal);
     return Interpret(introspector, cord, machine, cord.GetMachine(machine)?.Body, options, solverName, binds);
 }

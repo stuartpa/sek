@@ -31,7 +31,15 @@ public sealed class DeclaredAction
 
     /// <summary>Raw embedded C# from the <c>where {. ... .}</c> block, if any.</summary>
     public string? WhereCode { get; set; }
+
+    /// <summary>The action kind (Cord <c>call</c> / <c>return</c> / <c>event</c> modifier). A
+    /// <c>call</c> is a controllable stimulus; an <c>event</c> is an observable the SUT raises.</summary>
+    public ActionKind Kind { get; set; } = ActionKind.Call;
 }
+
+/// <summary>Cord action kinds. A <c>call</c> (default) is controllable; a <c>return</c> is the
+/// completion of a call; an <c>event</c> is an uncontrollable observation raised by the SUT.</summary>
+public enum ActionKind { Call, Return, Event }
 
 public sealed class Parameter
 {
@@ -141,6 +149,10 @@ public sealed class InvocationBehavior : Behavior
     public List<string>? Args { get; set; } // null => parentheses omitted (all params unknown)
     public bool Negated { get; set; }
     public string? Qualifier { get; set; } // call | return | event
+
+    /// <summary>Return-binding variable from <c>Action(args) / var</c>: the action's return value
+    /// is bound to <c>var</c> and can be referenced as an argument by a later action.</summary>
+    public string? ReturnBinding { get; set; }
 }
 
 public sealed class PreconstraintBehavior : Behavior

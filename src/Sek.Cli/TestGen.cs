@@ -325,7 +325,10 @@ public static class TestGen
                 var args = t.Action.Arguments.Count == 0
                     ? string.Empty
                     : ", " + string.Join(", ", t.Action.Arguments.Select(Literal));
-                sb.AppendLine($"            _sut.Step({Literal(t.Action.Name)}{args});");
+                // A `call` is a controllable stimulus the test sends; an `event` is an
+                // observation the SUT raises, so it is asserted rather than driven.
+                var verb = t.Action.IsEvent ? "Observe" : "Step";
+                sb.AppendLine($"            _sut.{verb}({Literal(t.Action.Name)}{args});");
             }
 
             sb.AppendLine("        }");
@@ -378,6 +381,11 @@ public static class TestGen
                         var target = method.IsStatic ? null : Activator.CreateInstance(type);
                         method.Invoke(target, call);
                     }
+
+                    // An observation of an `event` action (the SUT raises it). Replaying model-based
+                    // tests exercises the same transition; a live conformance harness would instead
+                    // wait for and verify the event. Kept distinct from Step for that semantics.
+                    public void Observe(string label, params string[] args) => Step(label, args);
 
                     private static object Coerce(string v, Type t)
                     {
