@@ -114,17 +114,26 @@ Other Spec Explorer switches (e.g. `GeneratedTestPath`, `TestClassBase`,
 
 ## Notes on parity
 
-- `construct model program from <Config>` and the full behavior algebra are
-  supported today.
-- **Scenario slicing** — `Scenario || construct model program from <Config>` — is
-  supported: the scenario restricts the model exploration to the action sequences it
-  permits. Matching is by action label (argument-pattern matching in scenarios is not
-  yet applied).
+- `construct model program from <Config>` and the full behavior algebra are supported.
+- **Scenario slicing** — `Scenario || construct model program from <Config>` —
+  restricts the model exploration to the action sequences the scenario permits.
 - **Combination refinements** `Combination.Isolated`, `Combination.Seeded`, and
   `Combination.Expand` are supported (in addition to `Interaction` and `Pairwise`).
-- Advanced scenario-control constructs (`bind`, `construct point shoot`,
-  `construct bounded exploration`, `construct requirement coverage`) are on the
-  roadmap; see [Migrating from Spec Explorer](../guides/migrating-from-spec-explorer.md).
+- **`bind Action(domain…) in Behavior`** binds parameter domains for an action within a
+  behavior (literal values, `{set}` domains, and `_` unbound; structured/struct binds are
+  treated as unbound).
+- **`construct bounded exploration where PathDepth=n for M`** bounds the exploration depth.
+- **`construct accepting paths for M`** keeps only paths that reach an accepting state.
+- **`construct point shoot …`**, **`construct accept completion …`**, and
+  **`construct requirement coverage …`** are parsed and explored; the point-shoot /
+  accept-completion *steering heuristics* are approximated by exploring the referenced
+  target machine, and requirement coverage reports the covered action set.
+- **Matching is by action label**; argument-pattern matching inside scenarios/binds
+  (e.g. pinning `Publish("m1")`) is on the roadmap.
+- On the roadmap: `let`-bound parameter generation, native domain expressions
+  (`instances T`, `T[n..m]`, ranges), and execution of arbitrary embedded C# in
+  `{. … .}` / `(. … .)` blocks (beyond the recognized `Condition.*`/`Combination.*`
+  patterns).
 
 ## Related
 
