@@ -1,7 +1,8 @@
 using PubSub.Model;
 
-// PubSub (SEK port). Publisher/Subscriber objects are created during exploration and form
-// the domains of the object-typed parameters; message payloads come from Cord Condition.In.
+// PubSub (SEK port) — faithful to the classic sample's Cord. Publisher/Subscriber objects
+// are created with `new`; the object-typed parameters draw their domain from the reachable
+// objects. `TwoSubscribersWithParameters*` uses a `let` to generate the published payloads.
 
 config Config
 {
@@ -15,28 +16,51 @@ config Config
     switch TestEnabled = false;
 }
 
-config Params : Config
+/// Defines the model program extracted from C#. The exploration graph is infinite and is
+/// pruned after a step bound is hit.
+machine ModelProgram() : Config where ForExploration = false
 {
-    action void Publisher.Publish(Publisher pub, string data)
-      where {. Condition.In(data, "m1", "m2"); .};
-
-    action event void Subscriber.Received(Subscriber sub, string data)
-      where {. Condition.In(data, "m1", "m2"); .};
+    construct model program from Config
 }
 
-machine PubSubExploration() : Params
+/// A scenario with two subscribers. Publish arguments are left free (the `_` wildcard),
+/// so this is not yet suitable for testing.
+machine TwoSubscribersScenario() : Config where ForExploration = false
 {
-    construct model program from Params
+    new Publisher; new Subscriber(_); new Subscriber(_);
+    (Publish(_, "object1"); Publish(_, "object2")) ; Received*
 }
 
-// Scenario slicing (as in the classic sample's TwoSubscribersSlice): a publisher with two
-// subscribers publishes, then messages are acknowledged. The scenario slices the model.
-machine TwoSubscribersScenario() : Params
+/// The slice with two subscribers.
+machine TwoSubscribersSlice() : Config
 {
-    Publisher; Subscriber; Subscriber; Publish; Publish; Received*
+    TwoSubscribersScenario || ModelProgram
 }
 
-machine TwoSubscribersSlice() : Params
+/// A scenario where the published payloads are assigned by a `let`.
+machine TwoSubscribersWithParametersScenario() : Config where ForExploration = false
 {
-    TwoSubscribersScenario || construct model program from Params
+    let string data1, string data2, string data3
+          where {.
+            Condition.In(data1, "a1", "a2");
+            Condition.In(data2, "b1", "b2");
+            Condition.In(data3, "c1", "c2");
+          .}
+    in
+    new Publisher; new Subscriber(_); new Subscriber(_);
+    Publish(_, data1); Publish(_, data2); Publish(_, data3); Received*
+}
+
+/// A slice where the parameters are assigned.
+machine TwoSubscribersWithParametersSlice() : Config
+{
+    TwoSubscribersWithParametersScenario || ModelProgram
+}
+
+/// A test suite derived from the parametrized slice.
+machine TestSuite() : Config where TestEnabled = true
+{
+    construct test cases
+        where strategy = "longtests", allowundeterminedcoverage = true
+        for TwoSubscribersWithParametersSlice
 }

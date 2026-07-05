@@ -165,15 +165,37 @@ public sealed class Explorer
                 }
 
                 var domainValues = ResolveDomains(rule, domainInstance);
+                // Scenario-supplied arguments: when the scenario pins concrete argument values
+                // for this action (e.g. Publish(_, "object1") or a desugared let), feed those
+                // values into the value-typed parameter domains so the action can fire with the
+                // scenario's values (Spec Explorer's scenario-as-parameter-source semantics).
+                var patterns = scenario.ArgPatterns(dfaState, bareLabel).ToList();
+                if (patterns.Count > 0)
+                {
+                    domainValues = ApplyScenarioArgDomains(rule, domainValues, patterns);
+                }
+
+                // Event / output value parameters with no Cord domain and no scenario-supplied
+                // value draw their domain from the reachable values in the current state (the
+                // model determines the observed value, e.g. a delivered message payload).
+                for (var pi = 0; pi < rule.Parameters.Count; pi++)
+                {
+                    var pu = Underlying(rule.Parameters[pi].Type);
+                    if (IsModelObjectType(pu) || domainValues[pi].Count > 0) continue;
+                    if (HasCordInConstraint(rule, rule.Parameters[pi].Name)) continue;
+                    domainValues[pi] = CollectReachableValues(domainInstance, pu);
+                }
+
                 foreach (var argSet in GenerateArgSets(rule, domainValues))
                 {
                     var target = Deserialize(fromJson);
                     var invokeArgs = MaterializeArgs(rule, target, argSet);
 
-                    // Argument-aware scenario step: try the concrete symbol (label with the
-                    // transition's argument values) first, then the bare label (any args).
-                    var concrete = bareLabel + "(" + string.Join(",", invokeArgs.Select(a => BehaviorExplorer.NormArg(Stringify(a)))) + ")";
-                    if (!scenario.TryStep(dfaState, concrete, out var ndfa) &&
+                    // Argument-aware scenario step: match each pinned argument pattern
+                    // positionally (a `_` pattern argument is a wildcard), then fall back to
+                    // the bare label (any arguments).
+                    var normArgs = invokeArgs.Select(a => BehaviorExplorer.NormArg(Stringify(a))).ToList();
+                    if (!scenario.TryStepArgs(dfaState, bareLabel, normArgs, out var ndfa) &&
                         !scenario.TryStep(dfaState, bareLabel, out ndfa))
                     {
                         continue; // the scenario does not permit this action with these arguments
@@ -343,6 +365,49 @@ public sealed class Explorer
             diagnostics.Add($"{rule.ActionLabel}: {tie.InnerException?.GetType().Name}: {tie.InnerException?.Message}");
             return false;
         }
+    }
+
+    /// <summary>
+    /// Applies scenario-supplied argument values to the parameter domains: for each value-typed
+    /// parameter position that the scenario pins to a concrete value (not <c>_</c>), the pinned
+    /// value is unioned into that parameter's candidate domain. This lets a sliced action fire
+    /// with the values the scenario names (e.g. <c>Publish(_, "object1")</c>).
+    /// </summary>
+    private List<List<object?>> ApplyScenarioArgDomains(RuleInfo rule, List<List<object?>> domainValues, List<string[]> patterns)
+    {
+        var result = domainValues.Select(d => new List<object?>(d)).ToList();
+        for (var i = 0; i < rule.Parameters.Count; i++)
+        {
+            var u = Underlying(rule.Parameters[i].Type);
+            if (IsModelObjectType(u)) continue; // object params use the reachable-object domain
+
+            foreach (var pat in patterns)
+            {
+                if (i >= pat.Length) continue;
+                var tok = pat[i];
+                if (tok == "_") continue;
+                var val = ParseScenarioValue(tok, rule.Parameters[i].Type);
+                if (val is not null && !result[i].Any(v => Equals(v, val))) result[i].Add(val);
+            }
+        }
+
+        return result;
+    }
+
+    private static object? ParseScenarioValue(string token, Type type)
+    {
+        var t = Underlying(type);
+        if (t.IsEnum)
+        {
+            try { return Enum.Parse(t, token, true); } catch { return null; }
+        }
+
+        if (t == typeof(string)) return token;
+        if (t == typeof(bool)) return bool.TryParse(token, out var b) ? b : (object?)null;
+        if (t == typeof(long) || t == typeof(ulong)) return long.TryParse(token, out var l) ? l : (object?)null;
+        if (t == typeof(float) || t == typeof(double) || t == typeof(decimal))
+            return double.TryParse(token, out var d) ? Convert.ChangeType(d, t) : (object?)null;
+        return int.TryParse(token, out var n) ? n : (object?)null;
     }
 
     /// <summary>
@@ -592,6 +657,70 @@ public sealed class Explorer
         return u.IsPrimitive || u.IsEnum || u == typeof(string) || u == typeof(decimal)
                || u == typeof(DateTime) || u == typeof(Guid);
     }
+
+    /// <summary>
+    /// Breadth-first collection of the distinct scalar values assignable to
+    /// <paramref name="targetType"/> reachable from <paramref name="root"/>. Gives event /
+    /// output value parameters (e.g. a delivered message payload) their natural domain from
+    /// the current model state when no Cord or scenario value is supplied.
+    /// </summary>
+    private static List<object?> CollectReachableValues(object root, Type targetType)
+    {
+        var found = new List<object?>();
+        var seen = new HashSet<object?>();
+        var visited = new HashSet<object>(ReferenceEqualityComparer.Instance);
+        var queue = new Queue<object>();
+        queue.Enqueue(root);
+        visited.Add(root);
+
+        void Consider(object? v)
+        {
+            if (v is not null && targetType.IsInstanceOfType(v) && seen.Add(v)) found.Add(v);
+        }
+
+        while (queue.Count > 0)
+        {
+            var cur = queue.Dequeue();
+            var t = cur.GetType();
+
+            if (cur is System.Collections.IEnumerable en && cur is not string)
+            {
+                foreach (var item in en)
+                {
+                    if (item is null) continue;
+                    if (IsScalar(item.GetType())) Consider(item);
+                    else if (visited.Add(item)) queue.Enqueue(item);
+                }
+
+                continue;
+            }
+
+            foreach (var prop in t.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (prop.GetIndexParameters().Length != 0) continue;
+                object? val;
+                try { val = prop.GetValue(cur); } catch { continue; }
+                if (val is null) continue;
+                if (IsScalar(val.GetType())) Consider(val);
+                else if (visited.Add(val)) queue.Enqueue(val);
+            }
+
+            foreach (var field in t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
+            {
+                var val = field.GetValue(cur);
+                if (val is null) continue;
+                if (IsScalar(val.GetType())) Consider(val);
+                else if (visited.Add(val)) queue.Enqueue(val);
+            }
+        }
+
+        return found;
+    }
+
+    private bool HasCordInConstraint(RuleInfo rule, string paramName) =>
+        _paramGen is not null
+        && _paramGen.ByAction.TryGetValue(rule.ActionLabel, out var spec)
+        && spec.Constraints.OfType<InConstraint>().Any(c => c.Param == paramName);
 
     private static Type Underlying(Type t) => Nullable.GetUnderlyingType(t) ?? t;
 

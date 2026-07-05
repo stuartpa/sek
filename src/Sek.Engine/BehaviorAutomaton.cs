@@ -146,6 +146,63 @@ public sealed class BehaviorExplorer
 
             return false;
         }
+
+        /// <summary>Steps an argument-pinned action, matching each scenario argument pattern
+        /// against the transition's concrete (normalized) arguments positionally. A pattern
+        /// argument of <c>_</c> is a wildcard that matches any value; other pattern arguments
+        /// must match exactly. Returns the next scenario state on the first matching pattern.</summary>
+        public bool TryStepArgs(int state, string bareLabel, IReadOnlyList<string> concreteArgs, out int next)
+        {
+            next = -1;
+            if (state < 0 || state >= _on.Length) return false;
+            var prefix = bareLabel + "(";
+            foreach (var kv in _on[state])
+            {
+                var key = kv.Key;
+                if (!key.StartsWith(prefix, StringComparison.Ordinal) || !key.EndsWith(")", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var inside = key.Substring(prefix.Length, key.Length - prefix.Length - 1);
+                var pat = inside.Length == 0 ? Array.Empty<string>() : inside.Split(',');
+                if (pat.Length != concreteArgs.Count)
+                {
+                    continue;
+                }
+
+                var ok = true;
+                for (var i = 0; i < pat.Length; i++)
+                {
+                    if (pat[i] == "_") continue; // wildcard
+                    if (!string.Equals(pat[i], concreteArgs[i], StringComparison.Ordinal)) { ok = false; break; }
+                }
+
+                if (ok) { next = kv.Value; return true; }
+            }
+
+            return false;
+        }
+
+        /// <summary>The argument patterns the scenario pins for <paramref name="bareLabel"/> at
+        /// <paramref name="state"/> (each a normalized token array; <c>_</c> = wildcard). Used to
+        /// feed scenario-supplied argument values into parameter generation during slicing.</summary>
+        public IEnumerable<string[]> ArgPatterns(int state, string bareLabel)
+        {
+            if (state < 0 || state >= _on.Length) yield break;
+            var prefix = bareLabel + "(";
+            foreach (var kv in _on[state])
+            {
+                var key = kv.Key;
+                if (!key.StartsWith(prefix, StringComparison.Ordinal) || !key.EndsWith(")", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var inside = key.Substring(prefix.Length, key.Length - prefix.Length - 1);
+                yield return inside.Length == 0 ? Array.Empty<string>() : inside.Split(',');
+            }
+        }
     }
 
     // ---- NFA ----------------------------------------------------------------
