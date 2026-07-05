@@ -74,5 +74,9 @@ namespace Sailboat.Model
 
         [AcceptingCondition]
         public bool InitialPosition() => X == 0 && Y == 0;
+
+        /// <summary>State predicate used by the Cord <c>point shoot … with (. … .)</c> steering
+        /// construct: true when the boat is in open water (mirrors the original sample).</summary>
+        public bool AwayFromTheShore => 350 < X && X < 650 && 350 < Y && Y < 650;
     }
 }

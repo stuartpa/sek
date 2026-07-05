@@ -304,9 +304,32 @@ ExplorationResult InterpretConstruct(
             r.Graph.Metadata["requirementCount"] = reqs.Count.ToString();
             return r;
         }
+        case ConstructKind.PointShoot:
+        {
+            // Steering: explore the target, mark states satisfying the `with (. expr .)` goal
+            // predicate, then prune to paths that actually reach a goal state.
+            if (cb.Params.TryGetValue("PathDepth", out var psd) && int.TryParse(psd, out var pdp)) options.MaxDepth = pdp;
+            options.GoalPredicate = BuildGoalPredicate(introspector, cb.Params.GetValueOrDefault("with"));
+            var r = InterpretTarget(introspector, cord, machine, cb, options, solverName, binds);
+            if (options.GoalPredicate is not null)
+            {
+                var goals = (r.Graph.Metadata.GetValueOrDefault("goals") ?? string.Empty)
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries).ToHashSet();
+                FilterToReaching(r.Graph, s => goals.Contains(s.Id));
+                r.Graph.Metadata["goalCount"] = goals.Count.ToString();
+            }
+
+            return r;
+        }
+        case ConstructKind.AcceptCompletion:
+        {
+            // Completion: keep only paths that can be completed to an accepting state.
+            var r = InterpretTarget(introspector, cord, machine, cb, options, solverName, binds);
+            FilterToReaching(r.Graph, s => s.Accepting);
+            return r;
+        }
         default:
-            // TestCases, PointShoot, AcceptCompletion: explore the target. (The point-shoot /
-            // accept-completion steering heuristics are approximated by exploring the target.)
+            // TestCases: explore the target.
             return InterpretTarget(introspector, cord, machine, cb, options, solverName, binds);
     }
 }
@@ -330,21 +353,44 @@ static Sek.Cord.Ast.Behavior? Unwrap(Sek.Cord.Ast.Behavior? b) =>
     b is Sek.Cord.Ast.GroupBehavior g ? Unwrap(g.Inner) : b;
 
 // Keep only states that can reach an accepting state (and the transitions among them).
-static void FilterToAcceptingPaths(ExplorationGraph graph)
-{
-    var canReach = new HashSet<string>(graph.States.Where(s => s.Accepting).Select(s => s.Id));
-    var changed = true;
-    while (changed)
-    {
-        changed = false;
-        foreach (var t in graph.Transitions)
-        {
-            if (canReach.Contains(t.ToStateId) && canReach.Add(t.FromStateId)) changed = true;
-        }
-    }
+static void FilterToAcceptingPaths(ExplorationGraph graph) =>
+    Sek.Core.Analysis.GraphAnalysis.FilterToReaching(graph, s => s.Accepting);
 
-    graph.Transitions.RemoveAll(t => !canReach.Contains(t.FromStateId) || !canReach.Contains(t.ToStateId));
-    graph.States.RemoveAll(s => !canReach.Contains(s.Id) && !s.Initial);
+// Keep only states that lie on a path from the initial state to a "target" state (a state
+// matching <paramref name="isTarget"/>). Used by accepting-paths, point-shoot (goal states),
+// and accept-completion (accepting states).
+static void FilterToReaching(ExplorationGraph graph, Func<Sek.Core.Model.ModelState, bool> isTarget) =>
+    Sek.Core.Analysis.GraphAnalysis.FilterToReaching(graph, isTarget);
+
+// Builds a goal-state predicate from a Cord `with (. expr .)` steering condition. The common
+// form names a boolean state member (`[Ns.]Type.Member` or a bare `Member`), which is read by
+// reflection on the current model instance. Returns null when there is no condition.
+static Func<object, bool>? BuildGoalPredicate(ModelIntrospector introspector, string? withExpr)
+{
+    if (string.IsNullOrWhiteSpace(withExpr) || withExpr == "(inline)") return null;
+    var expr = withExpr.Trim();
+    // Trailing identifier of a (possibly dotted) member access is the state predicate name.
+    var member = expr.Contains('.') ? expr[(expr.LastIndexOf('.') + 1)..].Trim() : expr;
+    if (member.Length == 0 || !member.All(c => char.IsLetterOrDigit(c) || c == '_')) return null;
+
+    var type = introspector.ModelType;
+    const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
+    var prop = type.GetProperty(member, flags);
+    var field = prop is null ? type.GetField(member, flags) : null;
+    var method = prop is null && field is null ? type.GetMethod(member, flags, Type.EmptyTypes) : null;
+    if (prop is null && field is null && method is null) return null;
+
+    return instance =>
+    {
+        try
+        {
+            object? v = prop is not null ? prop.GetValue(prop.GetGetMethod(true)!.IsStatic ? null : instance)
+                : field is not null ? field.GetValue(field.IsStatic ? null : instance)
+                : method!.Invoke(method.IsStatic ? null : instance, null);
+            return v is bool b && b;
+        }
+        catch { return false; }
+    };
 }
 
 static string ShortLabel(string label)

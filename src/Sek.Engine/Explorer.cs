@@ -46,6 +46,7 @@ public sealed class Explorer
         var hashToId = new Dictionary<string, string>();
         var queue = new Queue<(string Id, string Json, int Depth)>();
         var hitBound = false;
+        var goals = new List<string>();
 
         // Initial state.
         var initialInstance = CreateInstance();
@@ -56,6 +57,7 @@ public sealed class Explorer
         hashToId[initialHash] = initialId;
         graph.InitialStateId = initialId;
         graph.States.Add(new ModelState(initialId, initialHash, Label: null, Accepting: IsAccepting(initialInstance), Initial: true));
+        if (IsGoal(initialInstance)) goals.Add(initialId);
         queue.Enqueue((initialId, initialJson, 0));
 
         var nextId = 1;
@@ -99,6 +101,7 @@ public sealed class Explorer
                         toId = "S" + nextId++;
                         hashToId[toHash] = toId;
                         graph.States.Add(new ModelState(toId, toHash, Label: null, Accepting: IsAccepting(target)));
+                        if (IsGoal(target)) goals.Add(toId);
                         queue.Enqueue((toId, toJson, depth + 1));
                     }
 
@@ -118,6 +121,7 @@ public sealed class Explorer
         graph.Metadata["transitions"] = graph.Transitions.Count.ToString();
         graph.Metadata["accepting"] = graph.States.Count(s => s.Accepting).ToString();
         graph.Metadata["hitBound"] = hitBound.ToString();
+        if (_options.GoalPredicate is not null) graph.Metadata["goals"] = string.Join(",", goals);
 
         return new ExplorationResult { Graph = graph, HitBound = hitBound };
     }
@@ -273,6 +277,14 @@ public sealed class Explorer
     private ModelProgram Deserialize(string json) =>
         (ModelProgram)(JsonSerializer.Deserialize(json, _model.ModelType, _json)
                        ?? throw new InvalidOperationException("Failed to deserialize model state."));
+
+    /// <summary>Whether a state satisfies the optional steering goal predicate (Cord
+    /// <c>point shoot … with (. expr .)</c>). False when no goal predicate is set.</summary>
+    private bool IsGoal(object instance)
+    {
+        try { return _options.GoalPredicate is { } g && g(instance); }
+        catch { return false; }
+    }
 
     private bool IsAccepting(object instance)
     {
