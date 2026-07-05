@@ -42,3 +42,30 @@ machine ManagedJobs() : ConfigWithParameters
     AddManageScenario || JobScheduler
 }
 
+// Phase 3 validation: argument-matched scenario. The scenario pins AddJob's arguments
+// to the concrete pair ("x", 600000), so slicing keeps ONLY the run that adds that exact
+// job (not every AddJob run). A bare `AddJob` would match any arguments.
+machine AddSpecificScenario() : ConfigWithParameters
+{
+    AddJob("x", 600000); (GetJobInfo | DeleteJob)*
+}
+
+machine SpecificJobRuns() : ConfigWithParameters
+{
+    AddSpecificScenario || JobScheduler
+}
+
+// Phase 3 validation: `let` parameter generation. The bound variable `cmd` ranges over
+// {"x","y"}; each binding is substituted into the AddJob invocation and the resulting
+// argument-matched scenarios are unioned, then sliced against the model.
+machine LetJobScenario() : ConfigWithParameters
+{
+    let string cmd where {. Condition.In(cmd, "x", "y"); .}
+        in AddJob(cmd, 600000); (GetJobInfo | DeleteJob)*
+}
+
+machine LetJobRuns() : ConfigWithParameters
+{
+    LetJobScenario || JobScheduler
+}
+

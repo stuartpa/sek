@@ -128,12 +128,15 @@ Other Spec Explorer switches (e.g. `GeneratedTestPath`, `TestClassBase`,
   **`construct requirement coverage …`** are parsed and explored; the point-shoot /
   accept-completion *steering heuristics* are approximated by exploring the referenced
   target machine, and requirement coverage reports the covered action set.
-- **Matching is by action label**; argument-pattern matching inside scenarios/binds
-  (e.g. pinning `Publish("m1")`) is on the roadmap.
-- On the roadmap: `let`-bound parameter generation, native domain expressions
-  (`instances T`, `T[n..m]`, ranges), and execution of arbitrary embedded C# in
-  `{. … .}` / `(. … .)` blocks (beyond the recognized `Condition.*`/`Combination.*`
-  patterns).
+- **Argument-pattern matching** inside scenarios is supported: a scenario atom such as
+  `AddJob("x", 600000)` slices the model to runs whose invocation arguments match those
+  values, while a bare `AddJob` still matches any arguments.
+- **`let vars where {. … .} in Behavior`** parameter generation is supported: each binding
+  of the `let` variables (constrained by the `where` block) is substituted into the inner
+  behavior and the resulting argument-matched behaviors are unioned before slicing.
+- On the roadmap: native domain expressions (`instances T`, `T[n..m]`, ranges), and
+  execution of arbitrary embedded C# in `{. … .}` / `(. … .)` blocks (beyond the
+  recognized `Condition.*`/`Combination.*` patterns).
 
 ## Related
 

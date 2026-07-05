@@ -557,12 +557,33 @@ public sealed class Parser
 
     private Behavior ParseLet()
     {
-        Take();
-        var start = _i;
-        while (!IsId("in") && !Is(TokenKind.EndOfFile)) Take();
-        var raw = string.Join(" ", _tokens.Skip(start).Take(_i - start).Select(t => t.Text));
+        Take(); // 'let'
+        var let = new LetBehavior();
+
+        // Local variable declarations: Type name {, Type name}
+        do
+        {
+            var type = ParseTypeName();
+            var name = Expect(TokenKind.Identifier).Text;
+            let.Vars.Add(new Parameter { Type = type, Name = name });
+        }
+        while (Accept(TokenKind.Comma));
+
+        if (AcceptId("where"))
+        {
+            if (Is(TokenKind.EmbeddedStmt) || Is(TokenKind.EmbeddedExpr))
+            {
+                let.WhereCode = Take().Text;
+            }
+            else if (Is(TokenKind.LParen))
+            {
+                SkipBalancedParens();
+            }
+        }
+
         RequireId("in");
-        return new LetBehavior { Raw = raw, Inner = ParseBehavior() };
+        let.Inner = ParseBehavior();
+        return let;
     }
 
     private Behavior ParseInvocation()

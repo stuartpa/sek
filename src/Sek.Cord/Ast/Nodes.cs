@@ -149,6 +149,12 @@ public sealed class LetBehavior : Behavior
 {
     public string Raw { get; set; } = string.Empty;
     public Behavior Inner { get; set; } = null!;
+
+    /// <summary>Local variable declarations (<c>let Type name, ...</c>).</summary>
+    public List<Parameter> Vars { get; } = new();
+
+    /// <summary>Embedded C# from the <c>where {. ... .}</c> block (Condition.In / Combination.*).</summary>
+    public string? WhereCode { get; set; }
 }
 
 public enum ConstructKind { ModelProgram, AcceptingPaths, TestCases, BoundedExploration, PointShoot, AcceptCompletion, RequirementCoverage }

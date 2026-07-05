@@ -169,7 +169,7 @@ ExplorationGraph ExploreBehavior(CordDocument cord, string machine)
         .ToHashSet(StringComparer.Ordinal);
 
     var explorer = new BehaviorExplorer(name => cord.GetMachine(name)?.Body, alphabet);
-    return explorer.Explore(machine, m.Body);
+    return explorer.Explore(machine, DesugarLet(m.Body));
 }
 
 ExplorationResult ExploreMachine(ProjectConfig config, string dir, CordDocument cord, string machine, string solverName)
@@ -204,7 +204,7 @@ ExplorationResult Interpret(
         var pg = BuildParamGen(cord, cfg, machine, solverName, binds, introspector);
         var explorer = new Explorer(introspector, options, pg);
         var shortNames = introspector.Rules.Select(r => ShortLabel(r.ActionLabel)).ToHashSet(StringComparer.Ordinal);
-        var compiled = new BehaviorExplorer(name => cord.GetMachine(name)?.Body, shortNames).Compile(slice);
+        var compiled = new BehaviorExplorer(name => cord.GetMachine(name)?.Body, shortNames).Compile(DesugarLet(slice));
         return explorer.ExploreSliced(machine, compiled, ShortLabel);
     }
 
@@ -325,6 +325,108 @@ static Sek.Cord.Ast.Behavior? ResolveSliceItem(CordDocument cord, Sek.Cord.Ast.B
     }
 
     return item;
+}
+
+// Expands `let vars where {Condition.In...} in Behavior` into a choice over each variable
+// assignment, substituting the bound values into the inner behavior's invocation arguments.
+// Combined with argument-aware slicing this pins the let-bound values through the scenario.
+static Sek.Cord.Ast.Behavior DesugarLet(Sek.Cord.Ast.Behavior b)
+{
+    switch (b)
+    {
+        case Sek.Cord.Ast.LetBehavior let:
+        {
+            var da = new DeclaredAction { WhereCode = let.WhereCode };
+            foreach (var v in let.Vars) da.Parameters.Add(v);
+            var ac = CordConstraintExtractor.Extract(da);
+            var solverParams = let.Vars.Select(v => new SolverParam { Name = v.Name, Kind = KindOf(v.Type) }).ToList();
+            var assignments = new EnumerativeSolver().Generate(solverParams, ac.Constraints, ac.Combination, 100000);
+
+            var inner = DesugarLet(let.Inner);
+            var choices = new List<Sek.Cord.Ast.Behavior>();
+            foreach (var a in assignments)
+            {
+                var subst = new Dictionary<string, string>(StringComparer.Ordinal);
+                foreach (var kv in a) subst[kv.Key] = kv.Value?.ToString() ?? string.Empty;
+                choices.Add(CloneWithSubst(inner, subst));
+            }
+
+            if (choices.Count == 0) return inner;
+            if (choices.Count == 1) return choices[0];
+            var ch = new Sek.Cord.Ast.ChoiceBehavior();
+            ch.Items.AddRange(choices);
+            return ch;
+        }
+        case Sek.Cord.Ast.SequenceBehavior s:
+        { var n = new Sek.Cord.Ast.SequenceBehavior(); n.Items.AddRange(s.Items.Select(DesugarLet)); return n; }
+        case Sek.Cord.Ast.ChoiceBehavior c:
+        { var n = new Sek.Cord.Ast.ChoiceBehavior(); n.Items.AddRange(c.Items.Select(DesugarLet)); return n; }
+        case Sek.Cord.Ast.ParallelBehavior p:
+        { var n = new Sek.Cord.Ast.ParallelBehavior { Op = p.Op }; n.Items.AddRange(p.Items.Select(DesugarLet)); return n; }
+        case Sek.Cord.Ast.PermutationBehavior pm:
+        { var n = new Sek.Cord.Ast.PermutationBehavior(); n.Items.AddRange(pm.Items.Select(DesugarLet)); return n; }
+        case Sek.Cord.Ast.LooseSequenceBehavior ls:
+        { var n = new Sek.Cord.Ast.LooseSequenceBehavior(); n.Items.AddRange(ls.Items.Select(DesugarLet)); return n; }
+        case Sek.Cord.Ast.RepetitionBehavior r:
+            return new Sek.Cord.Ast.RepetitionBehavior { Inner = DesugarLet(r.Inner), Op = r.Op, Min = r.Min, Max = r.Max };
+        case Sek.Cord.Ast.GroupBehavior gg:
+            return new Sek.Cord.Ast.GroupBehavior { Inner = DesugarLet(gg.Inner) };
+        case Sek.Cord.Ast.PreconstraintBehavior pc:
+            return new Sek.Cord.Ast.PreconstraintBehavior { Code = pc.Code, Inner = DesugarLet(pc.Inner) };
+        case Sek.Cord.Ast.BindBehavior bd:
+        { var n = new Sek.Cord.Ast.BindBehavior { Inner = DesugarLet(bd.Inner) }; n.Binds.AddRange(bd.Binds); return n; }
+        default:
+            return b;
+    }
+}
+
+// Deep-clones a behavior, replacing invocation argument tokens that name a bound variable
+// with its assigned value.
+static Sek.Cord.Ast.Behavior CloneWithSubst(Sek.Cord.Ast.Behavior b, Dictionary<string, string> subst)
+{
+    switch (b)
+    {
+        case Sek.Cord.Ast.InvocationBehavior inv:
+        {
+            var n = new Sek.Cord.Ast.InvocationBehavior { Target = inv.Target, Negated = inv.Negated, Qualifier = inv.Qualifier };
+            if (inv.Args is not null)
+            {
+                n.Args = inv.Args.Select(a => subst.TryGetValue(a.Trim(), out var v) ? v : a).ToList();
+            }
+
+            return n;
+        }
+        case Sek.Cord.Ast.SequenceBehavior s:
+        { var n = new Sek.Cord.Ast.SequenceBehavior(); n.Items.AddRange(s.Items.Select(i => CloneWithSubst(i, subst))); return n; }
+        case Sek.Cord.Ast.ChoiceBehavior c:
+        { var n = new Sek.Cord.Ast.ChoiceBehavior(); n.Items.AddRange(c.Items.Select(i => CloneWithSubst(i, subst))); return n; }
+        case Sek.Cord.Ast.ParallelBehavior p:
+        { var n = new Sek.Cord.Ast.ParallelBehavior { Op = p.Op }; n.Items.AddRange(p.Items.Select(i => CloneWithSubst(i, subst))); return n; }
+        case Sek.Cord.Ast.PermutationBehavior pm:
+        { var n = new Sek.Cord.Ast.PermutationBehavior(); n.Items.AddRange(pm.Items.Select(i => CloneWithSubst(i, subst))); return n; }
+        case Sek.Cord.Ast.LooseSequenceBehavior ls:
+        { var n = new Sek.Cord.Ast.LooseSequenceBehavior(); n.Items.AddRange(ls.Items.Select(i => CloneWithSubst(i, subst))); return n; }
+        case Sek.Cord.Ast.RepetitionBehavior r:
+            return new Sek.Cord.Ast.RepetitionBehavior { Inner = CloneWithSubst(r.Inner, subst), Op = r.Op, Min = r.Min, Max = r.Max };
+        case Sek.Cord.Ast.GroupBehavior gg:
+            return new Sek.Cord.Ast.GroupBehavior { Inner = CloneWithSubst(gg.Inner, subst) };
+        case Sek.Cord.Ast.PreconstraintBehavior pc:
+            return new Sek.Cord.Ast.PreconstraintBehavior { Code = pc.Code, Inner = CloneWithSubst(pc.Inner, subst) };
+        default:
+            return b;
+    }
+}
+
+static ValueKind KindOf(string type)
+{
+    var t = type.Trim().ToLowerInvariant();
+    return t switch
+    {
+        "string" => ValueKind.String,
+        "bool" => ValueKind.Bool,
+        "long" or "ulong" => ValueKind.Long,
+        _ => ValueKind.Int,
+    };
 }
 
 ParameterGeneration BuildParamGen(

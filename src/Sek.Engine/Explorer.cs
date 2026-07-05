@@ -156,9 +156,12 @@ public sealed class Explorer
             var domainInstance = Deserialize(fromJson);
             foreach (var rule in _model.Rules)
             {
-                if (!scenario.TryStep(dfaState, shortOf(rule.ActionLabel), out var ndfa))
+                var bareLabel = shortOf(rule.ActionLabel);
+                // Quick reject: if the scenario permits neither this action's bare label nor
+                // any argument-pinned form of it from here, skip generating arguments at all.
+                if (!scenario.Permits(dfaState, bareLabel))
                 {
-                    continue; // the scenario does not permit this action here
+                    continue;
                 }
 
                 var domainValues = ResolveDomains(rule, domainInstance);
@@ -166,6 +169,16 @@ public sealed class Explorer
                 {
                     var target = Deserialize(fromJson);
                     var invokeArgs = MaterializeArgs(rule, target, argSet);
+
+                    // Argument-aware scenario step: try the concrete symbol (label with the
+                    // transition's argument values) first, then the bare label (any args).
+                    var concrete = bareLabel + "(" + string.Join(",", invokeArgs.Select(a => BehaviorExplorer.NormArg(Stringify(a)))) + ")";
+                    if (!scenario.TryStep(dfaState, concrete, out var ndfa) &&
+                        !scenario.TryStep(dfaState, bareLabel, out ndfa))
+                    {
+                        continue; // the scenario does not permit this action with these arguments
+                    }
+
                     if (!TryInvoke(rule, target, invokeArgs, result.Diagnostics))
                     {
                         continue;

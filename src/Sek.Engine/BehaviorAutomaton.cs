@@ -28,6 +28,11 @@ public sealed class BehaviorExplorer
 
     public ExplorationGraph Explore(string machineName, Behavior body)
     {
+        foreach (var sym in CollectSymbols(body, new HashSet<string>(StringComparer.Ordinal)))
+        {
+            _alphabet.Add(sym);
+        }
+
         var dfa = ToDfa(body);
         return ToGraph(machineName, dfa);
     }
@@ -39,9 +44,66 @@ public sealed class BehaviorExplorer
     /// </summary>
     public CompiledScenario Compile(Behavior body)
     {
+        foreach (var sym in CollectSymbols(body, new HashSet<string>(StringComparer.Ordinal)))
+        {
+            _alphabet.Add(sym);
+        }
+
         var dfa = ToDfa(body);
         var on = dfa.On.Select(d => new Dictionary<string, int>(d, StringComparer.Ordinal)).ToArray();
         return new CompiledScenario(dfa.Start, dfa.Accept.ToArray(), on);
+    }
+
+    /// <summary>The scenario symbol for an invocation: the bare action label, or
+    /// <c>label(arg1,arg2)</c> when the scenario pins argument values (a bare label matches
+    /// any arguments; a pinned symbol matches only those argument values).</summary>
+    public static string SymbolOf(InvocationBehavior inv)
+    {
+        if (inv.Args is null || inv.Args.Count == 0) return inv.Target;
+        return inv.Target + "(" + string.Join(",", inv.Args.Select(NormArg)) + ")";
+    }
+
+    /// <summary>Normalizes an argument token for matching: strips quotes and any type prefix
+    /// (e.g. <c>ShareType.DISK</c> -&gt; <c>DISK</c>) so it aligns with a stringified value.</summary>
+    public static string NormArg(string a)
+    {
+        a = a.Trim();
+        if (a.Length >= 2 && a[0] == '"' && a[^1] == '"') a = a[1..^1];
+        var dot = a.LastIndexOf('.');
+        return dot >= 0 ? a[(dot + 1)..] : a;
+    }
+
+    private IEnumerable<string> CollectSymbols(Behavior? b, HashSet<string> seenMachines)
+    {
+        switch (b)
+        {
+            case null:
+                yield break;
+            case InvocationBehavior inv:
+                if (inv.Target == "_" || inv.Negated) yield break;
+                var m = _resolveMachine(inv.Target);
+                if (m is not null)
+                {
+                    if (seenMachines.Add(inv.Target))
+                        foreach (var s in CollectSymbols(m, seenMachines)) yield return s;
+                }
+                else if (inv.Args is { Count: > 0 })
+                {
+                    yield return SymbolOf(inv);
+                }
+
+                yield break;
+            case SequenceBehavior s: foreach (var i in s.Items) foreach (var x in CollectSymbols(i, seenMachines)) yield return x; yield break;
+            case ChoiceBehavior c: foreach (var i in c.Items) foreach (var x in CollectSymbols(i, seenMachines)) yield return x; yield break;
+            case ParallelBehavior p: foreach (var i in p.Items) foreach (var x in CollectSymbols(i, seenMachines)) yield return x; yield break;
+            case PermutationBehavior pm: foreach (var i in pm.Items) foreach (var x in CollectSymbols(i, seenMachines)) yield return x; yield break;
+            case LooseSequenceBehavior ls: foreach (var i in ls.Items) foreach (var x in CollectSymbols(i, seenMachines)) yield return x; yield break;
+            case RepetitionBehavior rep: foreach (var x in CollectSymbols(rep.Inner, seenMachines)) yield return x; yield break;
+            case GroupBehavior g: foreach (var x in CollectSymbols(g.Inner, seenMachines)) yield return x; yield break;
+            case PreconstraintBehavior pc: foreach (var x in CollectSymbols(pc.Inner, seenMachines)) yield return x; yield break;
+            case LetBehavior l: foreach (var x in CollectSymbols(l.Inner, seenMachines)) yield return x; yield break;
+            case BindBehavior bd: foreach (var x in CollectSymbols(bd.Inner, seenMachines)) yield return x; yield break;
+        }
     }
 
     /// <summary>A determinized scenario automaton over action labels.</summary>
@@ -67,6 +129,22 @@ public sealed class BehaviorExplorer
         {
             next = -1;
             return state >= 0 && state < _on.Length && _on[state].TryGetValue(label, out next);
+        }
+
+        /// <summary>True if the scenario permits the action <paramref name="bareLabel"/> from
+        /// <paramref name="state"/> in any form — the bare label (any arguments) or an
+        /// argument-pinned form <c>bareLabel(...)</c>.</summary>
+        public bool Permits(int state, string bareLabel)
+        {
+            if (state < 0 || state >= _on.Length) return false;
+            if (_on[state].ContainsKey(bareLabel)) return true;
+            var prefix = bareLabel + "(";
+            foreach (var k in _on[state].Keys)
+            {
+                if (k.StartsWith(prefix, StringComparison.Ordinal)) return true;
+            }
+
+            return false;
         }
     }
 
@@ -119,7 +197,7 @@ public sealed class BehaviorExplorer
                 }
 
                 var machine = _resolveMachine(inv.Target);
-                return machine is not null ? Build(machine) : Atom(inv.Target);
+                return machine is not null ? Build(machine) : Atom(SymbolOf(inv));
 
             case GroupBehavior g:
                 return Build(g.Inner);
