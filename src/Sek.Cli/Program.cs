@@ -262,7 +262,7 @@ static string? FindTestStrategyIn(CordDocument cord, Sek.Cord.Ast.Behavior? body
 ExplorationResult Interpret(
     ModelIntrospector introspector, CordDocument cord, string machine,
     Sek.Cord.Ast.Behavior? body, ExplorationOptions options, string solverName,
-    Dictionary<string, List<List<string>>> binds)
+    Dictionary<string, List<List<string>>> binds, string? startJson = null)
 {
     body = Unwrap(body);
 
@@ -275,16 +275,16 @@ ExplorationResult Interpret(
             && (invp.Args is null || invp.Args.Count == 0)
             && cord.GetMachine(invp.Target) is { } innerMachine)
         {
-            return Interpret(introspector, cord, invp.Target, innerMachine.Body, options, solverName, binds);
+            return Interpret(introspector, cord, invp.Target, innerMachine.Body, options, solverName, binds, startJson);
         }
 
-        return Interpret(introspector, cord, machine, pc.Inner, options, solverName, binds);
+        return Interpret(introspector, cord, machine, pc.Inner, options, solverName, binds, startJson);
     }
 
     if (body is Sek.Cord.Ast.BindBehavior bind)
     {
         foreach (var c in bind.Binds) binds[c.Action] = c.ArgDomains;
-        return Interpret(introspector, cord, machine, bind.Inner, options, solverName, binds);
+        return Interpret(introspector, cord, machine, bind.Inner, options, solverName, binds, startJson);
     }
 
     var extracted = ExtractSlice(cord, body);
@@ -300,7 +300,7 @@ ExplorationResult Interpret(
 
     if (body is Sek.Cord.Ast.ConstructBehavior cb)
     {
-        return InterpretConstruct(introspector, cord, machine, cb, options, solverName, binds);
+        return InterpretConstruct(introspector, cord, machine, cb, options, solverName, binds, startJson);
     }
 
     // A pure behavior (a scenario / parametrized `let`) with no model program is explored
@@ -312,19 +312,19 @@ ExplorationResult Interpret(
 ExplorationResult InterpretConstruct(
     ModelIntrospector introspector, CordDocument cord, string machine,
     Sek.Cord.Ast.ConstructBehavior cb, ExplorationOptions options, string solverName,
-    Dictionary<string, List<List<string>>> binds)
+    Dictionary<string, List<List<string>>> binds, string? startJson = null)
 {
     switch (cb.Kind)
     {
         case ConstructKind.ModelProgram:
         {
             var pg = BuildParamGen(cord, cb.Reference, machine, solverName, binds, introspector);
-            return new Explorer(introspector, options, pg).Explore(machine);
+            return new Explorer(introspector, options, pg).Explore(machine, startJson);
         }
         case ConstructKind.BoundedExploration:
         {
             if (cb.Params.TryGetValue("PathDepth", out var pdv) && int.TryParse(pdv, out var pd)) options.MaxDepth = pd;
-            return InterpretTarget(introspector, cord, machine, cb, options, solverName, binds);
+            return InterpretTarget(introspector, cord, machine, cb, options, solverName, binds, startJson);
         }
         case ConstructKind.AcceptingPaths:
         {
@@ -374,20 +374,72 @@ ExplorationResult InterpretConstruct(
         }
         case ConstructKind.PointShoot:
         {
-            // Steering: explore the target, mark states satisfying the `with (. expr .)` goal
-            // predicate, then prune to paths that actually reach a goal state.
-            if (cb.Params.TryGetValue("PathDepth", out var psd) && int.TryParse(psd, out var pdp)) options.MaxDepth = pdp;
-            options.GoalPredicate = BuildGoalPredicate(introspector, cb.Params.GetValueOrDefault("with"));
-            var r = InterpretTarget(introspector, cord, machine, cb, options, solverName, binds);
-            if (options.GoalPredicate is not null)
+            // Phased steering. Phase 1: explore the `for` target (the Point) to establish launch
+            // states. Phase 2: from each launch state, explore the `Shoot` machine (bounded by
+            // PathDepth) to reach a state satisfying the `with (. expr .)` goal predicate. Phase 3:
+            // from each goal, explore the `Completer` machine to an accepting state. The phases are
+            // stitched by model-state hash and pruned to complete root→goal→accepting paths.
+            var goalPred = BuildGoalPredicate(introspector, cb.Params.GetValueOrDefault("with"));
+            var pathDepth = cb.Params.TryGetValue("PathDepth", out var psd) && int.TryParse(psd, out var pdp) ? pdp : (int?)null;
+            var shootName = cb.Params.GetValueOrDefault("Shoot");
+            var completerName = cb.Params.GetValueOrDefault("Completer");
+
+            options.GoalPredicate = goalPred;
+            var point = InterpretTarget(introspector, cord, machine, cb, options, solverName, binds);
+
+            // No Shoot/Completer machines: degenerate to steering the Point graph to the goal.
+            if ((shootName is null || cord.GetMachine(shootName) is null)
+                && (completerName is null || cord.GetMachine(completerName) is null))
             {
-                var goals = (r.Graph.Metadata.GetValueOrDefault("goals") ?? string.Empty)
-                    .Split(',', StringSplitOptions.RemoveEmptyEntries).ToHashSet();
-                FilterToReaching(r.Graph, s => goals.Contains(s.Id));
-                r.Graph.Metadata["goalCount"] = goals.Count.ToString();
+                if (goalPred is not null)
+                {
+                    var g0 = (point.Graph.Metadata.GetValueOrDefault("goals") ?? string.Empty)
+                        .Split(',', StringSplitOptions.RemoveEmptyEntries).ToHashSet();
+                    FilterToReaching(point.Graph, s => g0.Contains(s.Id));
+                    point.Graph.Metadata["goalCount"] = g0.Count.ToString();
+                }
+
+                return point;
             }
 
-            return r;
+            var phases = new List<ExplorationResult> { point };
+            var goalHashes = GoalHashes(point);
+
+            // Phase 2 — Shoot from each launch (Point) state.
+            if (shootName is not null && cord.GetMachine(shootName) is { } shootM)
+            {
+                var shootOpts = BoundsFor(cord, shootName);
+                shootOpts.GoalPredicate = goalPred;
+                if (pathDepth is int d) shootOpts.MaxDepth = d;
+                shootOpts.AllowedActionLabels = options.AllowedActionLabels;
+                shootOpts.EventActionLabels = options.EventActionLabels;
+                foreach (var json in point.StateJson.Values.ToList())
+                {
+                    var g2 = Interpret(introspector, cord, shootName, shootM.Body, shootOpts, solverName, new Dictionary<string, List<List<string>>>(StringComparer.Ordinal), json);
+                    phases.Add(g2);
+                    goalHashes.UnionWith(GoalHashes(g2));
+                }
+            }
+
+            // Phase 3 — Completer from each goal state, to an accepting state.
+            if (completerName is not null && cord.GetMachine(completerName) is { } compM)
+            {
+                var compOpts = BoundsFor(cord, completerName);
+                compOpts.AllowedActionLabels = options.AllowedActionLabels;
+                compOpts.EventActionLabels = options.EventActionLabels;
+                var goalJsons = phases.SelectMany(p => p.StateJson.Where(kv => goalHashes.Contains(p.Graph.FindState(kv.Key)?.Hash ?? "")).Select(kv => kv.Value)).Distinct().ToList();
+                foreach (var json in goalJsons)
+                {
+                    var g3 = Interpret(introspector, cord, completerName, compM.Body, compOpts, solverName, new Dictionary<string, List<List<string>>>(StringComparer.Ordinal), json);
+                    phases.Add(g3);
+                }
+            }
+
+            var merged = MergePhaseGraphs(machine, phases, goalHashes);
+            FilterToGoalThenAccepting(merged, goalHashes);
+            merged.Metadata["goalCount"] = merged.States.Count(s => goalHashes.Contains(s.Hash)).ToString();
+            merged.Metadata["phases"] = phases.Count.ToString();
+            return new ExplorationResult { Graph = merged };
         }
         case ConstructKind.AcceptCompletion:
         {
@@ -405,7 +457,7 @@ ExplorationResult InterpretConstruct(
 ExplorationResult InterpretTarget(
     ModelIntrospector introspector, CordDocument cord, string machine,
     Sek.Cord.Ast.ConstructBehavior cb, ExplorationOptions options, string solverName,
-    Dictionary<string, List<List<string>>> binds)
+    Dictionary<string, List<List<string>>> binds, string? startJson = null)
 {
     Sek.Cord.Ast.Behavior? target = cb.Target;
     if (target is null && !string.IsNullOrEmpty(cb.Reference))
@@ -414,7 +466,7 @@ ExplorationResult InterpretTarget(
         target = refMachine?.Body ?? new Sek.Cord.Ast.ConstructBehavior { Kind = ConstructKind.ModelProgram, Reference = cb.Reference };
     }
 
-    return Interpret(introspector, cord, machine, target, options, solverName, binds);
+    return Interpret(introspector, cord, machine, target, options, solverName, binds, startJson);
 }
 
 static Sek.Cord.Ast.Behavior? Unwrap(Sek.Cord.Ast.Behavior? b) =>
@@ -466,6 +518,27 @@ static string ShortLabel(string label)
     var i = label.LastIndexOf('.');
     return i >= 0 ? label[(i + 1)..] : label;
 }
+
+// The canonical state hashes marked as goals in an exploration (from graph.Metadata["goals"],
+// which lists goal state ids).
+static HashSet<string> GoalHashes(ExplorationResult r)
+{
+    var ids = (r.Graph.Metadata.GetValueOrDefault("goals") ?? string.Empty)
+        .Split(',', StringSplitOptions.RemoveEmptyEntries).ToHashSet(StringComparer.Ordinal);
+    return r.Graph.States.Where(s => ids.Contains(s.Id)).Select(s => s.Hash).ToHashSet(StringComparer.Ordinal);
+}
+
+// Stitches the point-shoot phase graphs into one graph, unifying states across phases by their
+// canonical model-state hash. Delegates to the pure Sek.Core graph merge.
+static ExplorationGraph MergePhaseGraphs(string machine, List<ExplorationResult> phases, HashSet<string> goalHashes)
+{
+    var rootHash = phases[0].Graph.FindState(phases[0].Graph.InitialStateId ?? "S0")?.Hash;
+    return Sek.Core.Analysis.GraphAnalysis.MergeByHash(machine, phases.Select(p => p.Graph), rootHash);
+}
+
+// Prunes a stitched point-shoot graph to root → goal → accepting paths.
+static void FilterToGoalThenAccepting(ExplorationGraph graph, HashSet<string> goalHashes) =>
+    Sek.Core.Analysis.GraphAnalysis.FilterToGoalThenAccepting(graph, goalHashes);
 
 // Executes a Cord state-slice preconstraint `{. Left = literal; ... .}` by setting the named
 // static field/property on a type in the model assembly. The left-hand qualifier (e.g.

@@ -92,6 +92,70 @@ public class SteeringTests
         Assert.False(result.Graph.Metadata.ContainsKey("goals"));
     }
 
+    // ---- phased point-shoot building blocks ----
+
+    [Fact]
+    public void Explorer_RetainsPerStateJson()
+    {
+        var introspector = new ModelIntrospector(typeof(Counter));
+        var result = new Explorer(introspector, new ExplorationOptions { MaxDepth = 100 }).Explore("Counter");
+        // Every graph state has a serialized snapshot, and the initial one reflects N == 0.
+        Assert.Equal(result.Graph.States.Count, result.StateJson.Count);
+        Assert.Contains("\"N\":0", result.StateJson[result.Graph.InitialStateId!].Replace(" ", ""));
+    }
+
+    [Fact]
+    public void Explorer_ResumesFromStartJson()
+    {
+        var introspector = new ModelIntrospector(typeof(Counter));
+        var full = new Explorer(introspector, new ExplorationOptions { MaxDepth = 100 }).Explore("Counter");
+        // Resume from the N == 2 state; only N = 2, 3 remain reachable.
+        var n2 = full.StateJson.Values.First(j => j.Replace(" ", "").Contains("\"N\":2"));
+        var resumed = new Explorer(introspector, new ExplorationOptions { MaxDepth = 100 }).Explore("Counter", n2);
+        Assert.Equal(2, resumed.Graph.States.Count); // N = 2 (start) and N = 3
+    }
+
+    [Fact]
+    public void MergeByHash_UnifiesStatesAcrossGraphs()
+    {
+        // g1: A(hX) -> B(hY).  g2 resumes at B(hY) -> C(hZ).  Merged: A -> B -> C (3 states).
+        var g1 = new ExplorationGraph { InitialStateId = "S0" };
+        g1.States.Add(new ModelState("S0", "hX", Initial: true));
+        g1.States.Add(new ModelState("S1", "hY"));
+        g1.Transitions.Add(new Transition("S0", new ActionInvocation("a", System.Array.Empty<string>()), "S1"));
+
+        var g2 = new ExplorationGraph { InitialStateId = "S0" };
+        g2.States.Add(new ModelState("S0", "hY", Initial: true));
+        g2.States.Add(new ModelState("S1", "hZ", Accepting: true));
+        g2.Transitions.Add(new Transition("S0", new ActionInvocation("b", System.Array.Empty<string>()), "S1"));
+
+        var merged = GraphAnalysis.MergeByHash("M", new[] { g1, g2 }, "hX");
+        Assert.Equal(3, merged.States.Count);        // hX, hY, hZ unified (hY shared)
+        Assert.Equal(2, merged.Transitions.Count);   // a, b
+        Assert.Equal("hX", merged.FindState(merged.InitialStateId!)!.Hash);
+        Assert.Single(merged.States, s => s.Accepting);
+    }
+
+    [Fact]
+    public void FilterToGoalThenAccepting_KeepsRootGoalAccepting()
+    {
+        // root(hR) -> goal(hG) -> accept(hA) ; plus a dead branch root -> D(hD) that reaches no goal.
+        var g = new ExplorationGraph { InitialStateId = "S0" };
+        g.States.Add(new ModelState("S0", "hR", Initial: true));
+        g.States.Add(new ModelState("S1", "hG"));            // goal
+        g.States.Add(new ModelState("S2", "hA", Accepting: true));
+        g.States.Add(new ModelState("S3", "hD"));            // dead end
+        var a = new ActionInvocation("x", System.Array.Empty<string>());
+        g.Transitions.Add(new Transition("S0", a, "S1"));
+        g.Transitions.Add(new Transition("S1", a, "S2"));
+        g.Transitions.Add(new Transition("S0", a, "S3"));
+
+        GraphAnalysis.FilterToGoalThenAccepting(g, new HashSet<string> { "hG" });
+
+        Assert.Equal(new[] { "hA", "hG", "hR" }, g.States.Select(s => s.Hash).OrderBy(x => x)); // dead end pruned
+        Assert.DoesNotContain(g.States, s => s.Hash == "hD");
+    }
+
     /// <summary>A minimal model: counts 0..3 then stops. Used to exercise goal tracking.</summary>
     public sealed class Counter : ModelProgram
     {

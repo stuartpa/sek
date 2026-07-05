@@ -17,6 +17,10 @@ public sealed class ExplorationResult
     /// <summary>Distinct requirement ids captured (via <see cref="Sek.Modeling.Requirement.Capture"/>)
     /// anywhere in the exploration — the raw material for requirement-coverage reporting.</summary>
     public SortedSet<string> CapturedRequirements { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>Serialized model state (canonical JSON) for each graph state id. Lets a caller
+    /// resume exploration from a specific state — used by the phased point-shoot composition.</summary>
+    public Dictionary<string, string> StateJson { get; } = new(StringComparer.Ordinal);
 }
 
 /// <summary>
@@ -46,7 +50,12 @@ public sealed class Explorer
         _paramGen = parameterGeneration;
     }
 
-    public ExplorationResult Explore(string machineName)
+    public ExplorationResult Explore(string machineName) => Explore(machineName, null);
+
+    /// <summary>Explores a model program. When <paramref name="startJson"/> is given, the
+    /// exploration resumes from that serialized state instead of a fresh model instance (used to
+    /// chain phases in the point-shoot composition).</summary>
+    public ExplorationResult Explore(string machineName, string? startJson)
     {
         var graph = new ExplorationGraph { Machine = machineName };
         var result = new ExplorationResult { Graph = graph };
@@ -58,7 +67,7 @@ public sealed class Explorer
         var capturedReqs = new SortedSet<string>(StringComparer.Ordinal);
 
         // Initial state.
-        var initialInstance = CreateInstance();
+        var initialInstance = startJson is not null ? Deserialize(startJson) : CreateInstance();
         var initialJson = Serialize(initialInstance);
         var initialCanonical = CanonicalJson.Canonicalize(initialJson);
         var initialHash = CanonicalJson.Hash(initialCanonical);
@@ -66,6 +75,7 @@ public sealed class Explorer
         hashToId[initialHash] = initialId;
         graph.InitialStateId = initialId;
         graph.States.Add(new ModelState(initialId, initialHash, Label: null, Accepting: IsAccepting(initialInstance), Initial: true));
+        result.StateJson[initialId] = initialJson;
         if (IsGoal(initialInstance)) goals.Add(initialId);
         queue.Enqueue((initialId, initialJson, 0));
 
@@ -113,6 +123,7 @@ public sealed class Explorer
                         toId = "S" + nextId++;
                         hashToId[toHash] = toId;
                         graph.States.Add(new ModelState(toId, toHash, Label: null, Accepting: IsAccepting(target)));
+                        result.StateJson[toId] = toJson;
                         if (IsGoal(target)) goals.Add(toId);
                         queue.Enqueue((toId, toJson, depth + 1));
                     }
@@ -138,6 +149,7 @@ public sealed class Explorer
 
         var explored = new ExplorationResult { Graph = graph, HitBound = hitBound };
         foreach (var r in capturedReqs) explored.CapturedRequirements.Add(r);
+        foreach (var kv in result.StateJson) explored.StateJson[kv.Key] = kv.Value;
         return explored;
     }
 
