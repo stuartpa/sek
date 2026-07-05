@@ -1,44 +1,107 @@
 using Chat.Model;
 
-// chat (SEK port). Users are created on logon and form the domain of the User parameters;
-// user ids and broadcast payloads come from Cord Condition.In (Z3 parameter generation).
+// chat (SEK port) — faithful to the classic MS-CHAT sample. Users are created on logon and
+// form the domain of the User parameters; user ids come from LogonRequest(id) and broadcast
+// payloads are pinned by the scenarios. A user is pinned in a scenario by its id.
 
 config Actions
 {
+    action void StartServer();
+    action void ConnectToServer();
     action void LogonRequest(int userId);
     action void LogonResponse(User user);
+    action void ListRequest();
+    action void ListResponse();
     action void BroadcastRequest(User sender, string message);
     action void BroadcastAck(User receiver);
     action void LogoffRequest(User user);
     action void LogoffResponse(User user);
+    action void ErrorResponse(User user);
 
-    switch StateBound = 1000;
-    switch StepBound = 5000;
+    switch StateBound = 2000;
+    switch StepBound = 8000;
     switch TestEnabled = false;
 }
 
-config Parameters : Actions
+machine ModelProgram() : Actions
 {
-    action void LogonRequest(int userId)
-      where {. Condition.In(userId, 1, 2); .};
-
-    action void BroadcastRequest(User sender, string message)
-      where {. Condition.In(message, "hi"); .};
+    construct model program from Actions
 }
 
-machine ChatProtocol() : Parameters
+// Bound model program (as in the classic BoundModelProgram): bind LogonRequest to id 1 and
+// pin the broadcast message to "hi".
+machine BoundModelProgram() : Actions
 {
-    construct model program from Parameters
+    bind LogonRequest({1}), BroadcastRequest(_, "hi")
+    in
+    ModelProgram
 }
 
-// Scenario slicing (as in the classic sample's LogOnOffListSlice): log a user on, let them
-// broadcast and receive acknowledgements, then log off. The scenario slices the model.
-machine LogonBroadcastScenario() : Parameters
+// ---- Log-on / list / log-off scenario ----
+machine LogOnOffListScenario() : Actions
 {
-    LogonRequest; LogonResponse; BroadcastRequest; BroadcastAck* ; LogoffRequest; LogoffResponse
+    LogonRequest(1); LogonResponse;
+    LogonRequest(2); LogonResponse;
+    LogonRequest(3); LogonResponse;
+    ListRequest; ListResponse;
+    ( LogoffRequest; (LogoffResponse | ErrorResponse) )*
 }
 
-machine ChatSlice() : Parameters
+machine LogOnOffListSlice() : Actions
 {
-    LogonBroadcastScenario || construct model program from Parameters
+    LogOnOffListScenario || ModelProgram
+}
+
+// ---- Broadcast (ordered) scenario ----
+machine BroadcastOrderedScenario() : Actions
+{
+    LogonRequest(1); LogonResponse;
+    LogonRequest(2); LogonResponse;
+    BroadcastRequest(1, "1a");
+    BroadcastRequest(1, "1b");
+    ( BroadcastAck )*
+}
+
+machine BroadcastOrderedSlice() : Actions
+{
+    BroadcastOrderedScenario || ModelProgram
+}
+
+// ---- Broadcast (unordered) scenario ----
+machine BroadcastUnorderedScenario() : Actions
+{
+    LogonRequest(1); LogonResponse;
+    LogonRequest(2); LogonResponse;
+    BroadcastRequest(1, "1");
+    BroadcastRequest(2, "2");
+    ( BroadcastAck )*
+}
+
+machine BroadcastUnorderedSlice() : Actions
+{
+    BroadcastUnorderedScenario || ModelProgram
+}
+
+// ---- Combined slices ----
+// The three scenarios (prefixed by server start/connect) are unioned and sliced against the
+// model in one machine — equivalent to composing the individual slices.
+machine CombinedScenario() : Actions
+{
+    StartServer; ConnectToServer;
+    (LogOnOffListScenario | BroadcastOrderedScenario | BroadcastUnorderedScenario)
+}
+
+machine CombinedSlices() : Actions
+{
+    CombinedScenario || ModelProgram
+}
+
+machine TestSuite() : Actions where TestEnabled = true
+{
+    construct test cases where AllowUndeterminedCoverage = true for CombinedSlices
+}
+
+machine ReqCoverage() : Actions
+{
+    construct requirement coverage where strategy = "selective" for CombinedSlices
 }

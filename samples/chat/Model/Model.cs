@@ -26,7 +26,24 @@ namespace Chat.Model
     /// </summary>
     public sealed class ChatModel : ModelProgram
     {
+        public bool ServerStarted { get; set; }
+        public bool ClientConnected { get; set; }
         public List<User> Users { get; set; } = new List<User>();
+
+        [Rule("StartServer")]
+        public void StartServer()
+        {
+            Require(!ServerStarted, "server already started");
+            ServerStarted = true;
+        }
+
+        [Rule("ConnectToServer")]
+        public void ConnectToServer()
+        {
+            Require(ServerStarted, "server not started");
+            Require(!ClientConnected, "already connected");
+            ClientConnected = true;
+        }
 
         [Rule("LogonRequest")]
         public void LogonRequest(int userId)
@@ -40,6 +57,21 @@ namespace Chat.Model
         {
             Require(user.State == UserState.WaitingForLogon, "not awaiting logon");
             user.State = UserState.LoggedOn;
+        }
+
+        /// <summary>Request the list of logged-on users.</summary>
+        [Rule("ListRequest")]
+        public void ListRequest()
+        {
+            // Observation request only.
+        }
+
+        /// <summary>Returns the ids of the currently logged-on users (the classic sample's
+        /// Set&lt;int&gt; list response). Observation only during exploration.</summary>
+        [Rule("ListResponse")]
+        public IEnumerable<int> ListResponse()
+        {
+            return Users.Where(u => u.State == UserState.LoggedOn).Select(u => u.Id).ToList();
         }
 
         [Rule("BroadcastRequest")]
@@ -68,6 +100,14 @@ namespace Chat.Model
 
         [Rule("LogoffResponse")]
         public void LogoffResponse(User user)
+        {
+            Require(user.State == UserState.WaitingForLogoff, "not awaiting logoff");
+            Users.Remove(user);
+        }
+
+        /// <summary>Error path for a logoff (an alternative to LogoffResponse).</summary>
+        [Rule("ErrorResponse")]
+        public void ErrorResponse(User user)
         {
             Require(user.State == UserState.WaitingForLogoff, "not awaiting logoff");
             Users.Remove(user);

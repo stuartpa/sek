@@ -194,7 +194,7 @@ public sealed class Explorer
                     // Argument-aware scenario step: match each pinned argument pattern
                     // positionally (a `_` pattern argument is a wildcard), then fall back to
                     // the bare label (any arguments).
-                    var normArgs = invokeArgs.Select(a => BehaviorExplorer.NormArg(Stringify(a))).ToList();
+                    var normArgs = invokeArgs.Select(a => BehaviorExplorer.NormArg(ArgIdentity(a))).ToList();
                     if (!scenario.TryStepArgs(dfaState, bareLabel, normArgs, out var ndfa) &&
                         !scenario.TryStep(dfaState, bareLabel, out ndfa))
                     {
@@ -979,5 +979,27 @@ public sealed class Explorer
             _ when IsModelObjectType(value.GetType()) => JsonSerializer.Serialize(value, value.GetType(), _json),
             _ => value.ToString() ?? string.Empty,
         };
+    }
+
+    /// <summary>The identity of an argument for scenario matching: for a model object with an
+    /// <c>Id</c>/<c>Name</c>/<c>Handle</c> property, that property's value (so a scenario can
+    /// pin an object by id, e.g. BroadcastRequest(1, ..)); otherwise the stringified value.</summary>
+    private string ArgIdentity(object? value)
+    {
+        if (value is not null && IsModelObjectType(value.GetType()))
+        {
+            var t = value.GetType();
+            foreach (var name in new[] { "Id", "Name", "Handle" })
+            {
+                var prop = t.GetProperty(name, BindingFlags.Public | BindingFlags.Instance);
+                if (prop is not null)
+                {
+                    var v = prop.GetValue(value);
+                    if (v is not null) return v.ToString() ?? string.Empty;
+                }
+            }
+        }
+
+        return Stringify(value);
     }
 }
