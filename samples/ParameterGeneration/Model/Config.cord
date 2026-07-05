@@ -156,6 +156,73 @@ machine EquivalenceClass() : EquivalenceClass
     AddJobEC || construct model program from EquivalenceClass
 }
 
+// Bitmask: an integer day bitmask; where-block locals extract the individual day bits,
+// which are then covered pairwise alongside name/time.
+config Bitmask : Base
+{
+    action static void SUT.AddJobBitmask(string name, int time, uint days)
+      where {.
+                Condition.In(name, "t.cmd", "t.exe");
+                Condition.In(time, 60, 3600);
+                Condition.IsTrue(days >= 0 & days <= 127);
+                uint mon = days & 0x1;
+                uint tue = days & 0x2;
+                uint wed = days & 0x4;
+                uint thu = days & 0x8;
+                uint fri = days & 0x10;
+                uint sat = days & 0x20;
+                uint sun = days & 0x40;
+                Combination.Pairwise(name, time, mon, tue, wed, thu, fri, sat, sun);
+          .};
+}
+machine Bitmask() : Bitmask
+{
+    AddJobBitmask || construct model program from Bitmask
+}
+
+// Flags: a [Flags] enum; the individual flags are extracted inline as combination columns.
+config Flags : Base
+{
+    action static void SUT.AddJobFlags(string name, int time, DaysOfWeek days)
+      where {.
+                Condition.In(name, "t.cmd", "t.exe");
+                Condition.In(time, 60, 3600);
+                Condition.IsTrue(days >= DaysOfWeek.None & days <= DaysOfWeek.All);
+                Combination.Pairwise(name, time,
+                    days & DaysOfWeek.Mon,
+                    days & DaysOfWeek.Tue,
+                    days & DaysOfWeek.Wed,
+                    days & DaysOfWeek.Thu,
+                    days & DaysOfWeek.Fri,
+                    days & DaysOfWeek.Sat,
+                    days & DaysOfWeek.Sun);
+          .};
+}
+machine Flags() : Flags
+{
+    AddJobFlags || construct model program from Flags
+}
+
+// Probability: a probabilistic branch selects the name domain (deterministic majority
+// branch in SEK), then the parameters are covered pairwise.
+config Probability : Base
+{
+    action static void SUT.CreateFile(string name, bool errorIfExists, bool appendAtEnd)
+      where {.
+                if (Probability.IsTrue(0.8))
+                    Condition.In(name, "foo", "bar");
+                else
+                    Condition.In(name, "@^@");
+                Combination.Pairwise(name, errorIfExists, appendAtEnd);
+          .};
+    switch RandomSeed = 2;
+}
+machine Probability() : Probability
+{
+    (CreateFile; CreateFile; CreateFile; CreateFile; CreateFile)
+    || construct model program from Probability
+}
+
 // Let: bound variables combined pairwise then fully expanded, threaded through A;B;C.
 // (Sliced against the model so only A/B/C fire with the let-bound values.)
 machine Let() : Base

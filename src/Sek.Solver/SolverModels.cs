@@ -103,4 +103,9 @@ public sealed class CombinationSpec
     /// <summary><c>Combination.Expand(p...)</c>: fully expand these parameters — every distinct
     /// value tuple they take must be represented, even under a pairwise reduction.</summary>
     public List<string> Expand { get; } = new();
+
+    /// <summary>When set, pairwise reduction covers value-pairs of these named columns (each an
+    /// expression over the parameters, e.g. <c>days &amp; 0x1</c>) instead of the raw parameters.
+    /// Enables <c>Combination.Pairwise(name, time, days &amp; 0x1, ...)</c> over derived values.</summary>
+    public List<(string Name, Expr Expr)> PairwiseColumns { get; } = new();
 }

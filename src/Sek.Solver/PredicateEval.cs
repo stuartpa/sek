@@ -9,6 +9,10 @@ public static class PredicateEval
         return v is bool b && b;
     }
 
+    /// <summary>Evaluates an expression to its value against an assignment (public for
+    /// computing derived combination columns, e.g. <c>days &amp; 0x1</c>).</summary>
+    public static object? Evaluate(Expr expr, IReadOnlyDictionary<string, object?> assignment) => Value(expr, assignment);
+
     private static object? Value(Expr expr, IReadOnlyDictionary<string, object?> a)
     {
         switch (expr)

@@ -876,7 +876,8 @@ public sealed class Explorer
     private static CombinationSpec ResolveEnumLiterals(RuleInfo rule, CombinationSpec c)
     {
         var enumTypes = EnumTypes(rule);
-        if (enumTypes.Count == 0 || (c.Isolated.Count == 0 && c.Seeded.Count == 0))
+        var needsRewrite = enumTypes.Count > 0 && (c.Isolated.Count > 0 || c.Seeded.Count > 0 || c.PairwiseColumns.Count > 0);
+        if (!needsRewrite && c.PairwiseColumns.Count == 0)
         {
             return c;
         }
@@ -885,6 +886,7 @@ public sealed class Explorer
         res.Expand.AddRange(c.Expand);
         foreach (var e in c.Isolated) res.Isolated.Add(RewriteEnum(e, enumTypes));
         foreach (var seed in c.Seeded) res.Seeded.Add(seed.Select(e => RewriteEnum(e, enumTypes)).ToList());
+        foreach (var col in c.PairwiseColumns) res.PairwiseColumns.Add((col.Name, RewriteEnum(col.Expr, enumTypes)));
         return res;
     }
 

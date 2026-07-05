@@ -27,12 +27,47 @@ public static class CordConstraintExtractor
             return result;
         }
 
+        // First pass: collect where-block local declarations `Type name = expr;` (e.g.
+        // `uint mon = days & 0x1;`) so Combination columns can reference them.
+        var locals = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var stmt in SplitStatements(action.WhereCode))
+        {
+            var s = stmt.Trim();
+            if (TryParseLocal(s, paramNames, out var localName, out var localExpr))
+            {
+                locals[localName] = localExpr;
+            }
+        }
+
+        var takeElse = false;
         foreach (var stmt in SplitStatements(action.WhereCode))
         {
             var s = stmt.Trim();
             if (s.Length == 0)
             {
                 continue;
+            }
+
+            // Probabilistic branch: `if (Probability.IsTrue(p)) <then>` / `else <else>`. (p >= 0.5 takes the `then` branch) — Spec Explorer
+            // uses a seeded RNG; SEK approximates with the majority branch for reproducibility.
+            if (s.StartsWith("if ", StringComparison.Ordinal) || s.StartsWith("if(", StringComparison.Ordinal))
+            {
+                var open = s.IndexOf('(');
+                var close = MatchParen(s, open);
+                var cond = open >= 0 && close > open ? s[(open + 1)..close] : string.Empty;
+                var thenStmt = close >= 0 && close + 1 <= s.Length ? s[(close + 1)..].Trim() : string.Empty;
+                var taken = EvalProbability(cond);
+                takeElse = !taken;
+                if (!taken) continue;
+                s = thenStmt;
+            }
+            else if (s.StartsWith("else", StringComparison.Ordinal))
+            {
+                var elseStmt = s[4..].Trim();
+                var run = takeElse;
+                takeElse = false;
+                if (!run) continue;
+                s = elseStmt;
             }
 
             if (s.StartsWith("Condition.In", StringComparison.Ordinal))
@@ -71,6 +106,22 @@ public static class CordConstraintExtractor
             else if (s.StartsWith("Combination.Pairwise", StringComparison.Ordinal))
             {
                 result.Combination.Mode = CombinationSpec.Strategy.Pairwise;
+                // If any Pairwise argument is a derived expression (a where-local or a compound
+                // expression like `days & DaysOfWeek.Mon`), treat every argument as a column.
+                var args = SplitArgs(ArgsInside(s)).Select(a => a.Trim()).Where(a => a.Length > 0).ToList();
+                var anyDerived = args.Any(a => locals.ContainsKey(a) || !(paramNames.Contains(a) || IsFieldOfParam(a, paramNames)));
+                if (anyDerived)
+                {
+                    foreach (var a in args)
+                    {
+                        var exprText = locals.TryGetValue(a, out var le) ? le : a;
+                        var (cexpr, _, cok) = ExprParser.TryParse(exprText);
+                        if (cok && cexpr is not null)
+                        {
+                            result.Combination.PairwiseColumns.Add((a, cexpr));
+                        }
+                    }
+                }
             }
             else if (s.StartsWith("Combination.Expand", StringComparison.Ordinal))
             {
@@ -126,6 +177,53 @@ public static class CordConstraintExtractor
     {
         var dot = token.IndexOf('.');
         return dot > 0 && paramNames.Contains(token[..dot]);
+    }
+
+    /// <summary>Index of the parenthesis matching the one at <paramref name="open"/>, or -1.</summary>
+    private static int MatchParen(string s, int open)
+    {
+        if (open < 0 || open >= s.Length || s[open] != '(') return -1;
+        var depth = 0;
+        for (var i = open; i < s.Length; i++)
+        {
+            if (s[i] == '(') depth++;
+            else if (s[i] == ')' && --depth == 0) return i;
+        }
+
+        return -1;
+    }
+
+    /// <summary>Evaluates a <c>Probability.IsTrue(p)</c> condition deterministically: true when
+    /// p &gt;= 0.5 (the majority branch). Spec Explorer uses a seeded RNG.</summary>
+    private static bool EvalProbability(string cond)
+    {
+        var inner = ArgsInside(cond);
+        return double.TryParse(inner.Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var p)
+            ? p >= 0.5
+            : true;
+    }
+
+    /// <summary>Recognizes a where-block local declaration <c>Type name = expr</c> (e.g.    /// <c>uint mon = days &amp; 0x1</c>) whose right-hand side references a parameter.</summary>
+    private static bool TryParseLocal(string stmt, HashSet<string> paramNames, out string name, out string expr)
+    {
+        name = string.Empty;
+        expr = string.Empty;
+        if (stmt.StartsWith("Condition", StringComparison.Ordinal) || stmt.StartsWith("Combination", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var eq = stmt.IndexOf('=');
+        if (eq <= 0) return false;
+        var lhs = stmt[..eq].Trim();
+        var rhs = stmt[(eq + 1)..].Trim();
+        // lhs must be "Type name" (two identifiers) and rhs must mention a parameter.
+        var parts = lhs.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length != 2) return false;
+        if (!MentionsParam(rhs, paramNames)) return false;
+        name = parts[1];
+        expr = rhs;
+        return true;
     }
 
     /// <summary>True if any whole-word identifier in the code names a known parameter.</summary>

@@ -32,6 +32,20 @@ public static class Combinatorics
             ? Pairwise(paramNames, all)
             : all.ToList();
 
+        // Pairwise over derived expression columns (e.g. Combination.Pairwise(name, days & 0x1, ..)):
+        // compute each column per combination, then cover value-pairs of the columns.
+        if (spec.PairwiseColumns.Count > 0)
+        {
+            var colNames = spec.PairwiseColumns.Select(c => c.Name).ToList();
+            var augmented = all.Select(a =>
+            {
+                var d = new Dictionary<string, object?>(a);
+                foreach (var col in spec.PairwiseColumns) d[col.Name] = PredicateEval.Evaluate(col.Expr, a);
+                return (IReadOnlyDictionary<string, object?>)d;
+            }).ToList();
+            work = Pairwise(colNames, augmented);
+        }
+
         // Expand: ensure every distinct value-tuple of the listed params (as seen across all
         // satisfying combinations) is represented in the result.
         var expand = spec.Expand.Where(paramNames.Contains).ToList();
