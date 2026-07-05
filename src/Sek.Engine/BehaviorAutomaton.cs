@@ -49,7 +49,45 @@ public sealed class BehaviorExplorer
             _alphabet.Add(sym);
         }
 
-        return new CompiledScenario(ToDfa(body), ContainsFail(body, new HashSet<string>(StringComparer.Ordinal)));
+        // Return-bindings: map each producing atom's symbol to the variable it binds
+        // (`Producer(args) / var`), and collect the variable names so a consumer's argument that
+        // references one is matched against the captured value during slicing.
+        var returnBindings = new Dictionary<string, string>(StringComparer.Ordinal);
+        var bindingVars = new HashSet<string>(StringComparer.Ordinal);
+        CollectReturnBindings(body, new HashSet<string>(StringComparer.Ordinal), returnBindings, bindingVars);
+
+        return new CompiledScenario(ToDfa(body), ContainsFail(body, new HashSet<string>(StringComparer.Ordinal)), returnBindings, bindingVars);
+    }
+
+    /// <summary>Walks the behavior collecting return-binding metadata: <c>symbol → bound
+    /// variable</c> for each <c>Action(args) / var</c>, and the set of bound variable names.</summary>
+    private void CollectReturnBindings(Behavior? b, HashSet<string> seenMachines, Dictionary<string, string> map, HashSet<string> vars)
+    {
+        switch (b)
+        {
+            case null: return;
+            case InvocationBehavior inv:
+                if (inv.ReturnBinding is { Length: > 0 } v)
+                {
+                    map[SymbolOf(inv)] = v;
+                    vars.Add(v);
+                }
+
+                var m = _resolveMachine(inv.Target);
+                if (m is not null && seenMachines.Add(inv.Target)) CollectReturnBindings(m, seenMachines, map, vars);
+                return;
+            case SequenceBehavior s: foreach (var i in s.Items) CollectReturnBindings(i, seenMachines, map, vars); return;
+            case ChoiceBehavior c: foreach (var i in c.Items) CollectReturnBindings(i, seenMachines, map, vars); return;
+            case ParallelBehavior p: foreach (var i in p.Items) CollectReturnBindings(i, seenMachines, map, vars); return;
+            case PermutationBehavior pm: foreach (var i in pm.Items) CollectReturnBindings(i, seenMachines, map, vars); return;
+            case LooseSequenceBehavior ls: foreach (var i in ls.Items) CollectReturnBindings(i, seenMachines, map, vars); return;
+            case RepetitionBehavior rep: CollectReturnBindings(rep.Inner, seenMachines, map, vars); return;
+            case GroupBehavior g: CollectReturnBindings(g.Inner, seenMachines, map, vars); return;
+            case PreconstraintBehavior pc: CollectReturnBindings(pc.Inner, seenMachines, map, vars); return;
+            case FailBehavior fb: CollectReturnBindings(fb.Inner, seenMachines, map, vars); return;
+            case LetBehavior l: CollectReturnBindings(l.Inner, seenMachines, map, vars); return;
+            case BindBehavior bd: CollectReturnBindings(bd.Inner, seenMachines, map, vars); return;
+        }
     }
 
     /// <summary>Whether the behavior contains a <c>: fail</c> annotation (recursing machine
@@ -135,15 +173,27 @@ public sealed class BehaviorExplorer
     public sealed class CompiledScenario
     {
         private readonly IDfa _dfa;
+        private readonly IReadOnlyDictionary<string, string> _returnBindings;
+        private readonly IReadOnlySet<string> _bindingVars;
 
         internal CompiledScenario(IDfa dfa, bool hasFail)
+            : this(dfa, hasFail, new Dictionary<string, string>(StringComparer.Ordinal), new HashSet<string>(StringComparer.Ordinal))
+        {
+        }
+
+        internal CompiledScenario(IDfa dfa, bool hasFail, IReadOnlyDictionary<string, string> returnBindings, IReadOnlySet<string> bindingVars)
         {
             _dfa = dfa;
             HasFailStates = hasFail;
             Start = dfa.Start;
+            _returnBindings = returnBindings;
+            _bindingVars = bindingVars;
         }
 
         public int Start { get; }
+
+        /// <summary>True when the scenario uses return-bindings (<c>Action(args) / var</c>).</summary>
+        public bool HasReturnBindings => _returnBindings.Count > 0;
 
         public bool IsAccepting(int state) => state >= 0 && _dfa.Accept(state);
 
@@ -216,7 +266,55 @@ public sealed class BehaviorExplorer
             return false;
         }
 
-        /// <summary>The argument patterns the scenario pins for <paramref name="bareLabel"/> at
+        /// <summary>Steps an action honouring return-bindings: a scenario argument token that names
+        /// a bound variable matches the value captured for it (via <paramref name="env"/>) — or is a
+        /// wildcard while still unbound. Also matches the bare label (any args). On success, reports
+        /// the next state and, when the taken atom is a producer (<c>Action(args) / var</c>), the
+        /// variable <paramref name="boundVar"/> whose value the caller should capture.</summary>
+        public bool TryStepBinding(int state, string bareLabel, IReadOnlyList<string> concreteArgs, IReadOnlyDictionary<string, string> env, out int next, out string? boundVar)
+        {
+            next = -1;
+            boundVar = null;
+            if (state < 0) return false;
+            var on = _dfa.On(state);
+            var prefix = bareLabel + "(";
+
+            foreach (var kv in on)
+            {
+                var key = kv.Key;
+                if (key.StartsWith(prefix, StringComparison.Ordinal) && key.EndsWith(")", StringComparison.Ordinal))
+                {
+                    var inside = key.Substring(prefix.Length, key.Length - prefix.Length - 1);
+                    var pat = inside.Length == 0 ? Array.Empty<string>() : inside.Split(',');
+                    if (pat.Length != concreteArgs.Count) continue;
+
+                    var ok = true;
+                    for (var i = 0; i < pat.Length; i++)
+                    {
+                        if (pat[i] == "_") continue;                          // wildcard
+                        if (_bindingVars.Contains(pat[i]))                    // binding-var reference
+                        {
+                            if (env.TryGetValue(pat[i], out var bound) && !string.Equals(bound, concreteArgs[i], StringComparison.Ordinal)) { ok = false; break; }
+                            continue; // unbound var acts as a wildcard
+                        }
+
+                        if (!string.Equals(pat[i], concreteArgs[i], StringComparison.Ordinal)) { ok = false; break; }
+                    }
+
+                    if (ok) { next = kv.Value; boundVar = _returnBindings.GetValueOrDefault(key); return true; }
+                }
+            }
+
+            // Bare label (a producer with no pinned args, e.g. `Producer() / h`).
+            if (on.TryGetValue(bareLabel, out var bareNext))
+            {
+                next = bareNext;
+                boundVar = _returnBindings.GetValueOrDefault(bareLabel);
+                return true;
+            }
+
+            return false;
+        }
         /// <paramref name="state"/> (each a normalized token array; <c>_</c> = wildcard). Used to
         /// feed scenario-supplied argument values into parameter generation during slicing.</summary>
         public IEnumerable<string[]> ArgPatterns(int state, string bareLabel)

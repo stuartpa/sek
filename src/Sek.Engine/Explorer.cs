@@ -165,9 +165,10 @@ public sealed class Explorer
         var graph = new ExplorationGraph { Machine = machineName };
         var result = new ExplorationResult { Graph = graph };
         var hashToId = new Dictionary<string, string>();
-        var queue = new Queue<(string Id, string Json, int Dfa, int Depth)>();
+        var queue = new Queue<(string Id, string Json, int Dfa, int Depth, IReadOnlyDictionary<string, string> Env)>();
         var hitBound = false;
         var capturedReqs = new SortedSet<string>(StringComparer.Ordinal);
+        var emptyEnv = (IReadOnlyDictionary<string, string>)new Dictionary<string, string>(StringComparer.Ordinal);
 
         var initialInstance = CreateInstance();
         var initialJson = Serialize(initialInstance);
@@ -177,12 +178,12 @@ public sealed class Explorer
         graph.InitialStateId = initialId;
         graph.States.Add(new ModelState(initialId, initialHash, Label: null,
             Accepting: CombinedAccepting(scenario, initialInstance, scenario.Start), Initial: true));
-        queue.Enqueue((initialId, initialJson, scenario.Start, 0));
+        queue.Enqueue((initialId, initialJson, scenario.Start, 0, emptyEnv));
         var nextId = 1;
 
         while (queue.Count > 0)
         {
-            var (fromId, fromJson, dfaState, depth) = queue.Dequeue();
+            var (fromId, fromJson, dfaState, depth, env) = queue.Dequeue();
             if (depth >= _options.MaxDepth) continue;
 
             var domainInstance = Deserialize(fromJson);
@@ -233,8 +234,17 @@ public sealed class Explorer
                     // the bare label (any arguments). The implicit receiver is skipped so the
                     // pattern aligns with the action's visible parameters.
                     var normArgs = invokeArgs.Skip(recv).Select(a => BehaviorExplorer.NormArg(ArgIdentity(a))).ToList();
-                    if (!scenario.TryStepArgs(dfaState, bareLabel, normArgs, out var ndfa) &&
-                        !scenario.TryStep(dfaState, bareLabel, out ndfa))
+                    int ndfa;
+                    string? boundVar = null;
+                    if (scenario.HasReturnBindings)
+                    {
+                        if (!scenario.TryStepBinding(dfaState, bareLabel, normArgs, env, out ndfa, out boundVar))
+                        {
+                            continue; // scenario does not permit this action with these arguments/bindings
+                        }
+                    }
+                    else if (!scenario.TryStepArgs(dfaState, bareLabel, normArgs, out ndfa) &&
+                             !scenario.TryStep(dfaState, bareLabel, out ndfa))
                     {
                         continue; // the scenario does not permit this action with these arguments
                     }
@@ -246,9 +256,18 @@ public sealed class Explorer
 
                     foreach (var req in Requirement.Captured) capturedReqs.Add(req);
 
+                    // Return-binding: when the scenario atom captures a return value (`… / var`),
+                    // extend the environment so a later consumer referencing `var` matches it.
+                    var toEnv = env;
+                    if (boundVar is not null)
+                    {
+                        var captured = ResultOf(rule, retVal) ?? Stringify(retVal);
+                        toEnv = new Dictionary<string, string>(env, StringComparer.Ordinal) { [boundVar] = captured ?? string.Empty };
+                    }
+
                     var toJson = Serialize(target);
                     var toHash = CanonicalJson.Hash(CanonicalJson.Canonicalize(toJson));
-                    var toCombined = toHash + "@" + ndfa;
+                    var toCombined = toHash + "@" + ndfa + (scenario.HasReturnBindings ? "#" + EnvSig(toEnv) : "");
 
                     if (!hashToId.TryGetValue(toCombined, out var toId))
                     {
@@ -260,7 +279,7 @@ public sealed class Explorer
                         // Failure states are terminal violations: do not expand past them.
                         if (!scenario.IsFail(ndfa))
                         {
-                            queue.Enqueue((toId, toJson, ndfa, depth + 1));
+                            queue.Enqueue((toId, toJson, ndfa, depth + 1, toEnv));
                         }
                     }
 
@@ -334,6 +353,11 @@ public sealed class Explorer
     /// <c>Action(args) / var</c> return-binding captures), or null for a <c>void</c> action.</summary>
     private string? ResultOf(RuleInfo rule, object? returnValue) =>
         rule.Method.ReturnType == typeof(void) || returnValue is null ? null : Stringify(returnValue);
+
+    /// <summary>A stable signature of a return-binding environment, part of the combined state key
+    /// so states that differ only in their captured bindings stay distinct.</summary>
+    private static string EnvSig(IReadOnlyDictionary<string, string> env) =>
+        env.Count == 0 ? "" : string.Join(",", env.OrderBy(kv => kv.Key, StringComparer.Ordinal).Select(kv => kv.Key + "=" + kv.Value));
 
     private bool IsAccepting(object instance)
     {

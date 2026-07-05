@@ -102,6 +102,30 @@ public class ActionSemanticsTests
         Assert.Equal(new[] { "5", "y" }, resolved[1]);   // x bound to 5; y unbound stays
     }
 
+    [Fact]
+    public void ExploreSliced_ReturnBinding_ConsumerMatchesCapturedValue()
+    {
+        // Scenario:  Open() / h ; Use(h)  — Open returns handle 1, so Use must fire with 1, not 2.
+        var open = new InvocationBehavior { Target = "Open", Args = new List<string>(), ReturnBinding = "h" };
+        var use = new InvocationBehavior { Target = "Use", Args = new List<string> { "h" } };
+        var scenario = new SequenceBehavior();
+        scenario.Items.Add(open);
+        scenario.Items.Add(use);
+
+        var introspector = new ModelIntrospector(typeof(HandleModel));
+        static string Short(string l) { var i = l.LastIndexOf('.'); return i >= 0 ? l[(i + 1)..] : l; }
+        var be = new BehaviorExplorer(_ => null, introspector.Rules.Select(r => Short(r.ActionLabel)));
+        var compiled = be.Compile(scenario);
+        Assert.True(compiled.HasReturnBindings);
+
+        var result = new Explorer(introspector, new ExplorationOptions { MaxDepth = 10, MaxStates = 50 })
+            .ExploreSliced("HandleModel", compiled, Short);
+
+        var useTransitions = result.Graph.Transitions.Where(t => t.Action.Name == "Use").ToList();
+        Assert.Single(useTransitions);                        // exactly one Use fired
+        Assert.Equal("1", useTransitions[0].Action.Arguments.Single()); // with the captured handle 1, not 2
+    }
+
     /// <summary>Emits a controllable Press and an observable Ring.</summary>
     public sealed class Emitter : ModelProgram
     {
@@ -121,5 +145,19 @@ public class ActionSemanticsTests
 
         [Rule("Next")]
         public int Next() { Require(N < 2, "max"); N++; return N; }
+    }
+
+    /// <summary>Opens a single handle (always id 1); Use accepts handle 1 or 2 from its domain.</summary>
+    public sealed class HandleModel : ModelProgram
+    {
+        public bool Opened { get; set; }
+
+        private int[] Two() => new[] { 1, 2 };
+
+        [Rule("Open")]
+        public int Open() { Require(!Opened, "once"); Opened = true; return 1; }
+
+        [Rule("Use")]
+        public void Use([Domain("Two")] int h) { Require(Opened, "not opened"); }
     }
 }
