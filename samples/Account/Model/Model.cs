@@ -7,7 +7,7 @@ namespace AccountSample
     /// <summary>A model-side account. State is its balance; identity is structural.</summary>
     public sealed class Account
     {
-        public int Balance { get; set; }
+        public float Balance { get; set; }
     }
 
     /// <summary>
@@ -28,7 +28,7 @@ namespace AccountSample
         }
 
         [Rule("AccountImpl.SetBalance")]
-        public void SetBalance(Account account, int balance)
+        public void SetBalance(Account account, float balance)
         {
             account.Balance = balance;
         }
@@ -37,6 +37,14 @@ namespace AccountSample
         public void GetBalance(Account account)
         {
             // Observation only — no state change.
+        }
+
+        /// <summary>Returns the accounts whose balance matches (the classic sample's
+        /// Set&lt;Account&gt;-returning LINQ query). Observation only during exploration.</summary>
+        [Rule("AccountImpl.SearchAccounts")]
+        public IEnumerable<Account> SearchAccounts(float balance)
+        {
+            return Accounts.Where(a => a.Balance == balance).ToList();
         }
 
         [Rule("AccountImpl.Clear")]

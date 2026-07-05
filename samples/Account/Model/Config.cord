@@ -1,14 +1,16 @@
 using AccountSample;
 
-// Account (SEK port). CreateAccount populates the object domain; SetBalance/GetBalance
-// take an Account parameter whose domain is the set of reachable accounts. SetBalance's
-// balance domain comes from Cord (Z3 / enumerative parameter generation).
+// Account (SEK port) — faithful to the classic TypeBinding sample. CreateAccount populates
+// the object domain; SetBalance/GetBalance/SearchAccounts take an Account or a balance whose
+// domain comes from Cord (Z3 / enumerative parameter generation). SearchAccounts returns the
+// matching accounts (the sample's Set<Account> LINQ query).
 
 config Main
 {
     action void AccountImpl.CreateAccount();
-    action void AccountImpl.SetBalance(Account account, int balance);
+    action void AccountImpl.SetBalance(Account account, float balance);
     action void AccountImpl.GetBalance(Account account);
+    action void AccountImpl.SearchAccounts(float balance);
     action void AccountImpl.Clear();
 
     switch StateBound = 500;
@@ -18,19 +20,32 @@ config Main
 
 config ParameterCombinationConfig : Main
 {
-    action void AccountImpl.SetBalance(Account account, int balance)
+    action void AccountImpl.SetBalance(Account account, float balance)
       where {. Condition.In(balance, 10, 100); .};
+
+    action void AccountImpl.SearchAccounts(float balance)
+      where {. Condition.In(balance, 20, 100); .};
 }
 
+machine ModelProgram() : ParameterCombinationConfig
+{
+    construct model program from ParameterCombinationConfig
+}
+
+// Scenario slicing (the classic sample's SlicedModelProgram): create an account, use it
+// (set/get its balance, search) any number of times, then clear.
+machine SlicedModelProgram() : ParameterCombinationConfig
+{
+    (CreateAccount; (SetBalance | GetBalance | SearchAccounts)* ; Clear) || ModelProgram
+}
+
+// Retained alias for the earlier SEK machine name.
 machine AccountExploration() : ParameterCombinationConfig
 {
     construct model program from ParameterCombinationConfig
 }
 
-// Scenario slicing (as in the classic sample's SlicedModelProgram): restrict the model
-// to runs that create an account, use it (set/get its balance) any number of times, then
-// clear. The scenario composes with the model program via `||`.
 machine SlicedAccount() : ParameterCombinationConfig
 {
-    (CreateAccount; (SetBalance | GetBalance)* ; Clear) || construct model program from ParameterCombinationConfig
+    (CreateAccount; (SetBalance | GetBalance | SearchAccounts)* ; Clear) || ModelProgram
 }
