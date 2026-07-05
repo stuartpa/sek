@@ -18,7 +18,7 @@ public sealed class ActionConstraints
 
 public static class CordConstraintExtractor
 {
-    public static ActionConstraints Extract(DeclaredAction action)
+    public static ActionConstraints Extract(DeclaredAction action, int randomSeed = 0)
     {
         var result = new ActionConstraints();
         var paramNames = action.Parameters.Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
@@ -26,6 +26,10 @@ public static class CordConstraintExtractor
         {
             return result;
         }
+
+        // A seeded gate for `Probability.IsTrue(p)` branch selection: reproducible for a given
+        // `switch RandomSeed`, and consulted sequentially as the where-block is scanned.
+        var probability = new Sek.Solver.ProbabilityGate(randomSeed);
 
         // Strip C# comments so a `// ...` line preceding a statement does not swallow it when
         // the block is split on `;` (a chunk beginning with a comment would fail the
@@ -61,7 +65,7 @@ public static class CordConstraintExtractor
                 var close = MatchParen(s, open);
                 var cond = open >= 0 && close > open ? s[(open + 1)..close] : string.Empty;
                 var thenStmt = close >= 0 && close + 1 <= s.Length ? s[(close + 1)..].Trim() : string.Empty;
-                var taken = EvalProbability(cond);
+                var taken = EvalProbability(cond, probability);
                 takeElse = !taken;
                 if (!taken) continue;
                 s = thenStmt;
@@ -198,13 +202,13 @@ public static class CordConstraintExtractor
         return -1;
     }
 
-    /// <summary>Evaluates a <c>Probability.IsTrue(p)</c> condition deterministically: true when
-    /// p &gt;= 0.5 (the majority branch). Spec Explorer uses a seeded RNG.</summary>
-    private static bool EvalProbability(string cond)
+    /// <summary>Evaluates a <c>Probability.IsTrue(p)</c> condition with a seeded gate, so the
+    /// chosen branch is reproducible for a given <c>RandomSeed</c> and varies across seeds.</summary>
+    private static bool EvalProbability(string cond, Sek.Solver.ProbabilityGate gate)
     {
         var inner = ArgsInside(cond);
         return double.TryParse(inner.Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var p)
-            ? p >= 0.5
+            ? gate.IsTrue(p)
             : true;
     }
 

@@ -701,12 +701,19 @@ ParameterGeneration BuildParamGen(
 {
     var byAction = new Dictionary<string, ActionParamSpec>();
 
+    // Seed for Probability.IsTrue(p) branch selection (Cord `switch RandomSeed`, default 0).
+    var randomSeed = 0;
+    if (cord.ResolveMachineSwitches(machine).TryGetValue("RandomSeed", out var seedText)
+        && int.TryParse(seedText, out var parsedSeed))
+    {
+        randomSeed = parsedSeed;
+    }
+
     var declared = new Dictionary<string, DeclaredAction>();
     if (!string.IsNullOrEmpty(cfgName))
     {
         foreach (var kv in cord.ResolveDeclaredActions(cfgName)) declared[kv.Key] = kv.Value;
     }
-
     foreach (var kv in cord.ResolveMachineDeclaredActions(machine))
     {
         // Do not let the slice machine's own base config (often the bare scenario config)
@@ -723,7 +730,7 @@ ParameterGeneration BuildParamGen(
 
     foreach (var da in declared.Values)
     {
-        var ac = CordConstraintExtractor.Extract(da);
+        var ac = CordConstraintExtractor.Extract(da, randomSeed);
         if (ac.Constraints.Count > 0
             || ac.Combination.Mode != CombinationSpec.Strategy.AllCombinations
             || ac.Combination.Isolated.Count > 0

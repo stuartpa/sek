@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Sek.Tests: unit + integration coverage for the SEK engine, Cord front-end, and solver.
+    Focuses on the "proper systems engineering" features (probability sampling, point-shoot
+    steering, requirement coverage, test-generation strategies, action-all resolution,
+    call/return/event semantics, return binding, and value-typed state containers).
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>Sek.Tests</RootNamespace>
+    <AssemblyName>Sek.Tests</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Sek.Cli\Sek.Cli.csproj" />
+    <ProjectReference Include="..\..\src\Sek.Cord\Sek.Cord.csproj" />
+    <ProjectReference Include="..\..\src\Sek.Core\Sek.Core.csproj" />
+    <ProjectReference Include="..\..\src\Sek.Engine\Sek.Engine.csproj" />
+    <ProjectReference Include="..\..\src\Sek.Modeling\Sek.Modeling.csproj" />
+    <ProjectReference Include="..\..\src\Sek.Solver\Sek.Solver.csproj" />
+  </ItemGroup>
+
+</Project>

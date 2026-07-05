@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Sek.Cli/Sek.Cli.csproj" />
+    <Project Path="src/Sek.Cord/Sek.Cord.csproj" />
+    <Project Path="src/Sek.Core/Sek.Core.csproj" />
+    <Project Path="src/Sek.Engine/Sek.Engine.csproj" />
+    <Project Path="src/Sek.Modeling/Sek.Modeling.csproj" />
+    <Project Path="src/Sek.Solver/Sek.Solver.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Sek.Tests/Sek.Tests.csproj" />
+  </Folder>
+</Solution>
