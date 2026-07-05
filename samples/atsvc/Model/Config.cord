@@ -1,11 +1,13 @@
 using ATSvc.Model;
 
-// atsvc (SEK port). Job objects created during exploration form the domain of the Job
-// parameters; AddJob's command/time domains and validity predicate come from Cord (Z3).
+// atsvc (SEK port) — faithful to the classic sample. AddJob takes a JobInfo struct and an
+// out job id; the struct's field domains + validity predicate come from Cord (Z3). Job
+// objects created during exploration form the domain of the Job parameters.
 
+/// The basic configuration.
 config Config
 {
-    action static void ATService.AddJob(string command, int time);
+    action static bool ATService.AddJob(JobInfo info, out int jobId);
     action static void ATService.GetJobInfo(Job job);
     action static void ATService.DeleteJob(Job job);
 
@@ -14,84 +16,51 @@ config Config
     switch TestEnabled = false;
 }
 
+// ========== Parameter slicing: with action declarations
 config ConfigWithParameters : Config
 {
-    action static void ATService.AddJob(string command, int time)
-      where {.
-        Condition.In(command, "x", "y");
-        Condition.In(time, 340000, 600000);
-        Condition.IsTrue(!(command == "x" & time < 600000));
-      .};
+    action static bool ATService.AddJob(JobInfo info, out int jobId)
+        where {.
+            Condition.In(info.Command, "x", "y");
+            Condition.In(info.Time, 340000, 600000);
+            Condition.IsTrue(!(info.Command == "x" & info.Time < 600000));
+        .};
 }
 
-machine JobScheduler() : ConfigWithParameters
+machine ModelProgramWithConfigParameters() : ConfigWithParameters where ForExploration = false
 {
     construct model program from ConfigWithParameters
 }
 
-// Phase 4 validation: the predicate uses embedded C# the mini-parser cannot represent —
-// a string method call (`command.StartsWith`) and `System.Math.Abs`. SEK compiles and
-// executes it via Roslyn as a post-filter over the candidate assignments.
-config ConfigRoslyn : Config
+// ========== Parameter slicing: with bind construct
+machine ModelProgramWithBoundParameters() : Config
 {
-    action static void ATService.AddJob(string command, int time)
-      where {.
-        Condition.In(command, "x", "y", "zzz");
-        Condition.In(time, 340000, 600000, 15);
-        Condition.IsTrue(command.StartsWith("z") || System.Math.Abs(time - 600000) < 1000);
-      .};
+    bind AddJob(JobInfo(Command={"x", "y"}, Time={340000, 600000}), out _)
+    in
+    construct model program from Config
 }
 
-machine RoslynJobScheduler() : ConfigRoslyn
+// ========== State slicing with bound in model
+machine ModelProgramWithJobBound() : Config
 {
-    construct model program from ConfigRoslyn
+    {. AtsvcModel.JobBound = 2; .}: ModelProgramWithConfigParameters
 }
 
-// Scenario slicing: restrict the model to runs that start with an AddJob and then only
-// query or delete jobs (never add a second job). `AddManageScenario` is a pure Cord
-// behavior over the action alphabet; `ManagedJobs` slices the model program with it.
-machine AddManageScenario() : ConfigWithParameters
+// ========== Trace pattern slicing
+machine AddTwoJobsPattern() : Config
 {
-    AddJob; (GetJobInfo | DeleteJob)*
+    AddJob; AddJob; GetJobInfo; DeleteJob; AddJob; GetJobInfo; DeleteJob*
 }
 
-machine ManagedJobs() : ConfigWithParameters
+machine ModelProgramWithTwoJobsPattern() : Config
 {
-    AddManageScenario || JobScheduler
+    AddTwoJobsPattern || ModelProgramWithConfigParameters
 }
 
-// Phase 3 validation: argument-matched scenario. The scenario pins AddJob's arguments
-// to the concrete pair ("x", 600000), so slicing keeps ONLY the run that adds that exact
-// job (not every AddJob run). A bare `AddJob` would match any arguments.
-machine AddSpecificScenario() : ConfigWithParameters
+// ========= Test suite
+machine TestSuite() : Config where TestEnabled = true
 {
-    AddJob("x", 600000); (GetJobInfo | DeleteJob)*
-}
-
-machine SpecificJobRuns() : ConfigWithParameters
-{
-    AddSpecificScenario || JobScheduler
-}
-
-// Phase 3 validation: `let` parameter generation. The bound variable `cmd` ranges over
-// {"x","y"}; each binding is substituted into the AddJob invocation and the resulting
-// argument-matched scenarios are unioned, then sliced against the model.
-machine LetJobScenario() : ConfigWithParameters
-{
-    let string cmd where {. Condition.In(cmd, "x", "y"); .}
-        in AddJob(cmd, 600000); (GetJobInfo | DeleteJob)*
-}
-
-machine LetJobRuns() : ConfigWithParameters
-{
-    LetJobScenario || JobScheduler
-}
-
-// Item 4 validation: state slicing. The preconstraint sets the model-level JobBound to 1
-// before exploring, so at most one job may be added (compare with JobScheduler at the
-// default bound of 2).
-machine OneJobBounded() : ConfigWithParameters
-{
-    {. AtsvcModel.JobBound = 1; .}: JobScheduler
+    construct test cases where strategy = "shorttests"
+    for ModelProgramWithTwoJobsPattern
 }
 

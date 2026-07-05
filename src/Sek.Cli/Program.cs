@@ -216,7 +216,9 @@ ExplorationResult Interpret(
     var slice = TryGetSliceScenario(cord, body);
     if (slice is not null)
     {
-        var cfg = body!.FindConstruct()?.Reference ?? cord.GetMachine(machine)?.BaseConfigs.FirstOrDefault() ?? string.Empty;
+        var cfg = FindSliceModelConfig(cord, body)
+                  ?? body!.FindConstruct()?.Reference
+                  ?? cord.GetMachine(machine)?.BaseConfigs.FirstOrDefault() ?? string.Empty;
         var pg = BuildParamGen(cord, cfg, machine, solverName, binds, introspector);
         var explorer = new Explorer(introspector, options, pg);
         var shortNames = introspector.Rules.Select(r => ShortLabel(r.ActionLabel)).ToHashSet(StringComparer.Ordinal);
@@ -368,6 +370,21 @@ static Sek.Cord.Ast.Behavior? TryGetSliceScenario(CordDocument cord, Sek.Cord.As
     return null;
 }
 
+// Resolves the config name of the model-program side of a slice (so its Cord `where`
+// domains are picked up), resolving machine references on either side.
+static string? FindSliceModelConfig(CordDocument cord, Sek.Cord.Ast.Behavior? body)
+{
+    body = Unwrap(body);
+    if (body is not Sek.Cord.Ast.ParallelBehavior par) return null;
+    foreach (var item in par.Items)
+    {
+        var c = ResolveSliceItem(cord, item)?.FindConstruct();
+        if (c?.Kind == ConstructKind.ModelProgram && !string.IsNullOrEmpty(c.Reference)) return c.Reference;
+    }
+
+    return null;
+}
+
 static Sek.Cord.Ast.Behavior? ResolveSliceItem(CordDocument cord, Sek.Cord.Ast.Behavior item)
 {
     if (item is Sek.Cord.Ast.GroupBehavior g) item = g.Inner;
@@ -382,7 +399,6 @@ static Sek.Cord.Ast.Behavior? ResolveSliceItem(CordDocument cord, Sek.Cord.Ast.B
 
 // Expands `let vars where {Condition.In...} in Behavior` into a choice over each variable
 // assignment, substituting the bound values into the inner behavior's invocation arguments.
-// Combined with argument-aware slicing this pins the let-bound values through the scenario.
 static Sek.Cord.Ast.Behavior DesugarLet(Sek.Cord.Ast.Behavior b)
 {
     switch (b)
@@ -494,7 +510,19 @@ ParameterGeneration BuildParamGen(
         foreach (var kv in cord.ResolveDeclaredActions(cfgName)) declared[kv.Key] = kv.Value;
     }
 
-    foreach (var kv in cord.ResolveMachineDeclaredActions(machine)) declared[kv.Key] = kv.Value;
+    foreach (var kv in cord.ResolveMachineDeclaredActions(machine))
+    {
+        // Do not let the slice machine's own base config (often the bare scenario config)
+        // overwrite a where-constrained declaration coming from the model-program config.
+        if (declared.TryGetValue(kv.Key, out var existing)
+            && !string.IsNullOrWhiteSpace(existing.WhereCode)
+            && string.IsNullOrWhiteSpace(kv.Value.WhereCode))
+        {
+            continue;
+        }
+
+        declared[kv.Key] = kv.Value;
+    }
 
     foreach (var da in declared.Values)
     {
@@ -521,11 +549,23 @@ ParameterGeneration BuildParamGen(
         {
             var dom = argDomains[i];
             if (dom.Count == 1 && dom[0] == "_") continue; // unbound parameter
-            // `instances T` and structured `Field=val` domains fall back to the default
-            // (reachable-object / model-driven) domain; struct field binds are applied by
-            // the struct-aware path, not here.
-            if (dom.Any(t => t.StartsWith("instances:", StringComparison.Ordinal) || t.Contains('='))) continue;
+            // `instances T` falls back to the default reachable-object domain.
+            if (dom.Any(t => t.StartsWith("instances:", StringComparison.Ordinal))) continue;
             var p = rule.Parameters[i];
+
+            // Structured struct bind: `JobInfo(Command={"x","y"}, Time={..})` arrives as
+            // `Field=token` markers; group them into per-field domains (Param = "info.Field").
+            if (dom.Any(t => t.Contains('=')))
+            {
+                foreach (var grp in dom.Where(t => t.Contains('=')).GroupBy(t => t[..t.IndexOf('=')].Trim()))
+                {
+                    var values = grp.Select(t => ParseBindValue(t[(t.IndexOf('=') + 1)..], typeof(object))).ToList();
+                    constraints.Add(new InConstraint { Param = p.Name + "." + grp.Key, Values = values });
+                }
+
+                continue;
+            }
+
             constraints.Add(new InConstraint { Param = p.Name, Values = dom.Select(tok => ParseBindValue(tok, p.Type)).ToList() });
         }
 

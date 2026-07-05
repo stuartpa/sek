@@ -38,7 +38,9 @@ public static class CordConstraintExtractor
             if (s.StartsWith("Condition.In", StringComparison.Ordinal))
             {
                 var inC = ParseIn(s);
-                if (inC is not null && paramNames.Contains(inC.Param))
+                // Keep a domain for a parameter, or for a struct field of a parameter
+                // (e.g. Condition.In(info.Command, ...) where `info` is a struct parameter).
+                if (inC is not null && (paramNames.Contains(inC.Param) || IsFieldOfParam(inC.Param, paramNames)))
                 {
                     result.Constraints.Add(inC);
                 }
@@ -116,6 +118,14 @@ public static class CordConstraintExtractor
         }
 
         return result;
+    }
+
+    /// <summary>True if <paramref name="token"/> is a struct field access <c>param.field</c>
+    /// whose leading segment is a known parameter.</summary>
+    private static bool IsFieldOfParam(string token, HashSet<string> paramNames)
+    {
+        var dot = token.IndexOf('.');
+        return dot > 0 && paramNames.Contains(token[..dot]);
     }
 
     /// <summary>True if any whole-word identifier in the code names a known parameter.</summary>

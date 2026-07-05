@@ -429,7 +429,7 @@ public sealed class Explorer
         for (var i = 0; i < rule.Parameters.Count; i++)
         {
             var u = Underlying(rule.Parameters[i].Type);
-            if (IsModelObjectType(u) && argSet[i] is not null)
+            if (IsModelObjectType(u) && argSet[i] is int idx)
             {
                 if (!reachableByType.TryGetValue(u, out var objs))
                 {
@@ -437,7 +437,6 @@ public sealed class Explorer
                     reachableByType[u] = objs;
                 }
 
-                var idx = Convert.ToInt32(argSet[i]);
                 args[i] = idx >= 0 && idx < objs.Count ? objs[idx] : null;
             }
             else
@@ -449,6 +448,108 @@ public sealed class Explorer
         return args;
     }
 
+    /// <summary>True if <paramref name="p"/> is a struct-valued parameter: a class type that
+    /// has Cord field domains (e.g. Condition.In(info.Command, ..)).</summary>
+    private static bool IsStructValueParam(RuleParameter p, IReadOnlyList<SolverConstraint> constraints)
+    {
+        if (p.Type.IsByRef) return false;
+        var u = Underlying(p.Type);
+        if (!IsModelObjectType(u)) return false;
+        var prefix = p.Name + ".";
+        return constraints.OfType<InConstraint>().Any(c => c.Param.StartsWith(prefix, StringComparison.Ordinal));
+    }
+
+    private static IEnumerable<(string Name, Type Type)> StructMembers(Type t)
+    {
+        foreach (var prop in t.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            if (prop.CanWrite && prop.GetIndexParameters().Length == 0) yield return (prop.Name, prop.PropertyType);
+        }
+
+        foreach (var field in t.GetFields(BindingFlags.Public | BindingFlags.Instance))
+        {
+            yield return (field.Name, field.FieldType);
+        }
+    }
+
+    private static void SetMember(object instance, string name, object? value)
+    {
+        var t = instance.GetType();
+        var prop = t.GetProperty(name, BindingFlags.Public | BindingFlags.Instance);
+        if (prop is not null && prop.CanWrite) { prop.SetValue(instance, value); return; }
+        var field = t.GetField(name, BindingFlags.Public | BindingFlags.Instance);
+        field?.SetValue(instance, value);
+    }
+
+    /// <summary>
+    /// Generates argument sets for a rule with struct-valued parameters: each struct field
+    /// that has a Cord domain becomes a virtual scalar parameter (named <c>param.field</c>);
+    /// the solver combines them (honoring Condition.IsTrue / Combination over field names),
+    /// and each assignment is materialized into constructed struct instances. Out/ref
+    /// parameters are left as default output slots.
+    /// </summary>
+    private IEnumerable<object?[]> GenerateStructArgSets(RuleInfo rule, IReadOnlyList<SolverConstraint> constraints, CombinationSpec combination)
+    {
+        var inByName = constraints.OfType<InConstraint>()
+            .GroupBy(c => c.Param).ToDictionary(g => g.Key, g => g.Last().Values, StringComparer.Ordinal);
+
+        var virtualParams = new List<SolverParam>();
+        var slots = new List<(int ParamIndex, string? Field, Type MemberType)>();
+
+        for (var i = 0; i < rule.Parameters.Count; i++)
+        {
+            var p = rule.Parameters[i];
+            if (p.Type.IsByRef) continue; // out/ref: an output slot, not generated
+            var u = Underlying(p.Type);
+
+            if (IsStructValueParam(p, constraints))
+            {
+                foreach (var (fieldName, memberType) in StructMembers(u))
+                {
+                    var vname = p.Name + "." + fieldName;
+                    if (!inByName.ContainsKey(vname)) continue; // only fields with a Cord domain
+                    virtualParams.Add(new SolverParam { Name = vname, Kind = Kind(memberType), Domain = inByName[vname] });
+                    slots.Add((i, fieldName, memberType));
+                }
+            }
+            else
+            {
+                var dom = inByName.TryGetValue(p.Name, out var vals) ? vals : null;
+                virtualParams.Add(new SolverParam { Name = p.Name, Kind = Kind(p.Type), Domain = dom });
+                slots.Add((i, null, u));
+            }
+        }
+
+        foreach (var assignment in _paramGen!.Solver.Generate(virtualParams, constraints, combination, _paramGen.Limit))
+        {
+            var args = new object?[rule.Parameters.Count];
+            var structInstances = new Dictionary<int, object>();
+            for (var v = 0; v < virtualParams.Count; v++)
+            {
+                var (pi, field, mtype) = slots[v];
+                assignment.TryGetValue(virtualParams[v].Name, out var val);
+                var coerced = Coerce(val, mtype);
+                if (field is null)
+                {
+                    args[pi] = coerced;
+                }
+                else
+                {
+                    if (!structInstances.TryGetValue(pi, out var inst))
+                    {
+                        inst = Activator.CreateInstance(Underlying(rule.Parameters[pi].Type))!;
+                        structInstances[pi] = inst;
+                    }
+
+                    SetMember(inst, field, coerced);
+                }
+            }
+
+            foreach (var kv in structInstances) args[kv.Key] = kv.Value;
+            yield return args;
+        }
+    }
+
     private IEnumerable<object?[]> GenerateArgSets(RuleInfo rule, List<List<object?>> domainValues)
     {
         if (_paramGen is null || rule.Parameters.Count == 0)
@@ -456,7 +557,6 @@ public sealed class Explorer
             foreach (var c in CartesianProduct(domainValues)) yield return c;
             yield break;
         }
-
         // Per-action constraints from Cord (Condition.In / Condition.IsTrue / Combination).
         IReadOnlyList<SolverConstraint> constraints = Array.Empty<SolverConstraint>();
         var combination = new CombinationSpec();
@@ -464,6 +564,14 @@ public sealed class Explorer
         {
             constraints = ResolveEnumLiterals(rule, spec.Constraints);
             combination = ResolveEnumLiterals(rule, spec.Combination);
+        }
+
+        // Struct-valued parameters (a class with Cord field domains like Condition.In(info.X, ..))
+        // are generated by combining their field domains and constructing instances.
+        if (rule.Parameters.Any(p => IsStructValueParam(p, constraints)))
+        {
+            foreach (var c in GenerateStructArgSets(rule, constraints, combination)) yield return c;
+            yield break;
         }
 
         // Object- and floating-point-typed parameters are not part of the SMT theory the

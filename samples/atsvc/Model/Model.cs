@@ -3,7 +3,14 @@ using Sek.Modeling;
 
 namespace ATSvc.Model
 {
-    /// <summary>A scheduled job. Identity is structural (command + time).</summary>
+    /// <summary>The job-description struct passed to AddJob (the classic sample's JobInfo).</summary>
+    public sealed class JobInfo
+    {
+        public string Command { get; set; }
+        public int Time { get; set; }
+    }
+
+    /// <summary>A scheduled job, identified structurally by command + time.</summary>
     public sealed class Job
     {
         public string Command { get; set; }
@@ -24,10 +31,12 @@ namespace ATSvc.Model
         public List<Job> Jobs { get; set; } = new List<Job>();
 
         [Rule("ATService.AddJob")]
-        public void AddJob(string command, int time)
+        public bool AddJob(JobInfo info, out int jobId)
         {
             Require(Jobs.Count < JobBound, "bound the number of jobs");
-            Jobs.Add(new Job { Command = command, Time = time });
+            Jobs.Add(new Job { Command = info.Command, Time = info.Time });
+            jobId = Jobs.Count;
+            return true;
         }
 
         [Rule("ATService.GetJobInfo")]
