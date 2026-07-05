@@ -1,5 +1,14 @@
 # SEK — Cord Parity & Sample-Port Audit
 
+> **Update (zero-change effort):** all nine samples now use **byte-identical Cord-language
+> content** to their originals (`Operators`, `Sailboat`, `atsvc`, `PubSub`, `chat`, `Account`,
+> `ParameterGeneration`, `SMB2` are 0-diff; `RequirementReport` has no Cord). The differences
+> below have been eliminated by implementing the engine features cleanly; the only remaining
+> deltas are *references* (usings/config/model type names) documented in
+> [porting-from-spec-explorer.md](porting-from-spec-explorer.md). One runtime scalability limit
+> remains (SMB2 model-check at the full `id∈1..8` range) — see that guide §4. The sections below
+> are retained as the historical audit that drove the work.
+
 _Generated 2026-07-05. Audits the SEK sample ports (`samples/`) against the original
 Spec Explorer 2010 samples (`samples-source/`) and enumerates the remaining Cord language
 gaps._

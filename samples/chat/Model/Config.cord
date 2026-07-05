@@ -1,107 +1,100 @@
+using Chat.Adapter;
 using Chat.Model;
+using Microsoft.Modeling; 
 
-// chat (SEK port) — faithful to the classic MS-CHAT sample. Users are created on logon and
-// form the domain of the User parameters; user ids come from LogonRequest(id) and broadcast
-// payloads are pinned by the scenarios. A user is pinned in a scenario by its id.
-
-config Actions
+config Actions 
 {
-    action void StartServer();
-    action void ConnectToServer();
-    action void LogonRequest(int userId);
-    action void LogonResponse(User user);
-    action void ListRequest();
-    action void ListResponse();
-    action void BroadcastRequest(User sender, string message);
-    action void BroadcastAck(User receiver);
-    action void LogoffRequest(User user);
-    action void LogoffResponse(User user);
-    action void ErrorResponse(User user);
+    action all ChatSetupAdapter;
+    action all ChatAdapter;
 
-    switch StateBound = 2000;
-    switch StepBound = 8000;
+    switch StateBound = 1000;
+    switch StepBound = 1000;
+    switch PathDepthBound = 1000;
+    
+    switch generatedtestpath = "..\\GeneratedTest";
+    switch TestClassBase = "GeneratedTests.ChatTestClass";
+        
+    switch ForExploration = false;
     switch TestEnabled = false;
 }
 
 machine ModelProgram() : Actions
 {
-    construct model program from Actions
+  construct model program from Actions 
+  where scope = "Chat.Model"
 }
 
-// Bound model program (as in the classic BoundModelProgram): bind LogonRequest to id 1 and
-// pin the broadcast message to "hi".
-machine BoundModelProgram() : Actions
+machine BoundModelProgram() : Actions where ForExploration = true
 {
-    bind LogonRequest({1}), BroadcastRequest(_, "hi")
+  ( bind LogonRequest({1}), BroadcastRequest(_,"hi")
     in
-    ModelProgram
+    ModelProgram 
+  )
 }
 
-// ---- Log-on / list / log-off scenario ----
-machine LogOnOffListScenario() : Actions
+machine LogOnOffListScenario() : Actions 
 {
-    LogonRequest(1); LogonResponse;
+    LogonRequest(1); LogonResponse; 
     LogonRequest(2); LogonResponse;
     LogonRequest(3); LogonResponse;
     ListRequest; ListResponse;
-    ( LogoffRequest; (LogoffResponse | ErrorResponse) )*
+    ( LogoffRequest; (LogoffResponse|ErrorResponse) )*
 }
 
-machine LogOnOffListSlice() : Actions
+machine LogOnOffListSlice() : Actions where ForExploration = true
 {
-    LogOnOffListScenario || ModelProgram
+    LogOnOffListScenario() || ModelProgram
 }
 
-// ---- Broadcast (ordered) scenario ----
-machine BroadcastOrderedScenario() : Actions
+
+machine BroadcastOrderedScenario() : Actions 
 {
-    LogonRequest(1); LogonResponse;
+    LogonRequest(1); LogonResponse; 
     LogonRequest(2); LogonResponse;
     BroadcastRequest(1, "1a");
     BroadcastRequest(1, "1b");
-    ( BroadcastAck )*
+   ( BroadcastAck )*
 }
 
-machine BroadcastOrderedSlice() : Actions
+machine BroadcastOrderedSlice() : Actions where ForExploration = true
 {
     BroadcastOrderedScenario || ModelProgram
 }
 
-// ---- Broadcast (unordered) scenario ----
-machine BroadcastUnorderedScenario() : Actions
+machine BroadcastUnorderedScenario() : Actions 
 {
-    LogonRequest(1); LogonResponse;
+    LogonRequest(1); LogonResponse; 
     LogonRequest(2); LogonResponse;
     BroadcastRequest(1, "1");
     BroadcastRequest(2, "2");
-    ( BroadcastAck )*
+   ( BroadcastAck )*
 }
 
-machine BroadcastUnorderedSlice() : Actions
+machine BroadcastUnorderedSlice() : Actions where ForExploration = true
 {
     BroadcastUnorderedScenario || ModelProgram
 }
 
-// ---- Combined slices ----
-// The three scenarios (prefixed by server start/connect) are unioned and sliced against the
-// model in one machine — equivalent to composing the individual slices.
-machine CombinedScenario() : Actions
+machine CombinedSlices() : Actions where ForExploration = true
 {
     StartServer; ConnectToServer;
-    (LogOnOffListScenario | BroadcastOrderedScenario | BroadcastUnorderedScenario)
+    (LogOnOffListSlice | BroadcastOrderedSlice | BroadcastUnorderedSlice)
 }
 
-machine CombinedSlices() : Actions
+machine TestSuite() : Actions where ForExploration = true, TestEnabled = true
 {
-    CombinedScenario || ModelProgram
+    construct test cases
+        where AllowUndeterminedCoverage = true
+    for CombinedSlices
 }
 
-machine TestSuite() : Actions where TestEnabled = true
-{
-    construct test cases where AllowUndeterminedCoverage = true for CombinedSlices
-}
-
-machine ReqCoverage() : Actions
+machine ReqCoverage() : Actions where ForExploration = true
 {
     construct requirement coverage where strategy = "selective" for CombinedSlices
+}
+
+machine MinimumReqCoverage() : Actions where ForExploration = true
+{
+    construct requirement coverage where MinimumRequirementCount=2, RequirementsToCover = "ms-chat_R5,ms-chat_R6"
+        for CombinedSlices
 }

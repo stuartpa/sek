@@ -1,5 +1,5 @@
 {
-  "model": { "assembly": "Model/bin/Debug/Model.dll", "type": "PG.SUT" },
+  "model": { "assembly": "Model/bin/Debug/Model.dll", "type": "PG.ModelWithFrequency.SUT" },
   "cord":  "Model",
   "out":   ".specexplorerkit/out"
 }

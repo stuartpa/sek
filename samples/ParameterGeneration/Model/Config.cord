@@ -1,242 +1,260 @@
-using PG;
+using PG; 
 
-// ParameterGeneration (SEK port) — demonstrates Z3-backed parameter generation driven
-// entirely by Cord `where` blocks. Each machine explores the single AddJob action; the
-// number of transitions is the number of parameter combinations the strategy yields.
-
-config Base
+// Base configuration
+config Base 
 {
-    action static void SUT.AddJob(string name, int time, Frequency frequency);
+    action abstract static void SUT.AddJob(string name, int time, Frequency frequency); 	
 
-    switch StepBound = 10000;
+    switch StepBound = 128;
     switch PathDepthBound = 128;
+    switch TestClassBase = "vs";
+    switch GeneratedTestPath = "..\\TestSuite";
+    switch GeneratedTestNamespace = "SpecExplorerProject.TestSuite";
     switch TestEnabled = false;
+	
+	switch RecommendedViews = "CollapseLabelView";
 }
 
-// Interaction (== full cartesian product): 3 names x 3 times x 3 frequencies = 27.
+// Product
 config Product : Base
 {
-    action static void SUT.AddJob(string name, int time, Frequency frequency)
+    action abstract static void SUT.AddJob(string name, int time, Frequency frequency)
       where {.
-                Condition.In(name, "@$^", "t.cmd", "t.exe");
-                Condition.In(time, -1, 60, 3600);
-          .};
+		Condition.In(name, "@$^", "t.cmd", "t.exe");
+		Condition.In(time, -1, 60, 3600);
+	  .};
 }
 machine Product() : Product
 {
-    AddJob || construct model program from Product
+    AddJob || (construct model program from Product where scope="PG.ModelWithFrequency" ) 
 }
 
-// Explicit Interaction combination on subsets — still the full product here.
+
+// Interaction
 config Interaction : Base
 {
-    action static void SUT.AddJob(string name, int time, Frequency frequency)
+    action abstract static void SUT.AddJob(string name,int time, Frequency frequency)
       where {.
-                Condition.In(name, "@$^", "t.cmd", "t.exe");
-                Condition.In(time, -1, 60, 3600);
-                Combination.Interaction(name);
-                Combination.Interaction(time, frequency);
-          .};
+		Condition.In(name, "@$^", "t.cmd", "t.exe");
+		Condition.In(time, -1, 60, 3600);
+		Combination.Interaction(name);
+		Combination.Interaction(time, frequency);
+	  .};
 }
 machine Interaction() : Interaction
 {
-    AddJob || construct model program from Interaction
+    AddJob || (construct model program from Interaction where scope="PG.ModelWithFrequency") 
 }
 
-// Pairwise: every value-pair across (name, time, frequency) appears at least once.
+// Pairwise
 config Pairwise : Base
 {
-    action static void SUT.AddJob(string name, int time, Frequency frequency)
+    action abstract static void SUT.AddJob(string name,int time, Frequency frequency)
       where {.
-                Condition.In(name, "@$^", "t.cmd", "t.exe");
-                Condition.In(time, -1, 60, 3600);
-                Combination.Pairwise(name, time, frequency);
-          .};
+		Condition.In(name, "@$^", "t.cmd", "t.exe");
+		Condition.In(time, -1, 60, 3600);
+		Combination.Pairwise(name, time, frequency);
+		Combination.Isolated(name == "@$^");
+	    Combination.Isolated(time == -1);
+	    Combination.Seeded(name == "t.exe", time == 3600); 
+  .};
 }
 machine Pairwise() : Pairwise
 {
-    AddJob || construct model program from Pairwise
+    AddJob || (construct model program  from Pairwise where scope="PG.ModelWithFrequency") 
 }
 
-// Constraint: a Z3 predicate (Condition.IsTrue) prunes combinations.
-// Keep only combinations where NOT (name == "t.cmd" AND frequency != Daily).
-config Constraint : Base
-{
-    action static void SUT.AddJob(string name, int time, Frequency frequency)
-      where {.
-                Condition.In(name, "@$^", "t.cmd", "t.exe");
-                Condition.In(time, -1, 60, 3600);
-                Condition.IsTrue(!(name == "t.cmd" & frequency != Frequency.Daily));
-          .};
-}
-machine Constraint() : Constraint
-{
-    AddJob || construct model program from Constraint
-}
-
-// Isolated: "special" values are tested in isolation (one representative each) rather
-// than combined across the whole matrix, shrinking the suite. Full product is 27; the
-// two Isolated predicates collapse the name=="@$^" and time==-1 combinations to one each.
+// Isolated
 config Isolated : Base
 {
-    action static void SUT.AddJob(string name, int time, Frequency frequency)
+    action abstract static void SUT.AddJob(string name,int time, Frequency frequency)
       where {.
-                Condition.In(name, "@$^", "t.cmd", "t.exe");
-                Condition.In(time, -1, 60, 3600);
-                Combination.Isolated(name == "@$^");
-                Combination.Isolated(time == -1);
-          .};
+		Condition.In(name, "@$^", "t.cmd", "t.exe");
+		Condition.In(time, -1, 60, 3600);
+		Combination.Interaction(name);
+		Combination.Interaction(time, frequency);
+		Combination.Isolated(name == "@$^");
+	    Combination.Isolated(time == -1);
+	  .};
 }
 machine Isolated() : Isolated
 {
-    AddJob || construct model program from Isolated
+    AddJob || (construct model program  from Isolated where scope="PG.ModelWithFrequency") 
 }
 
-// Seeded: pairwise reduction, but a specific important combination is guaranteed present.
+// Seeded
 config Seeded : Base
 {
-    action static void SUT.AddJob(string name, int time, Frequency frequency)
+    action abstract static void SUT.AddJob(string name,int time, Frequency frequency)
       where {.
-                Condition.In(name, "@$^", "t.cmd", "t.exe");
-                Condition.In(time, -1, 60, 3600);
-                Combination.Pairwise(name, time, frequency);
-                Combination.Seeded(name == "t.exe", time == 3600);
-          .};
+		Condition.In(name, "@$^", "t.cmd", "t.exe");
+		Condition.In(time, -1, 60, 3600);
+		Combination.Interaction(name);
+		Combination.Interaction(time, frequency);
+		Combination.Isolated(name == "@$^");
+	    Combination.Isolated(time == -1);
+	    Combination.Seeded(name == "t.exe", time == 3600); 
+	  .};
 }
 machine Seeded() : Seeded
 {
-    AddJob || construct model program from Seeded
+    AddJob || (construct model program from Seeded where scope="PG.ModelWithFrequency") 
 }
 
-// Expand: pairwise would reduce, but Expand forces the listed parameters to be fully
-// crossed — recovering the complete 27-combination product.
-config Expand : Base
+// Constraint
+config Constraint : Base
 {
-    action static void SUT.AddJob(string name, int time, Frequency frequency)
+    action abstract static void SUT.AddJob(string name,int time, Frequency frequency)
       where {.
-                Condition.In(name, "@$^", "t.cmd", "t.exe");
-                Condition.In(time, -1, 60, 3600);
-                Combination.Pairwise(name, time, frequency);
-                Combination.Expand(name, time, frequency);
-          .};
+		Condition.In(name, "@$^", "t.cmd", "t.exe");
+		Condition.In(time, -1, 60, 3600);
+		Combination.Interaction(name);
+		Combination.Interaction(time, frequency);
+		Combination.Isolated(name == "@$^");
+	    Combination.Isolated(time == -1);
+	    Combination.Seeded(name == "t.exe", time == 3600); 
+        Condition.IsTrue(!(name == "t.cmd" & frequency != Frequency.Daily));
+	  .};
 }
-machine Expand() : Expand
+machine Constraint() : Constraint
 {
-    AddJob || construct model program from Expand
+    AddJob || (construct model program from Constraint where scope="PG.ModelWithFrequency") 
 }
 
-// Struct: parameters carried in a JobInfo struct + a scalar priority.
-config Struct : Base
+// Expand
+machine Expand() : Base
 {
-    action static void SUT.AddJobStruct(JobInfo info, int priority)
+    AddJob || (construct model program from Base where scope="PG.ModelWithExpand")
+}
+
+// Struct
+config Struct 
+{
+    action abstract static void SUT.AddJob(JobInfo info, int priority)
       where {.
-                Condition.In(info.Name, "t.cmd", "t.exe");
-                Condition.In(info.Time, 60, 3600);
-                Condition.IsTrue(priority >= 0 & priority < 3);
-                Combination.Interaction(info.Name, priority);
-                Combination.Interaction(info.Time, info.Frequency);
-          .};
+		Condition.In(info.Name, "t.cmd", "t.exe");
+		Condition.In(info.Time, 60, 3600);
+		Condition.IsTrue(priority >= 0 & priority < 3);
+		Combination.Interaction(info.Name, priority);
+		Combination.Interaction(info.Time, info.Frequency);
+	  .};
+    switch DefaultParameterExpansionLimit = 1024;
+    switch RecommendedViews = "CollapseLabelView";
+    switch TestEnabled = false;
 }
 machine Struct() : Struct
 {
-    AddJobStruct || construct model program from Struct
+    AddJob || (construct model program from Struct where scope="PG.ModelWithStruct") 
 }
 
-// EquivalenceClass: name/time domains; the DaysOfWeek enum ranges over its natural domain.
-config EquivalenceClass : Base
+// Bitmask
+config Bitmask 
 {
-    action static void SUT.AddJobEC(string name, int time, DaysOfWeek days)
+    action abstract static void SUT.AddJob(string name, int time, uint days)
       where {.
-                Condition.In(name, "t.cmd", "t.exe");
-                Condition.In(time, 60, 3600);
-          .};
-}
-machine EquivalenceClass() : EquivalenceClass
-{
-    AddJobEC || construct model program from EquivalenceClass
-}
-
-// Bitmask: an integer day bitmask; where-block locals extract the individual day bits,
-// which are then covered pairwise alongside name/time.
-config Bitmask : Base
-{
-    action static void SUT.AddJobBitmask(string name, int time, uint days)
-      where {.
-                Condition.In(name, "t.cmd", "t.exe");
-                Condition.In(time, 60, 3600);
-                Condition.IsTrue(days >= 0 & days <= 127);
-                uint mon = days & 0x1;
-                uint tue = days & 0x2;
-                uint wed = days & 0x4;
-                uint thu = days & 0x8;
-                uint fri = days & 0x10;
-                uint sat = days & 0x20;
-                uint sun = days & 0x40;
-                Combination.Pairwise(name, time, mon, tue, wed, thu, fri, sat, sun);
-          .};
+		Condition.In(name, "t.cmd", "t.exe");
+		Condition.In(time, 60, 3600);
+		Condition.IsTrue(days >= 0 & days <= 127);
+        uint mon = days & 0x1;
+        uint tue = days & 0x2;
+        uint wed = days & 0x4;
+        uint thu = days & 0x8;
+        uint fri = days & 0x10;
+        uint sat = days & 0x20;
+        uint sun = days & 0x40;    
+		Combination.Pairwise(name, time, mon, tue, wed, thu, fri, sat, sun);
+	  .};
+    switch RecommendedViews = "CollapseLabelView";
+    switch TestEnabled = false;
 }
 machine Bitmask() : Bitmask
 {
-    AddJobBitmask || construct model program from Bitmask
+    AddJob || (construct model program from Bitmask where scope="PG.ModelWithBitmask") 
 }
 
-// Flags: a [Flags] enum; the individual flags are extracted inline as combination columns.
-config Flags : Base
+// Flags
+config Flags 
 {
-    action static void SUT.AddJobFlags(string name, int time, DaysOfWeek days)
+    action abstract static void SUT.AddJob(string name, int time, DaysOfWeek days)
       where {.
-                Condition.In(name, "t.cmd", "t.exe");
-                Condition.In(time, 60, 3600);
-                Condition.IsTrue(days >= DaysOfWeek.None & days <= DaysOfWeek.All);
-                Combination.Pairwise(name, time,
-                    days & DaysOfWeek.Mon,
-                    days & DaysOfWeek.Tue,
-                    days & DaysOfWeek.Wed,
-                    days & DaysOfWeek.Thu,
-                    days & DaysOfWeek.Fri,
-                    days & DaysOfWeek.Sat,
-                    days & DaysOfWeek.Sun);
-          .};
+		Condition.In(name, "t.cmd", "t.exe");
+		Condition.In(time, 60, 3600);
+		Condition.IsTrue(days >= DaysOfWeek.None & days <= DaysOfWeek.All);
+		Combination.Pairwise(name, time, 
+			days & DaysOfWeek.Mon,
+			days & DaysOfWeek.Tue,
+			days & DaysOfWeek.Wed,
+			days & DaysOfWeek.Thu,
+			days & DaysOfWeek.Fri,
+			days & DaysOfWeek.Sat,
+			days & DaysOfWeek.Sun
+			);
+	  .};
+    switch RecommendedViews = "CollapseLabelView";
+    switch TestEnabled = false;
 }
 machine Flags() : Flags
 {
-    AddJobFlags || construct model program from Flags
+    AddJob || (construct model program from Flags where scope="PG.ModelWithFlags") 
 }
 
-// Probability: a probabilistic branch selects the name domain (deterministic majority
-// branch in SEK), then the parameters are covered pairwise.
-config Probability : Base
+// Let
+config Let
 {
-    action static void SUT.CreateFile(string name, bool errorIfExists, bool appendAtEnd)
+	action abstract static void SUT.A(int x);
+	action abstract static void SUT.B(int x);
+	action abstract static void SUT.C(int x);
+	switch TestEnabled = false;
+}
+
+machine Let() : Let
+{
+	let int x, int y, int z 
+		where {.
+			Condition.In(x, 1, 2);
+			Condition.In(y, 2, 3);
+			Condition.In(z, 4, 5);
+			Combination.Pairwise(x,y,z);
+			Combination.Expand(x,y,z);
+		.}
+	in
+	A(x); B(y); C(z)
+}
+		
+// Probablity
+config Probability 
+{
+    action abstract static void SUT.CreateFile(string name, bool errorIfExists, bool appendAtEnd)
       where {.
-                if (Probability.IsTrue(0.8))
-                    Condition.In(name, "foo", "bar");
-                else
-                    Condition.In(name, "@^@");
-                Combination.Pairwise(name, errorIfExists, appendAtEnd);
-          .};
+		if (Probability.IsTrue(0.8))
+			Condition.In(name, "foo", "bar");
+		else
+			Condition.In(name, "@^@\\");
+		Combination.Pairwise(name, errorIfExists, appendAtEnd);	
+	  .};
+    switch RecommendedViews = "CollapseLabelView";
     switch RandomSeed = 2;
+    switch TestEnabled = false;
 }
 machine Probability() : Probability
 {
-    (CreateFile; CreateFile; CreateFile; CreateFile; CreateFile)
-    || construct model program from Probability
+    (CreateFile; CreateFile; CreateFile; CreateFile; CreateFile) ||
+    (construct model program from Probability where scope="PG.Probability") 
 }
-
-// Let: bound variables combined pairwise then fully expanded, threaded through A;B;C.
-// (Sliced against the model so only A/B/C fire with the let-bound values.)
-machine Let() : Base
+	
+// Equivalence Class
+config EquivalenceClass 
 {
-    ( let int x, int y, int z
-        where {.
-            Condition.In(x, 1, 2);
-            Condition.In(y, 2, 3);
-            Condition.In(z, 4, 5);
-            Combination.Pairwise(x, y, z);
-            Combination.Expand(x, y, z);
-        .}
-      in
-      A(x); B(y); C(z) )
-    || construct model program from Base
+    action abstract static void SUT.AddJob(string name, int time, DaysOfWeek days)
+      where {.
+        Condition.In(name, "t.cmd", "t.exe");
+        Condition.In(time, 60, 3600);
+        .};
+    switch RecommendedViews = "CollapseLabelView";
+    switch TestEnabled = false;
 }
 
+machine EquivalenceClass() : EquivalenceClass
+{
+    AddJob || (construct model program from EquivalenceClass where scope="PG.ModelWithEquivalenceClass") 
+}

@@ -69,9 +69,9 @@ namespace Chat.Model
         /// <summary>Returns the ids of the currently logged-on users (the classic sample's
         /// Set&lt;int&gt; list response). Observation only during exploration.</summary>
         [Rule("ListResponse")]
-        public IEnumerable<int> ListResponse()
+        public Set<int> ListResponse()
         {
-            return Users.Where(u => u.State == UserState.LoggedOn).Select(u => u.Id).ToList();
+            return new Set<int>(Users.Where(u => u.State == UserState.LoggedOn).Select(u => u.Id));
         }
 
         [Rule("BroadcastRequest")]

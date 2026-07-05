@@ -1,13 +1,13 @@
 using System;
 using Sek.Modeling;
 
+// ParameterGeneration (SEK port) — the classic sample defines one action name (SUT.AddJob)
+// across several model *scopes*, each with a different signature. SEK loads the model program
+// whose namespace matches the Cord `scope`, so each scope is a small model class below.
+
 namespace PG
 {
-    /// <summary>
-    /// Job frequency — an enum parameter. With no explicit Condition.In, the SEK engine
-    /// gives an enum parameter its natural domain (all enum members), so Z3 ranges over
-    /// Once/Daily/Weekly.
-    /// </summary>
+    /// <summary>Job frequency — an enum parameter (natural domain: Once/Daily/Weekly).</summary>
     public enum Frequency
     {
         Once,
@@ -15,7 +15,7 @@ namespace PG
         Weekly,
     }
 
-    /// <summary>Days-of-week as a [Flags] enum (for the Flags / EquivalenceClass strategies).</summary>
+    /// <summary>Days-of-week as a [Flags] enum (for the Flags / EquivalenceClass scopes).</summary>
     [Flags]
     public enum DaysOfWeek
     {
@@ -30,75 +30,118 @@ namespace PG
         All = 127,
     }
 
-    /// <summary>A structured job description (for the Struct strategy).</summary>
+    /// <summary>A structured job description (for the Struct scope).</summary>
     public sealed class JobInfo
     {
         public string Name { get; set; }
         public int Time { get; set; }
         public Frequency Frequency { get; set; }
     }
+}
 
-    /// <summary>
-    /// The system-under-test model. It is intentionally stateless: the point of this
-    /// sample is to show parameter generation, so each distinct set of arguments is a
-    /// distinct transition out of the (single, accepting) state.
-    /// </summary>
+namespace PG.ModelWithFrequency
+{
+    /// <summary>SUT.AddJob(name, time, frequency) — used by the combination scopes.</summary>
     public sealed class SUT : ModelProgram
     {
-        // A trivial counter kept only so the state is serializable; it is reset to 0 by
-        // AddJob (making AddJob a self-loop) so the graph collapses to "N combinations".
-        public int Jobs { get; set; }
+        [Rule("SUT.AddJob")]
+        public void AddJob(string name, int time, PG.Frequency frequency) { }
+
+        [AcceptingCondition]
+        public bool Accepting() => true;
+    }
+}
+
+namespace PG.ModelWithExpand
+{
+    public sealed class SUT : ModelProgram
+    {
+        // The Expand demo expands every parameter fully; the model supplies the name/time
+        // domains (the frequency enum ranges naturally).
+        private string[] Names() => new[] { "@$^", "t.cmd", "t.exe" };
+        private int[] Times() => new[] { -1, 60, 3600 };
 
         [Rule("SUT.AddJob")]
-        public void AddJob(string name, int time, Frequency frequency)
-        {
-            // Stateless w.r.t. the explored graph: no state change => self-loop.
-        }
+        public void AddJob([Domain("Names")] string name, [Domain("Times")] int time, PG.Frequency frequency) { }
 
-        /// <summary>Struct strategy: a JobInfo + priority.</summary>
-        [Rule("SUT.AddJobStruct")]
-        public void AddJobStruct(JobInfo info, int priority)
-        {
-        }
+        [AcceptingCondition]
+        public bool Accepting() => true;
+    }
+}
 
-        /// <summary>Bitmask strategy: an integer day bitmask.</summary>
-        [Rule("SUT.AddJobBitmask")]
-        public void AddJobBitmask(string name, int time, uint days)
-        {
-        }
+namespace PG.ModelWithStruct
+{
+    public sealed class SUT : ModelProgram
+    {
+        [Rule("SUT.AddJob")]
+        public void AddJob(PG.JobInfo info, int priority) { }
 
-        /// <summary>Flags strategy: a [Flags] enum.</summary>
-        [Rule("SUT.AddJobFlags")]
-        public void AddJobFlags(string name, int time, DaysOfWeek days)
-        {
-        }
+        [AcceptingCondition]
+        public bool Accepting() => true;
+    }
+}
 
-        /// <summary>Equivalence-class strategy.</summary>
-        [Rule("SUT.AddJobEC")]
-        public void AddJobEC(string name, int time, DaysOfWeek days)
-        {
-        }
+namespace PG.ModelWithBitmask
+{
+    public sealed class SUT : ModelProgram
+    {
+        [Rule("SUT.AddJob")]
+        public void AddJob(string name, int time, uint days) { }
 
-        /// <summary>Probability strategy.</summary>
+        [AcceptingCondition]
+        public bool Accepting() => true;
+    }
+}
+
+namespace PG.ModelWithFlags
+{
+    public sealed class SUT : ModelProgram
+    {
+        [Rule("SUT.AddJob")]
+        public void AddJob(string name, int time, PG.DaysOfWeek days) { }
+
+        [AcceptingCondition]
+        public bool Accepting() => true;
+    }
+}
+
+namespace PG.ModelWithEquivalenceClass
+{
+    public sealed class SUT : ModelProgram
+    {
+        [Rule("SUT.AddJob")]
+        public void AddJob(string name, int time, PG.DaysOfWeek days) { }
+
+        [AcceptingCondition]
+        public bool Accepting() => true;
+    }
+}
+
+namespace PG.Probability
+{
+    public sealed class SUT : ModelProgram
+    {
         [Rule("SUT.CreateFile")]
-        public void CreateFile(string name, bool errorIfExists, bool appendAtEnd)
-        {
-        }
+        public void CreateFile(string name, bool errorIfExists, bool appendAtEnd) { }
 
+        [AcceptingCondition]
+        public bool Accepting() => true;
+    }
+}
+
+namespace PG.Let
+{
+    /// <summary>SUT.A/B/C(int x) — used by the `let` behavior machine (explored directly).</summary>
+    public sealed class SUT : ModelProgram
+    {
         [Rule("SUT.A")]
-        public void A(int x)
-        {
-        }
+        public void A(int x) { }
 
         [Rule("SUT.B")]
-        public void B(int x)
-        {
-        }
+        public void B(int x) { }
 
         [Rule("SUT.C")]
-        public void C(int x)
-        {
-        }
+        public void C(int x) { }
 
         [AcceptingCondition]
         public bool Accepting() => true;

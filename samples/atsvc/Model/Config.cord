@@ -1,22 +1,24 @@
+
+using Microsoft.Modeling;
+using ATSvc.Adapter;
 using ATSvc.Model;
 
-// atsvc (SEK port) — faithful to the classic sample. AddJob takes a JobInfo struct and an
-// out job id; the struct's field domains + validity predicate come from Cord (Z3). Job
-// objects created during exploration form the domain of the Job parameters.
-
-/// The basic configuration.
-config Config
+/// The basic configuration
+config Config 
 {
-    action static bool ATService.AddJob(JobInfo info, out int jobId);
-    action static void ATService.GetJobInfo(Job job);
-    action static void ATService.DeleteJob(Job job);
-
-    switch StateBound = 1024;
+	action all ATService; // get all actions in adapter interface
+	
+    switch generatedtestpath = "..\\ModeledTests";
+    switch TestClassBase = "GeneratedTests.AtsvcTestClass";
     switch StepBound = 65000;
+    switch StateBound = 1024;
+    switch PathDepthBound = 65000;
     switch TestEnabled = false;
 }
 
+
 // ========== Parameter slicing: with action declarations
+
 config ConfigWithParameters : Config
 {
     action static bool ATService.AddJob(JobInfo info, out int jobId)
@@ -25,42 +27,49 @@ config ConfigWithParameters : Config
             Condition.In(info.Time, 340000, 600000);
             Condition.IsTrue(!(info.Command == "x" & info.Time < 600000));
         .};
+        
 }
 
-machine ModelProgramWithConfigParameters() : ConfigWithParameters where ForExploration = false
+machine ModelProgramWithConfigParameters() : Config where ForExploration = false
 {
     construct model program from ConfigWithParameters
 }
 
+
 // ========== Parameter slicing: with bind construct
+
 machine ModelProgramWithBoundParameters() : Config
 {
-    bind AddJob(JobInfo(Command={"x", "y"}, Time={340000, 600000}), out _)
+    bind AddJob(JobInfo(Command={"x","y"}, Time={340000, 600000}), out _)
     in
     construct model program from Config
 }
 
 // ========== State slicing with bound in model
+
 machine ModelProgramWithJobBound() : Config
 {
-    {. AtsvcModel.JobBound = 2; .}: ModelProgramWithConfigParameters
+    {. ModelProgram.JobBound = 2; .}:
+    ModelProgramWithConfigParameters
 }
 
 // ========== Trace pattern slicing
+
 machine AddTwoJobsPattern() : Config
 {
-    AddJob; AddJob; GetJobInfo; DeleteJob; AddJob; GetJobInfo; DeleteJob*
+	AddJob; AddJob; GetJobInfo; DeleteJob; AddJob; GetJobInfo; DeleteJob*
 }
 
 machine ModelProgramWithTwoJobsPattern() : Config
 {
-    AddTwoJobsPattern || ModelProgramWithConfigParameters
+	AddTwoJobsPattern || ModelProgramWithConfigParameters
 }
+
 
 // ========= Test suite
+
 machine TestSuite() : Config where TestEnabled = true
 {
-    construct test cases where strategy = "shorttests"
-    for ModelProgramWithTwoJobsPattern
+	  construct test cases where strategy = "shorttests" 
+	  for ModelProgramWithTwoJobsPattern
 }
-

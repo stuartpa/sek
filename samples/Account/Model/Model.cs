@@ -42,9 +42,9 @@ namespace AccountSample
         /// <summary>Returns the accounts whose balance matches (the classic sample's
         /// Set&lt;Account&gt;-returning LINQ query). Observation only during exploration.</summary>
         [Rule("AccountImpl.SearchAccounts")]
-        public IEnumerable<Account> SearchAccounts(float balance)
+        public Set<Account> SearchAccounts(float balance)
         {
-            return Accounts.Where(a => a.Balance == balance).ToList();
+            return new Set<Account>(Accounts.Where(a => a.Balance == balance));
         }
 
         [Rule("AccountImpl.Clear")]

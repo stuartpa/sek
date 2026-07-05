@@ -493,7 +493,18 @@ public sealed class BehaviorExplorer
         {
             var id = queue.Dequeue();
             var set = idToSet[id];
-            foreach (var sym in _alphabet)
+
+            // Only the symbols reachable from this state set need to be tried: the concrete
+            // edge labels, plus the whole alphabet when a universal `_` or negated `!x` edge is
+            // present (those match every symbol). This keeps determinization tractable when the
+            // alphabet is large (e.g. many argument-pinned scenario symbols).
+            var hasUniversal = set.Any(st => st.Edges.Any(e =>
+                e.Label == "_" || (e.Label is not null && e.Label.StartsWith("!", StringComparison.Ordinal))));
+            IEnumerable<string> symbols = hasUniversal
+                ? _alphabet
+                : set.SelectMany(st => st.Edges).Where(e => e.Label is not null).Select(e => e.Label!).Distinct();
+
+            foreach (var sym in symbols)
             {
                 var move = new HashSet<NState>();
                 foreach (var st in set)

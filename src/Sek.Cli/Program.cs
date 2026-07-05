@@ -154,6 +154,7 @@ ExplorationOptions BoundsFor(CordDocument cord, string machine)
     if (switches.TryGetValue("StateBound", out var sb) && int.TryParse(sb, out var sbi)) options.MaxStates = sbi;
     if (switches.TryGetValue("StepBound", out var stb) && int.TryParse(stb, out var stbi)) options.MaxTransitions = stbi;
     if (switches.TryGetValue("PathDepthBound", out var pd) && int.TryParse(pd, out var pdi)) options.MaxDepth = pdi;
+    if (switches.TryGetValue("StopAtError", out var sae) && string.Equals(sae, "true", StringComparison.OrdinalIgnoreCase)) options.StopAtError = true;
     return options;
 }
 
@@ -170,16 +171,53 @@ ExplorationGraph ExploreBehavior(CordDocument cord, string machine)
         .ToHashSet(StringComparer.Ordinal);
 
     var explorer = new BehaviorExplorer(name => cord.GetMachine(name)?.Body, alphabet);
-    return explorer.Explore(machine, DesugarLet(m.Body));
+    return explorer.Explore(machine, ExpandParamMachines(cord, DesugarLet(m.Body)));
 }
 
 ExplorationResult ExploreMachine(ProjectConfig config, string dir, CordDocument cord, string machine, string solverName)
 {
-    var modelType = ModelLoader.LoadModelType(config.ResolveModelAssembly(dir), config.Model.Type);
+    // Scope-aware model loading: a `construct model program … where scope = "Ns.Sub"` selects
+    // the model program whose namespace is the scope; otherwise the project's default type.
+    var scope = ResolveModelScope(cord, cord.GetMachine(machine)?.Body);
+    var modelType = ModelLoader.LoadModelTypeInScope(config.ResolveModelAssembly(dir), scope, config.Model.Type);
     var introspector = new ModelIntrospector(modelType);
     var options = BoundsFor(cord, machine);
     var binds = new Dictionary<string, List<List<string>>>(StringComparer.Ordinal);
     return Interpret(introspector, cord, machine, cord.GetMachine(machine)?.Body, options, solverName, binds);
+}
+
+// Finds the model `scope` a machine explores under (the first `construct model program … where
+// scope = "…"` reachable through machine references), or null when there is none.
+static string? ResolveModelScope(CordDocument cord, Sek.Cord.Ast.Behavior? body)
+{
+    body = Unwrap(body);
+    switch (body)
+    {
+        case null:
+            return null;
+        case Sek.Cord.Ast.ConstructBehavior { Kind: ConstructKind.ModelProgram } cb:
+            return cb.Params.TryGetValue("scope", out var s) ? s : null;
+        case Sek.Cord.Ast.InvocationBehavior inv when (inv.Args is null || inv.Args.Count == 0) && cord.GetMachine(inv.Target) is { } m:
+            return ResolveModelScope(cord, m.Body);
+        case Sek.Cord.Ast.ParallelBehavior p:
+            return p.Items.Select(i => ResolveModelScope(cord, i)).FirstOrDefault(x => x is not null);
+        case Sek.Cord.Ast.SequenceBehavior sq:
+            return sq.Items.Select(i => ResolveModelScope(cord, i)).FirstOrDefault(x => x is not null);
+        case Sek.Cord.Ast.ChoiceBehavior ch:
+            return ch.Items.Select(i => ResolveModelScope(cord, i)).FirstOrDefault(x => x is not null);
+        case Sek.Cord.Ast.RepetitionBehavior rep:
+            return ResolveModelScope(cord, rep.Inner);
+        case Sek.Cord.Ast.GroupBehavior g:
+            return ResolveModelScope(cord, g.Inner);
+        case Sek.Cord.Ast.BindBehavior b:
+            return ResolveModelScope(cord, b.Inner);
+        case Sek.Cord.Ast.PreconstraintBehavior pcx:
+            return ResolveModelScope(cord, pcx.Inner);
+        case Sek.Cord.Ast.ConstructBehavior cbt when cbt.Target is not null:
+            return ResolveModelScope(cord, cbt.Target);
+        default:
+            return null;
+    }
 }
 
 // Recursively interprets a machine body: `bind`, scenario slicing (`||`), and the construct
@@ -213,19 +251,14 @@ ExplorationResult Interpret(
         return Interpret(introspector, cord, machine, bind.Inner, options, solverName, binds);
     }
 
-    var slice = TryGetSliceScenario(cord, body);
-    if (slice is not null)
+    var extracted = ExtractSlice(cord, body);
+    if (extracted.Config is not null)
     {
-        var flat = FlattenSlice(cord, body);
-        var scenario = flat?.Scenario ?? slice;
-        var cfg = flat?.Config
-                  ?? FindSliceModelConfig(cord, body)
-                  ?? body!.FindConstruct()?.Reference
-                  ?? cord.GetMachine(machine)?.BaseConfigs.FirstOrDefault() ?? string.Empty;
+        var cfg = extracted.Config;
         var pg = BuildParamGen(cord, cfg, machine, solverName, binds, introspector);
         var explorer = new Explorer(introspector, options, pg);
         var shortNames = introspector.Rules.Select(r => ShortLabel(r.ActionLabel)).ToHashSet(StringComparer.Ordinal);
-        var compiled = new BehaviorExplorer(name => cord.GetMachine(name)?.Body, shortNames).Compile(DesugarLet(scenario));
+        var compiled = new BehaviorExplorer(name => cord.GetMachine(name)?.Body, shortNames).Compile(ExpandParamMachines(cord, DesugarLet(extracted.Scenario)));
         return explorer.ExploreSliced(machine, compiled, ShortLabel);
     }
 
@@ -234,9 +267,10 @@ ExplorationResult Interpret(
         return InterpretConstruct(introspector, cord, machine, cb, options, solverName, binds);
     }
 
-    var cfgName = cord.GetMachine(machine)?.BaseConfigs.FirstOrDefault() ?? string.Empty;
-    var paramGen = BuildParamGen(cord, cfgName, machine, solverName, binds, introspector);
-    return new Explorer(introspector, options, paramGen).Explore(machine);
+    // A pure behavior (a scenario / parametrized `let`) with no model program is explored
+    // directly as a behavior automaton over its declared action alphabet.
+    var behaviorGraph = ExploreBehavior(cord, machine);
+    return new ExplorationResult { Graph = behaviorGraph };
 }
 
 ExplorationResult InterpretConstruct(
@@ -356,62 +390,93 @@ static object? ConvertLiteral(string token, Type type)
     return token;
 }
 
-// If the machine body is `A || B` where exactly one side constructs a model program
-// (directly or via a nested slice), returns the other side (the scenario) for slicing.
-static Sek.Cord.Ast.Behavior? TryGetSliceScenario(CordDocument cord, Sek.Cord.Ast.Behavior? body)
-{
-    var flat = FlattenSlice(cord, body);
-    return flat?.Scenario;
-}
-
-// Flattens a (possibly nested) slice `A || B` into a single composed scenario and the model
-// config it slices. Nested slices compose: `X || (Y || model)` == `(X || Y) || model`.
-static (Sek.Cord.Ast.Behavior Scenario, string Config)? FlattenSlice(CordDocument cord, Sek.Cord.Ast.Behavior? body)
+// Distributes `|| <model program>` out of a behavior expression, returning the composed
+// scenario and the (shared) model config it slices against, or config == null when the body is
+// not a slice. Because `||` distributes over the behavior operators when the model program is
+// shared, `setup; (A || M | B || M)` becomes scenario `setup; (A | B)` sliced against `M`, and
+// `X || (Y || M)` becomes `(X || Y) || M`. Pure behavior parallels (neither side a model
+// program) are preserved. Machine references are inlined.
+static (Sek.Cord.Ast.Behavior Scenario, string? Config) ExtractSlice(CordDocument cord, Sek.Cord.Ast.Behavior? body)
 {
     body = Unwrap(body);
-    if (body is not Sek.Cord.Ast.ParallelBehavior par || par.Items.Count != 2) return null;
-
-    var a = ResolveSliceItem(cord, par.Items[0]);
-    var b = ResolveSliceItem(cord, par.Items[1]);
-
-    foreach (var (scenarioSide, modelSide) in new[] { (a, b), (b, a) })
+    switch (body)
     {
-        if (scenarioSide is null || modelSide is null) continue;
+        case null:
+            return (new Sek.Cord.Ast.SequenceBehavior(), null);
 
-        // Model side is a direct model-program construct.
-        var c = modelSide.FindConstruct();
-        if (c?.Kind == ConstructKind.ModelProgram && !string.IsNullOrEmpty(c.Reference))
+        case Sek.Cord.Ast.InvocationBehavior inv when (inv.Args is null || inv.Args.Count == 0) && cord.GetMachine(inv.Target) is { } m:
+            // A machine reference: inline it (extracting any slice inside).
+            return ExtractSlice(cord, m.Body);
+
+        case Sek.Cord.Ast.ParallelBehavior par when par.Items.Count == 2:
         {
-            return (scenarioSide, c.Reference);
+            var cfg0 = IsPureModelProgram(cord, par.Items[0]);
+            var cfg1 = IsPureModelProgram(cord, par.Items[1]);
+            if (cfg1 is not null && cfg0 is null)
+            {
+                var (s, c) = ExtractSlice(cord, par.Items[0]);
+                return (s, c ?? cfg1);
+            }
+
+            if (cfg0 is not null && cfg1 is null)
+            {
+                var (s, c) = ExtractSlice(cord, par.Items[1]);
+                return (s, c ?? cfg0);
+            }
+
+            // Genuine behavior parallel (neither or both are model programs).
+            var (l, lc) = ExtractSlice(cord, par.Items[0]);
+            var (r, rc) = ExtractSlice(cord, par.Items[1]);
+            var np = new Sek.Cord.Ast.ParallelBehavior { Op = par.Op };
+            np.Items.Add(l);
+            np.Items.Add(r);
+            return (np, lc ?? rc);
         }
 
-        // Model side is itself a slice: compose this scenario with the nested one.
-        var nested = FlattenSlice(cord, modelSide);
-        if (nested is not null)
+        case Sek.Cord.Ast.SequenceBehavior seq:
         {
-            var composed = new Sek.Cord.Ast.ParallelBehavior { Op = "sync" };
-            composed.Items.Add(scenarioSide);
-            composed.Items.Add(nested.Value.Scenario);
-            return (composed, nested.Value.Config);
+            var n = new Sek.Cord.Ast.SequenceBehavior();
+            string? cfg = null;
+            foreach (var it in seq.Items) { var (s, c) = ExtractSlice(cord, it); n.Items.Add(s); cfg ??= c; }
+            return (n, cfg);
         }
+
+        case Sek.Cord.Ast.ChoiceBehavior ch:
+        {
+            var n = new Sek.Cord.Ast.ChoiceBehavior();
+            string? cfg = null;
+            foreach (var it in ch.Items) { var (s, c) = ExtractSlice(cord, it); n.Items.Add(s); cfg ??= c; }
+            return (n, cfg);
+        }
+
+        case Sek.Cord.Ast.RepetitionBehavior rep:
+        {
+            var (s, c) = ExtractSlice(cord, rep.Inner);
+            return (new Sek.Cord.Ast.RepetitionBehavior { Inner = s, Op = rep.Op, Min = rep.Min, Max = rep.Max }, c);
+        }
+
+        case Sek.Cord.Ast.GroupBehavior g:
+            return ExtractSlice(cord, g.Inner);
+
+        default:
+            return (body, null);
     }
-
-    return null;
 }
 
-// Resolves the config name of the model-program side of a slice (so its Cord `where`
-// domains are picked up), resolving machine references on either side.
-static string? FindSliceModelConfig(CordDocument cord, Sek.Cord.Ast.Behavior? body)
+// Returns the model-program config name if `item` (resolving machine references and groups) is
+// a bare `construct model program from Cfg`; otherwise null. A slice machine
+// (`scenario || model`) is NOT a pure model program — it is a scenario for further composition.
+static string? IsPureModelProgram(CordDocument cord, Sek.Cord.Ast.Behavior item)
 {
-    body = Unwrap(body);
-    if (body is not Sek.Cord.Ast.ParallelBehavior par) return null;
-    foreach (var item in par.Items)
+    item = Unwrap(item);
+    if (item is Sek.Cord.Ast.InvocationBehavior inv && (inv.Args is null || inv.Args.Count == 0) && cord.GetMachine(inv.Target) is { } m)
     {
-        var c = ResolveSliceItem(cord, item)?.FindConstruct();
-        if (c?.Kind == ConstructKind.ModelProgram && !string.IsNullOrEmpty(c.Reference)) return c.Reference;
+        item = Unwrap(m.Body);
     }
 
-    return null;
+    return item is Sek.Cord.Ast.ConstructBehavior { Kind: ConstructKind.ModelProgram } cb && !string.IsNullOrEmpty(cb.Reference)
+        ? cb.Reference
+        : null;
 }
 
 static Sek.Cord.Ast.Behavior? ResolveSliceItem(CordDocument cord, Sek.Cord.Ast.Behavior item)
@@ -424,6 +489,62 @@ static Sek.Cord.Ast.Behavior? ResolveSliceItem(CordDocument cord, Sek.Cord.Ast.B
     }
 
     return item;
+}
+
+// Expands parameterized-machine invocations: `machine AnyRequest(int id) { …(id)… }` used as
+// `AnyRequest(5)` is replaced by the machine's body with its parameters substituted by the
+// call arguments. Runs after DesugarLet so let-bound values are already in the arguments.
+static Sek.Cord.Ast.Behavior ExpandParamMachines(CordDocument cord, Sek.Cord.Ast.Behavior b)
+{
+    switch (b)
+    {
+        case Sek.Cord.Ast.InvocationBehavior inv when inv.Args is { Count: > 0 } && cord.GetMachine(inv.Target) is { } m && m.Parameters.Count > 0:
+        {
+            var subst = new Dictionary<string, string>(StringComparer.Ordinal);
+            for (var i = 0; i < m.Parameters.Count && i < inv.Args.Count; i++) subst[m.Parameters[i].Name] = inv.Args[i];
+            return ExpandParamMachines(cord, CloneWithSubst(m.Body, subst));
+        }
+        case Sek.Cord.Ast.SequenceBehavior s:
+        { var n = new Sek.Cord.Ast.SequenceBehavior(); n.Items.AddRange(s.Items.Select(i => ExpandParamMachines(cord, i))); return n; }
+        case Sek.Cord.Ast.ChoiceBehavior c:
+        { var n = new Sek.Cord.Ast.ChoiceBehavior(); n.Items.AddRange(c.Items.Select(i => ExpandParamMachines(cord, i))); return n; }
+        case Sek.Cord.Ast.ParallelBehavior p:
+        { var n = new Sek.Cord.Ast.ParallelBehavior { Op = p.Op }; n.Items.AddRange(p.Items.Select(i => ExpandParamMachines(cord, i))); return n; }
+        case Sek.Cord.Ast.PermutationBehavior pm:
+        { var n = new Sek.Cord.Ast.PermutationBehavior(); n.Items.AddRange(pm.Items.Select(i => ExpandParamMachines(cord, i))); return n; }
+        case Sek.Cord.Ast.LooseSequenceBehavior ls:
+        { var n = new Sek.Cord.Ast.LooseSequenceBehavior(); n.Items.AddRange(ls.Items.Select(i => ExpandParamMachines(cord, i))); return n; }
+        case Sek.Cord.Ast.RepetitionBehavior r:
+            return new Sek.Cord.Ast.RepetitionBehavior { Inner = ExpandParamMachines(cord, r.Inner), Op = r.Op, Min = r.Min, Max = r.Max };
+        case Sek.Cord.Ast.GroupBehavior g:
+            return new Sek.Cord.Ast.GroupBehavior { Inner = ExpandParamMachines(cord, g.Inner) };
+        case Sek.Cord.Ast.PreconstraintBehavior pc:
+            return new Sek.Cord.Ast.PreconstraintBehavior { Code = pc.Code, Inner = ExpandParamMachines(cord, pc.Inner) };
+        case Sek.Cord.Ast.FailBehavior fb:
+            return new Sek.Cord.Ast.FailBehavior { Inner = ExpandParamMachines(cord, fb.Inner) };
+        default:
+            return b;
+    }
+}
+
+// True if a behavior references any of the given variable names as an invocation argument.
+static bool ReferencesVars(Sek.Cord.Ast.Behavior b, HashSet<string> vars)
+{
+    switch (b)
+    {
+        case Sek.Cord.Ast.InvocationBehavior inv:
+            return inv.Args is not null && inv.Args.Any(a => vars.Contains(a.Trim()));
+        case Sek.Cord.Ast.SequenceBehavior s: return s.Items.Any(i => ReferencesVars(i, vars));
+        case Sek.Cord.Ast.ChoiceBehavior c: return c.Items.Any(i => ReferencesVars(i, vars));
+        case Sek.Cord.Ast.ParallelBehavior p: return p.Items.Any(i => ReferencesVars(i, vars));
+        case Sek.Cord.Ast.PermutationBehavior pm: return pm.Items.Any(i => ReferencesVars(i, vars));
+        case Sek.Cord.Ast.LooseSequenceBehavior ls: return ls.Items.Any(i => ReferencesVars(i, vars));
+        case Sek.Cord.Ast.RepetitionBehavior r: return ReferencesVars(r.Inner, vars);
+        case Sek.Cord.Ast.GroupBehavior g: return ReferencesVars(g.Inner, vars);
+        case Sek.Cord.Ast.PreconstraintBehavior pc: return ReferencesVars(pc.Inner, vars);
+        case Sek.Cord.Ast.FailBehavior fb: return ReferencesVars(fb.Inner, vars);
+        default: return false;
+    }
 }
 
 // Expands `let vars where {Condition.In...} in Behavior` into a choice over each variable
@@ -460,6 +581,40 @@ static Sek.Cord.Ast.Behavior DesugarLet(Sek.Cord.Ast.Behavior b)
 
             if (choices.Count == 0) return inner;
             if (choices.Count == 1) return choices[0];
+
+            // Left-factor a leading prefix that does not depend on the bound variables, so
+            // `pre; A(v1) | pre; A(v2) | …` becomes `pre; (A(v1) | A(v2) | …)`. This is essential
+            // when the prefix is `...` (== _*): duplicating it across many combinations otherwise
+            // causes an exponential determinization blow-up.
+            var varNames = let.Vars.Select(v => v.Name).ToHashSet(StringComparer.Ordinal);
+            if (inner is Sek.Cord.Ast.SequenceBehavior seqInner)
+            {
+                var k = 0;
+                while (k < seqInner.Items.Count && !ReferencesVars(seqInner.Items[k], varNames)) k++;
+                if (k > 0 && k < seqInner.Items.Count)
+                {
+                    Sek.Cord.Ast.Behavior Tail(Dictionary<string, string> subst)
+                    {
+                        var t = new Sek.Cord.Ast.SequenceBehavior();
+                        for (var i = k; i < seqInner.Items.Count; i++) t.Items.Add(CloneWithSubst(seqInner.Items[i], subst));
+                        return t.Items.Count == 1 ? t.Items[0] : t;
+                    }
+
+                    var tailChoice = new Sek.Cord.Ast.ChoiceBehavior();
+                    foreach (var a in assignments)
+                    {
+                        var subst = new Dictionary<string, string>(StringComparer.Ordinal);
+                        foreach (var kv in a) subst[kv.Key] = kv.Value?.ToString() ?? string.Empty;
+                        tailChoice.Items.Add(Tail(subst));
+                    }
+
+                    var factored = new Sek.Cord.Ast.SequenceBehavior();
+                    for (var i = 0; i < k; i++) factored.Items.Add(seqInner.Items[i]);
+                    factored.Items.Add(tailChoice);
+                    return factored;
+                }
+            }
+
             var ch = new Sek.Cord.Ast.ChoiceBehavior();
             ch.Items.AddRange(choices);
             return ch;

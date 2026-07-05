@@ -157,6 +157,10 @@ public sealed class Explorer
             foreach (var rule in _model.Rules)
             {
                 var bareLabel = shortOf(rule.ActionLabel);
+                // An instance action `Type.Method(...)` has an implicit receiver: its first
+                // parameter is the target object (its domain is the reachable objects). Scenario
+                // argument patterns pin the *visible* parameters, i.e. those after the receiver.
+                var recv = ReceiverCount(rule);
                 // Quick reject: if the scenario permits neither this action's bare label nor
                 // any argument-pinned form of it from here, skip generating arguments at all.
                 if (!scenario.Permits(dfaState, bareLabel))
@@ -172,7 +176,7 @@ public sealed class Explorer
                 var patterns = scenario.ArgPatterns(dfaState, bareLabel).ToList();
                 if (patterns.Count > 0)
                 {
-                    domainValues = ApplyScenarioArgDomains(rule, domainValues, patterns);
+                    domainValues = ApplyScenarioArgDomains(rule, domainValues, patterns, recv);
                 }
 
                 // Event / output value parameters with no Cord domain and no scenario-supplied
@@ -193,8 +197,9 @@ public sealed class Explorer
 
                     // Argument-aware scenario step: match each pinned argument pattern
                     // positionally (a `_` pattern argument is a wildcard), then fall back to
-                    // the bare label (any arguments).
-                    var normArgs = invokeArgs.Select(a => BehaviorExplorer.NormArg(ArgIdentity(a))).ToList();
+                    // the bare label (any arguments). The implicit receiver is skipped so the
+                    // pattern aligns with the action's visible parameters.
+                    var normArgs = invokeArgs.Skip(recv).Select(a => BehaviorExplorer.NormArg(ArgIdentity(a))).ToList();
                     if (!scenario.TryStepArgs(dfaState, bareLabel, normArgs, out var ndfa) &&
                         !scenario.TryStep(dfaState, bareLabel, out ndfa))
                     {
@@ -227,6 +232,13 @@ public sealed class Explorer
                     if (graph.Transitions.Count >= _options.MaxTransitions) { hitBound = true; break; }
                     var action = new ActionInvocation(rule.ActionLabel, invokeArgs.Select(Stringify).ToList());
                     graph.Transitions.Add(new Transition(fromId, action, toId));
+
+                    // StopAtError (model checking): halt at the first failure state reached.
+                    if (_options.StopAtError && scenario.IsFail(ndfa))
+                    {
+                        queue.Clear();
+                        break;
+                    }
                 }
             }
         }
@@ -389,18 +401,19 @@ public sealed class Explorer
     /// value is unioned into that parameter's candidate domain. This lets a sliced action fire
     /// with the values the scenario names (e.g. <c>Publish(_, "object1")</c>).
     /// </summary>
-    private List<List<object?>> ApplyScenarioArgDomains(RuleInfo rule, List<List<object?>> domainValues, List<string[]> patterns)
+    private List<List<object?>> ApplyScenarioArgDomains(RuleInfo rule, List<List<object?>> domainValues, List<string[]> patterns, int recv = 0)
     {
         var result = domainValues.Select(d => new List<object?>(d)).ToList();
-        for (var i = 0; i < rule.Parameters.Count; i++)
+        for (var vi = 0; vi < rule.Parameters.Count - recv; vi++)
         {
+            var i = vi + recv; // model parameter index (skip the implicit receiver)
             var u = Underlying(rule.Parameters[i].Type);
             if (IsModelObjectType(u)) continue; // object params use the reachable-object domain
 
             foreach (var pat in patterns)
             {
-                if (i >= pat.Length) continue;
-                var tok = pat[i];
+                if (vi >= pat.Length) continue;
+                var tok = pat[vi];
                 if (tok == "_") continue;
                 var val = ParseScenarioValue(tok, rule.Parameters[i].Type);
                 if (val is not null && !result[i].Any(v => Equals(v, val))) result[i].Add(val);
@@ -408,6 +421,22 @@ public sealed class Explorer
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Number of leading implicit-receiver parameters for an instance action. An action labeled
+    /// <c>Type.Method</c> whose first parameter is a model object of type <c>Type</c> models an
+    /// instance method whose receiver (the target object) is that first parameter.
+    /// </summary>
+    private static int ReceiverCount(RuleInfo rule)
+    {
+        if (rule.Parameters.Count == 0) return 0;
+        var dot = rule.ActionLabel.LastIndexOf('.');
+        if (dot <= 0) return 0;
+        var declaring = rule.ActionLabel[..dot];
+        var lastSeg = declaring.LastIndexOf('.') >= 0 ? declaring[(declaring.LastIndexOf('.') + 1)..] : declaring;
+        var p0 = Underlying(rule.Parameters[0].Type);
+        return IsModelObjectType(p0) && string.Equals(p0.Name, lastSeg, StringComparison.Ordinal) ? 1 : 0;
     }
 
     private static object? ParseScenarioValue(string token, Type type)

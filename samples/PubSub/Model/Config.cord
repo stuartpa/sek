@@ -1,43 +1,46 @@
-using PubSub.Model;
+using PubSub.Implementation;
 
-// PubSub (SEK port) — faithful to the classic sample's Cord. Publisher/Subscriber objects
-// are created with `new`; the object-typed parameters draw their domain from the reachable
-// objects. `TwoSubscribersWithParameters*` uses a `let` to generate the published payloads.
-
-config Config
+/// Defines the base configuration with actions and switches.
+config Config 
 {
     action Publisher();
+    action void Publisher.Publish(string data);
     action Subscriber(Publisher pub);
-    action void Publisher.Publish(Publisher pub, string data);
-    action event void Subscriber.Received(Subscriber sub, string data);
+    action event void Subscriber.Received(string data);
 
-    switch StateBound = 500;
-    switch StepBound = 5000;
+    switch StepBound = 1024;
+    switch StateBound = 1024;
+
+    switch GeneratedTestPath = "..\\TestSuite";  
+    switch TestClassBase = "vs";
+    
     switch TestEnabled = false;
 }
 
-/// Defines the model program extracted from C#. The exploration graph is infinite and is
-/// pruned after a step bound is hit.
+/// Defines the model program extracted from C#.
+/// The exploration graph is infinite and will be pruned after a 
+/// step bound is hit.
 machine ModelProgram() : Config where ForExploration = false
 {
     construct model program from Config
 }
 
-/// A scenario with two subscribers. Publish arguments are left free (the `_` wildcard),
-/// so this is not yet suitable for testing.
+
+/// Defines a scenario with two subscribers
 machine TwoSubscribersScenario() : Config where ForExploration = false
 {
     new Publisher; new Subscriber(_); new Subscriber(_);
-    (Publish(_, "object1"); Publish(_, "object2")) ; Received*
+    (Publish("object1"); Publish("object2")) ; Received*
 }
 
-/// The slice with two subscribers.
+/// Defines the slice with two subscribers. Parameters
+/// for Publish are not determined so this not suitable for testing yet.
 machine TwoSubscribersSlice() : Config
 {
     TwoSubscribersScenario || ModelProgram
 }
 
-/// A scenario where the published payloads are assigned by a `let`.
+/// Defines a scenario where parameters are assigned
 machine TwoSubscribersWithParametersScenario() : Config where ForExploration = false
 {
     let string data1, string data2, string data3
@@ -48,19 +51,27 @@ machine TwoSubscribersWithParametersScenario() : Config where ForExploration = f
           .}
     in
     new Publisher; new Subscriber(_); new Subscriber(_);
-    Publish(_, data1); Publish(_, data2); Publish(_, data3); Received*
+    Publish(data1); Publish(data2); Publish(data3); Received*
 }
 
-/// A slice where the parameters are assigned.
+/// Defines a slice where parameters are assigned. 
 machine TwoSubscribersWithParametersSlice() : Config
 {
     TwoSubscribersWithParametersScenario || ModelProgram
 }
 
-/// A test suite derived from the parametrized slice.
+     
+
+/// Derives a test suite. Explore this machine to see the translated and traversed test suite,
+/// or generate tests from it which can be executed with VSTT. Alternatively, directly Test 
+/// from this machine. You can trigger a conformance failure by injecting an error in the 
+/// Implementation project setting PubSub.HasBug to true. Than the implementation will
+/// have non-deterministic (random) failures. 
 machine TestSuite() : Config where TestEnabled = true
 {
-    construct test cases
-        where strategy = "longtests", allowundeterminedcoverage = true
+    construct test cases 
+        where strategy = "longtests", allowundeterminedcoverage = true 
         for TwoSubscribersWithParametersSlice
 }
+
+
