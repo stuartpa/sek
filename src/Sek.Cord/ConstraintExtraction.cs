@@ -27,10 +27,15 @@ public static class CordConstraintExtractor
             return result;
         }
 
+        // Strip C# comments so a `// ...` line preceding a statement does not swallow it when
+        // the block is split on `;` (a chunk beginning with a comment would fail the
+        // `StartsWith("Condition...")` dispatch and be dropped).
+        var whereCode = StripComments(action.WhereCode);
+
         // First pass: collect where-block local declarations `Type name = expr;` (e.g.
         // `uint mon = days & 0x1;`) so Combination columns can reference them.
         var locals = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var stmt in SplitStatements(action.WhereCode))
+        foreach (var stmt in SplitStatements(whereCode))
         {
             var s = stmt.Trim();
             if (TryParseLocal(s, paramNames, out var localName, out var localExpr))
@@ -40,7 +45,7 @@ public static class CordConstraintExtractor
         }
 
         var takeElse = false;
-        foreach (var stmt in SplitStatements(action.WhereCode))
+        foreach (var stmt in SplitStatements(whereCode))
         {
             var s = stmt.Trim();
             if (s.Length == 0)
@@ -333,6 +338,46 @@ public static class CordConstraintExtractor
     private static List<string> SplitArgs(string s) => SplitTopLevel(s, ',');
 
     private static List<string> SplitStatements(string s) => SplitTopLevel(s, ';');
+
+    /// <summary>Removes C# line (<c>// ...</c>) and block (<c>/* ... */</c>) comments,
+    /// preserving string literals, so comments in a <c>where {. ... .}</c> block do not
+    /// interfere with statement splitting.</summary>
+    private static string StripComments(string s)
+    {
+        var sb = new StringBuilder(s.Length);
+        var inStr = false;
+        for (var i = 0; i < s.Length; i++)
+        {
+            var ch = s[i];
+            if (inStr)
+            {
+                sb.Append(ch);
+                if (ch == '"') inStr = false;
+                continue;
+            }
+
+            if (ch == '"') { inStr = true; sb.Append(ch); continue; }
+
+            if (ch == '/' && i + 1 < s.Length && s[i + 1] == '/')
+            {
+                while (i < s.Length && s[i] != '\n') i++;
+                if (i < s.Length) sb.Append('\n');
+                continue;
+            }
+
+            if (ch == '/' && i + 1 < s.Length && s[i + 1] == '*')
+            {
+                i += 2;
+                while (i + 1 < s.Length && !(s[i] == '*' && s[i + 1] == '/')) i++;
+                i++; // skip the closing '/'
+                continue;
+            }
+
+            sb.Append(ch);
+        }
+
+        return sb.ToString();
+    }
 
     private static List<string> SplitTopLevel(string s, char sep)
     {

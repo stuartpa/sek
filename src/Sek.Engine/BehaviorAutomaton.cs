@@ -49,9 +49,32 @@ public sealed class BehaviorExplorer
             _alphabet.Add(sym);
         }
 
-        var dfa = ToDfa(body);
-        var on = dfa.On.Select(d => new Dictionary<string, int>(d, StringComparer.Ordinal)).ToArray();
-        return new CompiledScenario(dfa.Start, dfa.Accept.ToArray(), on, dfa.Fail.ToArray());
+        return new CompiledScenario(ToDfa(body), ContainsFail(body, new HashSet<string>(StringComparer.Ordinal)));
+    }
+
+    /// <summary>Whether the behavior contains a <c>: fail</c> annotation (recursing machine
+    /// references) — i.e. it is a model-checking scenario.</summary>
+    private bool ContainsFail(Behavior? b, HashSet<string> seenMachines)
+    {
+        switch (b)
+        {
+            case null: return false;
+            case FailBehavior: return true;
+            case InvocationBehavior inv:
+                var m = _resolveMachine(inv.Target);
+                return m is not null && seenMachines.Add(inv.Target) && ContainsFail(m, seenMachines);
+            case SequenceBehavior s: return s.Items.Any(i => ContainsFail(i, seenMachines));
+            case ChoiceBehavior c: return c.Items.Any(i => ContainsFail(i, seenMachines));
+            case ParallelBehavior p: return p.Items.Any(i => ContainsFail(i, seenMachines));
+            case PermutationBehavior pm: return pm.Items.Any(i => ContainsFail(i, seenMachines));
+            case LooseSequenceBehavior ls: return ls.Items.Any(i => ContainsFail(i, seenMachines));
+            case RepetitionBehavior rep: return ContainsFail(rep.Inner, seenMachines);
+            case GroupBehavior g: return ContainsFail(g.Inner, seenMachines);
+            case PreconstraintBehavior pc: return ContainsFail(pc.Inner, seenMachines);
+            case LetBehavior l: return ContainsFail(l.Inner, seenMachines);
+            case BindBehavior bd: return ContainsFail(bd.Inner, seenMachines);
+            default: return false;
+        }
     }
 
     /// <summary>The scenario symbol for an invocation: the bare action label, or
@@ -107,38 +130,36 @@ public sealed class BehaviorExplorer
         }
     }
 
-    /// <summary>A determinized scenario automaton over action labels.</summary>
+    /// <summary>A lazily-determinized scenario automaton over action labels (states and
+    /// transitions are computed on demand from the underlying NFA / product).</summary>
     public sealed class CompiledScenario
     {
-        private readonly bool[] _accept;
-        private readonly bool[] _fail;
-        private readonly Dictionary<string, int>[] _on;
+        private readonly IDfa _dfa;
 
-        public CompiledScenario(int start, bool[] accept, Dictionary<string, int>[] on, bool[]? fail = null)
+        internal CompiledScenario(IDfa dfa, bool hasFail)
         {
-            Start = start;
-            _accept = accept;
-            _fail = fail ?? new bool[accept.Length];
-            _on = on;
+            _dfa = dfa;
+            HasFailStates = hasFail;
+            Start = dfa.Start;
         }
 
         public int Start { get; }
 
-        public bool IsAccepting(int state) => state >= 0 && state < _accept.Length && _accept[state];
+        public bool IsAccepting(int state) => state >= 0 && _dfa.Accept(state);
 
         /// <summary>True if <paramref name="state"/> is a model-checking failure state
         /// (reached a <c>: fail</c> annotation).</summary>
-        public bool IsFail(int state) => state >= 0 && state < _fail.Length && _fail[state];
+        public bool IsFail(int state) => state >= 0 && _dfa.Fail(state);
 
         /// <summary>True if the scenario has any failure states (a model-checking machine).</summary>
-        public bool HasFailStates => _fail.Any(f => f);
+        public bool HasFailStates { get; }
 
         /// <summary>True if the scenario permits <paramref name="label"/> from <paramref name="state"/>,
         /// yielding the next scenario state.</summary>
         public bool TryStep(int state, string label, out int next)
         {
             next = -1;
-            return state >= 0 && state < _on.Length && _on[state].TryGetValue(label, out next);
+            return state >= 0 && _dfa.On(state).TryGetValue(label, out next);
         }
 
         /// <summary>True if the scenario permits the action <paramref name="bareLabel"/> from
@@ -146,10 +167,11 @@ public sealed class BehaviorExplorer
         /// argument-pinned form <c>bareLabel(...)</c>.</summary>
         public bool Permits(int state, string bareLabel)
         {
-            if (state < 0 || state >= _on.Length) return false;
-            if (_on[state].ContainsKey(bareLabel)) return true;
+            if (state < 0) return false;
+            var on = _dfa.On(state);
+            if (on.ContainsKey(bareLabel)) return true;
             var prefix = bareLabel + "(";
-            foreach (var k in _on[state].Keys)
+            foreach (var k in on.Keys)
             {
                 if (k.StartsWith(prefix, StringComparison.Ordinal)) return true;
             }
@@ -164,9 +186,9 @@ public sealed class BehaviorExplorer
         public bool TryStepArgs(int state, string bareLabel, IReadOnlyList<string> concreteArgs, out int next)
         {
             next = -1;
-            if (state < 0 || state >= _on.Length) return false;
+            if (state < 0) return false;
             var prefix = bareLabel + "(";
-            foreach (var kv in _on[state])
+            foreach (var kv in _dfa.On(state))
             {
                 var key = kv.Key;
                 if (!key.StartsWith(prefix, StringComparison.Ordinal) || !key.EndsWith(")", StringComparison.Ordinal))
@@ -199,9 +221,9 @@ public sealed class BehaviorExplorer
         /// feed scenario-supplied argument values into parameter generation during slicing.</summary>
         public IEnumerable<string[]> ArgPatterns(int state, string bareLabel)
         {
-            if (state < 0 || state >= _on.Length) yield break;
+            if (state < 0) yield break;
             var prefix = bareLabel + "(";
-            foreach (var kv in _on[state])
+            foreach (var kv in _dfa.On(state))
             {
                 var key = kv.Key;
                 if (!key.StartsWith(prefix, StringComparison.Ordinal) || !key.EndsWith(")", StringComparison.Ordinal))
@@ -412,36 +434,32 @@ public sealed class BehaviorExplorer
         }
     }
 
-    // ---- DFA ----------------------------------------------------------------
+    // ---- DFA (lazy determinization) ----------------------------------------
+    // Determinization is performed on demand: DFA states (NFA subsets, or products of
+    // sub-DFAs) are materialized and memoized only as a query reaches them, never eagerly
+    // enumerated. This keeps an unanchored scenario with many alternatives — whose full DFA is
+    // exponential — costing only what the bounded model exploration actually visits.
 
-    private sealed class Dfa
+    private static bool Matches(string label, string sym) =>
+        label == sym
+        || label == "_"
+        || (label.StartsWith("!", StringComparison.Ordinal) && label[1..] != sym);
+
+    /// <summary>A lazily-determinized automaton over action labels.</summary>
+    internal interface IDfa
     {
-        public readonly List<bool> Accept = new();
-        public readonly List<bool> Fail = new();
-        public readonly List<Dictionary<string, int>> On = new();
-        public int Start;
-
-        public int Add(bool accept, bool fail = false)
-        {
-            Accept.Add(accept);
-            Fail.Add(fail);
-            On.Add(new Dictionary<string, int>(StringComparer.Ordinal));
-            return Accept.Count - 1;
-        }
+        int Start { get; }
+        bool Accept(int state);
+        bool Fail(int state);
+        IReadOnlyDictionary<string, int> On(int state);
     }
 
-    private Dfa ToDfa(Behavior b)
+    private IDfa ToDfa(Behavior b) => b switch
     {
-        switch (b)
-        {
-            case ParallelBehavior par when par.Items.Count == 2:
-                return Product(ToDfa(par.Items[0]), ToDfa(par.Items[1]), par.Op);
-            case GroupBehavior g:
-                return ToDfa(g.Inner);
-            default:
-                return Subset(Build(b));
-        }
-    }
+        ParallelBehavior par when par.Items.Count == 2 => new ProductDfa(ToDfa(par.Items[0]), ToDfa(par.Items[1]), par.Op),
+        GroupBehavior g => ToDfa(g.Inner),
+        _ => new SubsetDfa(Build(b).Start, _alphabet),
+    };
 
     private static HashSet<NState> Closure(IEnumerable<NState> states)
     {
@@ -462,47 +480,58 @@ public sealed class BehaviorExplorer
         return set;
     }
 
-    private Dfa Subset(Nfa nfa)
+    /// <summary>Lazy subset construction over an NFA: each DFA state is an NFA-state subset,
+    /// materialized (with its outgoing transitions) on first query and memoized.</summary>
+    private sealed class SubsetDfa : IDfa
     {
-        var dfa = new Dfa();
-        var keyToId = new Dictionary<string, int>();
-        var idToSet = new List<HashSet<NState>>();
+        private readonly HashSet<string> _alphabet;
+        private readonly List<HashSet<NState>> _sets = new();
+        private readonly Dictionary<string, int> _ids = new(StringComparer.Ordinal);
+        private readonly Dictionary<int, IReadOnlyDictionary<string, int>> _on = new();
 
-        HashSet<NState> Start = Closure(new[] { nfa.Start });
-        string Key(HashSet<NState> s) => string.Join(",", s.Select(x => x.Id).OrderBy(x => x));
-
-        int GetOrAdd(HashSet<NState> s)
+        public SubsetDfa(NState nfaStart, HashSet<string> alphabet)
         {
-            var k = Key(s);
-            if (keyToId.TryGetValue(k, out var id))
-            {
-                return id;
-            }
+            _alphabet = alphabet;
+            Start = GetOrAdd(Closure(new[] { nfaStart }));
+        }
 
-            id = dfa.Add(s.Any(x => x.Accept), s.Any(x => x.Fail));
-            keyToId[k] = id;
-            idToSet.Add(s);
+        public int Start { get; }
+
+        private int GetOrAdd(HashSet<NState> s)
+        {
+            var key = string.Join(",", s.Select(x => x.Id).OrderBy(x => x));
+            if (_ids.TryGetValue(key, out var id)) return id;
+            id = _sets.Count;
+            _ids[key] = id;
+            _sets.Add(s);
             return id;
         }
 
-        dfa.Start = GetOrAdd(Start);
-        var queue = new Queue<int>();
-        queue.Enqueue(dfa.Start);
+        public bool Accept(int state) => _sets[state].Any(x => x.Accept);
 
-        while (queue.Count > 0)
+        public bool Fail(int state) => _sets[state].Any(x => x.Fail);
+
+        public IReadOnlyDictionary<string, int> On(int state)
         {
-            var id = queue.Dequeue();
-            var set = idToSet[id];
+            if (_on.TryGetValue(state, out var cached)) return cached;
 
-            // Only the symbols reachable from this state set need to be tried: the concrete
-            // edge labels, plus the whole alphabet when a universal `_` or negated `!x` edge is
-            // present (those match every symbol). This keeps determinization tractable when the
-            // alphabet is large (e.g. many argument-pinned scenario symbols).
+            var set = _sets[state];
+            var d = new Dictionary<string, int>(StringComparer.Ordinal);
+
+            // The concrete edge labels leaving this subset (bare, pinned, or negated).
+            var concrete = set.SelectMany(st => st.Edges)
+                .Where(e => e.Label is not null && e.Label != "_" && !e.Label.StartsWith("!", StringComparison.Ordinal))
+                .Select(e => e.Label!);
+
+            // A universal `_` or negated `!x` edge matches every *model action*, i.e. the bare
+            // (non-argument-pinned) alphabet symbols — not the scenario's own pinned symbols,
+            // which are only reached by their explicit atoms. Restricting `_` this way avoids
+            // materializing dead states for argument-pinned symbols the model never emits.
             var hasUniversal = set.Any(st => st.Edges.Any(e =>
                 e.Label == "_" || (e.Label is not null && e.Label.StartsWith("!", StringComparison.Ordinal))));
             IEnumerable<string> symbols = hasUniversal
-                ? _alphabet
-                : set.SelectMany(st => st.Edges).Where(e => e.Label is not null).Select(e => e.Label!).Distinct();
+                ? _alphabet.Where(s => !s.Contains('(')).Concat(concrete).Distinct(StringComparer.Ordinal)
+                : concrete.Distinct(StringComparer.Ordinal);
 
             foreach (var sym in symbols)
             {
@@ -511,125 +540,129 @@ public sealed class BehaviorExplorer
                 {
                     foreach (var (label, to) in st.Edges)
                     {
-                        if (label is null)
-                        {
-                            continue;
-                        }
-
-                        var matches = label == sym
-                                      || label == "_"
-                                      || (label.StartsWith("!", StringComparison.Ordinal) && label[1..] != sym);
-                        if (matches)
-                        {
-                            move.Add(to);
-                        }
+                        if (label is not null && Matches(label, sym)) move.Add(to);
                     }
                 }
 
-                if (move.Count == 0)
-                {
-                    continue;
-                }
-
-                var closed = Closure(move);
-                var before = keyToId.Count;
-                var toId = GetOrAdd(closed);
-                dfa.On[id][sym] = toId;
-                if (keyToId.Count > before)
-                {
-                    queue.Enqueue(toId);
-                }
+                if (move.Count > 0) d[sym] = GetOrAdd(Closure(move));
             }
-        }
 
-        return dfa;
+            _on[state] = d;
+            return d;
+        }
     }
 
-    private static Dfa Product(Dfa l, Dfa r, string op)
+    /// <summary>Lazy product of two DFAs for the parallel operators (sync / interleave /
+    /// sync-interleave). Product states (pairs of sub-DFA states) are created on demand.</summary>
+    private sealed class ProductDfa : IDfa
     {
-        var alphaL = l.On.SelectMany(d => d.Keys).ToHashSet(StringComparer.Ordinal);
-        var alphaR = r.On.SelectMany(d => d.Keys).ToHashSet(StringComparer.Ordinal);
-        var shared = new HashSet<string>(alphaL, StringComparer.Ordinal);
-        shared.IntersectWith(alphaR);
-        var union = new HashSet<string>(alphaL, StringComparer.Ordinal);
-        union.UnionWith(alphaR);
+        private readonly IDfa _l;
+        private readonly IDfa _r;
+        private readonly string _op;
+        private readonly HashSet<string>? _syncInterleaveShared;
+        private readonly List<(int L, int R)> _pairs = new();
+        private readonly Dictionary<(int, int), int> _ids = new();
+        private readonly Dictionary<int, IReadOnlyDictionary<string, int>> _on = new();
 
-        var dfa = new Dfa();
-        var keyToId = new Dictionary<string, int>();
-        var idToPair = new List<(int L, int R)>();
-
-        int GetOrAdd(int li, int ri)
+        public ProductDfa(IDfa l, IDfa r, string op)
         {
-            var k = $"{li}:{ri}";
-            if (keyToId.TryGetValue(k, out var id))
+            _l = l;
+            _r = r;
+            _op = op;
+            // Sync-interleave (`|?|`) synchronizes on the shared *signature* — the full alphabets
+            // of both sides — not per-state outgoing symbols, so compute it up front (the sides
+            // are small; this is not used for `sync`/`interleave`).
+            if (op == "syncinterleave")
             {
-                return id;
+                var la = FullAlphabet(l);
+                la.IntersectWith(FullAlphabet(r));
+                _syncInterleaveShared = la;
             }
 
-            id = dfa.Add(l.Accept[li] && r.Accept[ri], l.Fail[li] || r.Fail[ri]);
-            keyToId[k] = id;
-            idToPair.Add((li, ri));
+            Start = GetOrAdd(l.Start, r.Start);
+        }
+
+        public int Start { get; }
+
+        private int GetOrAdd(int li, int ri)
+        {
+            if (_ids.TryGetValue((li, ri), out var id)) return id;
+            id = _pairs.Count;
+            _ids[(li, ri)] = id;
+            _pairs.Add((li, ri));
             return id;
         }
 
-        dfa.Start = GetOrAdd(l.Start, r.Start);
-        var queue = new Queue<int>();
-        queue.Enqueue(dfa.Start);
+        public bool Accept(int state) { var (li, ri) = _pairs[state]; return _l.Accept(li) && _r.Accept(ri); }
 
-        while (queue.Count > 0)
+        public bool Fail(int state) { var (li, ri) = _pairs[state]; return _l.Fail(li) || _r.Fail(ri); }
+
+        public IReadOnlyDictionary<string, int> On(int state)
         {
-            var id = queue.Dequeue();
-            var (li, ri) = idToPair[id];
+            if (_on.TryGetValue(state, out var cached)) return cached;
 
+            var (li, ri) = _pairs[state];
+            var lon = _l.On(li);
+            var ron = _r.On(ri);
+            var union = new HashSet<string>(lon.Keys, StringComparer.Ordinal);
+            union.UnionWith(ron.Keys);
+
+            var d = new Dictionary<string, int>(StringComparer.Ordinal);
             foreach (var sym in union)
             {
                 // A bare label transition matches any argument-pinned form of it, so a scenario
-                // over bare labels syncs with one that pins arguments (e.g. `CreateResponse`
-                // syncs with `CreateResponse(1)`), yielding the pinned symbol.
-                var lHas = SideHas(l.On[li], sym, out var ln);
-                var rHas = SideHas(r.On[ri], sym, out var rn);
-                var mustSync = op switch
+                // over bare labels syncs with one that pins arguments (`CreateResponse` syncs
+                // with `CreateResponse(1)`), yielding the pinned symbol.
+                var lHas = SideHas(lon, sym, out var ln);
+                var rHas = SideHas(ron, sym, out var rn);
+                var mustSync = _op switch
                 {
                     "sync" => true,
                     "interleave" => false,
-                    "syncinterleave" => shared.Contains(sym),
+                    "syncinterleave" => _syncInterleaveShared!.Contains(sym),
                     _ => true,
                 };
 
-                int? nextL = null, nextR = null;
                 if (mustSync)
                 {
-                    if (lHas && rHas) { nextL = ln; nextR = rn; }
-                    else { continue; }
-
-                    AddEdge(id, sym, nextL.Value, nextR.Value);
+                    if (lHas && rHas) d[sym] = GetOrAdd(ln, rn);
                 }
                 else
                 {
-                    // interleave: advance whichever side can take the symbol
-                    if (lHas) AddEdge(id, sym, ln, ri);
-                    if (rHas) AddEdge(id, sym, li, rn);
+                    if (lHas) d[sym] = GetOrAdd(ln, ri);
+                    if (rHas) d[sym] = GetOrAdd(li, rn);
                 }
             }
-        }
 
-        void AddEdge(int fromId, string sym, int li2, int ri2)
+            _on[state] = d;
+            return d;
+        }
+    }
+
+    /// <summary>Fully materializes a (lazy) DFA and returns the set of all symbols on its
+    /// transitions — its action signature. Bounded by the DFA size.</summary>
+    private static HashSet<string> FullAlphabet(IDfa dfa)
+    {
+        var syms = new HashSet<string>(StringComparer.Ordinal);
+        var seen = new HashSet<int> { dfa.Start };
+        var queue = new Queue<int>();
+        queue.Enqueue(dfa.Start);
+        while (queue.Count > 0)
         {
-            var before = keyToId.Count;
-            var toId = GetOrAdd(li2, ri2);
-            dfa.On[fromId][sym] = toId;
-            if (keyToId.Count > before)
+            var s = queue.Dequeue();
+            foreach (var (k, to) in dfa.On(s))
             {
-                queue.Enqueue(toId);
+                syms.Add(k);
+                if (seen.Add(to)) queue.Enqueue(to);
             }
         }
 
-        return dfa;
+        return syms;
     }
 
     /// <summary>Looks up a transition for <paramref name="sym"/>, treating a bare label
     /// transition as matching an argument-pinned symbol (<c>X</c> matches <c>X(args)</c>).</summary>
-    private static bool SideHas(Dictionary<string, int> on, string sym, out int next)
+    private static bool SideHas(IReadOnlyDictionary<string, int> on, string sym, out int next)
     {
         if (on.TryGetValue(sym, out next)) return true;
         var paren = sym.IndexOf('(');
@@ -637,22 +670,36 @@ public sealed class BehaviorExplorer
         return false;
     }
 
-    private static ExplorationGraph ToGraph(string machine, Dfa dfa)
+    private static ExplorationGraph ToGraph(string machine, IDfa dfa)
     {
         var graph = new ExplorationGraph { Machine = machine };
-        for (var i = 0; i < dfa.Accept.Count; i++)
-        {
-            graph.States.Add(new ModelState("S" + i, "S" + i, Label: null, Accepting: dfa.Accept[i], Initial: i == dfa.Start));
-        }
-
         graph.InitialStateId = "S" + dfa.Start;
 
-        for (var i = 0; i < dfa.On.Count; i++)
+        var visited = new HashSet<int> { dfa.Start };
+        var queue = new Queue<int>();
+        queue.Enqueue(dfa.Start);
+        var states = new List<int>();
+        var edges = new List<(int From, string Sym, int To)>();
+
+        while (queue.Count > 0)
         {
-            foreach (var (sym, to) in dfa.On[i].OrderBy(kv => kv.Key, StringComparer.Ordinal))
+            var s = queue.Dequeue();
+            states.Add(s);
+            foreach (var (sym, to) in dfa.On(s).OrderBy(kv => kv.Key, StringComparer.Ordinal))
             {
-                graph.Transitions.Add(new Transition("S" + i, new ActionInvocation(sym, Array.Empty<string>()), "S" + to));
+                edges.Add((s, sym, to));
+                if (visited.Add(to)) queue.Enqueue(to);
             }
+        }
+
+        foreach (var s in states.OrderBy(x => x))
+        {
+            graph.States.Add(new ModelState("S" + s, "S" + s, Label: null, Accepting: dfa.Accept(s), Initial: s == dfa.Start));
+        }
+
+        foreach (var (from, sym, to) in edges)
+        {
+            graph.Transitions.Add(new Transition("S" + from, new ActionInvocation(sym, Array.Empty<string>()), "S" + to));
         }
 
         graph.Metadata["states"] = graph.States.Count.ToString();

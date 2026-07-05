@@ -103,6 +103,7 @@ namespace SMB2.Model
         public void CreateResponse([Domain("MsgIds")] int msgId, [Domain("Zero")] int credit, [Domain("Zero")] int fileId)
         {
             Require(IsOutstanding(msgId), "no matching outstanding request");
+            Require(OpenFiles < Parameters.maxNoOfFiles, "response must match an open (create) request");
             Complete(msgId);
             OpenFiles++;
         }
@@ -155,6 +156,7 @@ namespace SMB2.Model
         public void CloseResponse([Domain("MsgIds")] int msgId, [Domain("Zero")] int credit)
         {
             Require(IsOutstanding(msgId), "no matching outstanding request");
+            Require(OpenFiles > 0, "response must match an open (close) request");
             Complete(msgId);
             OpenFiles--;
         }

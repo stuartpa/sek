@@ -397,9 +397,14 @@ public sealed class Explorer
 
     /// <summary>
     /// Applies scenario-supplied argument values to the parameter domains: for each value-typed
-    /// parameter position that the scenario pins to a concrete value (not <c>_</c>), the pinned
-    /// value is unioned into that parameter's candidate domain. This lets a sliced action fire
-    /// with the values the scenario names (e.g. <c>Publish(_, "object1")</c>).
+    /// parameter the scenario pins to a concrete value (not <c>_</c>), the value seeds that
+    /// parameter's candidate domain, letting a sliced action fire with the value the scenario
+    /// names (e.g. <c>Publish(_, "object1")</c>, or a desugared <c>let</c> id). The scenario is a
+    /// parameter source: the value is added to the domain (Spec Explorer semantics), and the
+    /// scenario's own argument filter (<see cref="BehaviorExplorer.CompiledScenario.TryStepArgs"/>)
+    /// then permits a transition only for the pinned value, so unrelated domain values are still
+    /// rejected. This lets a bounded model parameter fire with a scenario value outside its
+    /// declared <c>[Domain]</c> (e.g. a share id or message id named by the scenario).
     /// </summary>
     private List<List<object?>> ApplyScenarioArgDomains(RuleInfo rule, List<List<object?>> domainValues, List<string[]> patterns, int recv = 0)
     {
@@ -416,7 +421,8 @@ public sealed class Explorer
                 var tok = pat[vi];
                 if (tok == "_") continue;
                 var val = ParseScenarioValue(tok, rule.Parameters[i].Type);
-                if (val is not null && !result[i].Any(v => Equals(v, val))) result[i].Add(val);
+                if (val is null) continue;
+                if (!result[i].Any(v => Equals(v, val))) result[i].Add(val);
             }
         }
 
