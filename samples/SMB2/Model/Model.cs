@@ -4,83 +4,115 @@ using Sek.Modeling;
 
 namespace SMB2.Model
 {
-    /// <summary>An open file within a tree; may or may not have been written.</summary>
-    public sealed class SFile
+    /// <summary>The kind of share a tree connects to.</summary>
+    public enum ShareType
     {
-        public bool Written { get; set; }
-        public bool Closed { get; set; }
+        DISK,
+        PIPE,
+        PRINT,
     }
 
-    /// <summary>A connected tree (share) holding open files.</summary>
-    public sealed class Tree
+    /// <summary>The disposition of a create request.</summary>
+    public enum CreateType
     {
-        public List<SFile> Files { get; set; } = new List<SFile>();
+        Create,
+        Open,
+        OpenIf,
     }
 
     /// <summary>
-    /// A simplified SMB2 protocol model, ported to SEK: session setup, tree connect, file
-    /// create/write/close, and teardown. Trees and files are model-state objects; rules that
-    /// act on them take a parameter whose domain is the reachable objects of that type.
+    /// A message-based SMB2 protocol model, ported to SEK. Requests carry a message id and are
+    /// tracked as outstanding until a matching response arrives. The credit window bounds the
+    /// number of outstanding requests: window == 1 is synchronous (responses necessarily match
+    /// the single outstanding request, in order); window == 2 is asynchronous (two requests may
+    /// be outstanding, so a response can complete them out of order).
     /// </summary>
     public sealed class Smb2Model : ModelProgram
     {
+        public static int maxNoOfFiles = 1;
+
+        public bool ShareKnown { get; set; }
         public bool SessionUp { get; set; }
-        public List<Tree> Trees { get; set; } = new List<Tree>();
+        public int Window { get; set; }
+        public bool TreeConnected { get; set; }
+        public int OpenFiles { get; set; }
+        /// <summary>Outstanding request message ids, in arrival order.</summary>
+        public List<int> Pending { get; set; } = new List<int>();
+
+        [Rule("AssumeShareExists")]
+        public void AssumeShareExists(int shareId, ShareType type)
+        {
+            Require(!ShareKnown, "share already assumed");
+            ShareKnown = true;
+        }
 
         [Rule("SetupConnectionAndSession")]
-        public void SetupConnectionAndSession()
+        public void SetupConnectionAndSession(int windowSize)
         {
-            Require(!SessionUp, "session already established");
+            Require(ShareKnown, "no share");
+            Require(!SessionUp, "session already up");
+            Require(windowSize >= 1 && windowSize <= 2, "window in 1..2");
             SessionUp = true;
+            Window = windowSize;
         }
 
-        [Rule("TreeConnect")]
-        public void TreeConnect()
+        [Rule("TreeConnectRequest")]
+        public void TreeConnectRequest(int msgId)
         {
-            Require(SessionUp, "no session");
-            Require(Trees.Count < 1, "bound: one tree");
-            Trees.Add(new Tree());
+            Require(SessionUp && !TreeConnected, "cannot connect tree now");
+            Require(Pending.Count < Window && !Pending.Contains(msgId), "window full or id reused");
+            Pending.Add(msgId);
         }
 
-        [Rule("Create")]
-        public void Create(Tree tree)
+        [Rule("TreeConnectResponse")]
+        public void TreeConnectResponse(int msgId)
         {
-            Require(tree.Files.Count < 2, "bound: two open files per tree");
-            tree.Files.Add(new SFile());
+            Require(Pending.Contains(msgId), "no matching outstanding request");
+            Pending.Remove(msgId);
+            TreeConnected = true;
         }
 
-        [Rule("Write")]
-        public void Write(SFile file)
+        [Rule("CreateRequest")]
+        public void CreateRequest(int msgId, CreateType type)
         {
-            Require(!file.Closed, "file is closed");
-            Require(!file.Written, "already written");
-            file.Written = true;
+            Require(TreeConnected && OpenFiles < maxNoOfFiles, "cannot create now");
+            Require(Pending.Count < Window && !Pending.Contains(msgId), "window full or id reused");
+            Pending.Add(msgId);
         }
 
-        [Rule("Close")]
-        public void Close(SFile file)
+        [Rule("CreateResponse")]
+        public void CreateResponse(int msgId)
         {
-            Require(!file.Closed, "already closed");
-            file.Closed = true;
+            Require(Pending.Contains(msgId), "no matching outstanding request");
+            Pending.Remove(msgId);
+            OpenFiles++;
         }
 
-        [Rule("TreeDisconnect")]
-        public void TreeDisconnect(Tree tree)
+        [Rule("CloseRequest")]
+        public void CloseRequest(int msgId)
         {
-            Require(tree.Files.All(f => f.Closed), "close all files first");
-            Trees.Remove(tree);
+            Require(TreeConnected && OpenFiles > 0, "nothing to close");
+            Require(Pending.Count < Window && !Pending.Contains(msgId), "window full or id reused");
+            Pending.Add(msgId);
         }
 
-        [Rule("LogOff")]
-        public void LogOff()
+        [Rule("CloseResponse")]
+        public void CloseResponse(int msgId)
         {
-            Require(SessionUp, "no session");
-            Require(Trees.Count == 0, "disconnect all trees first");
-            SessionUp = false;
+            Require(Pending.Contains(msgId), "no matching outstanding request");
+            Pending.Remove(msgId);
+            OpenFiles--;
         }
 
-        /// <summary>Accepting when the session is torn down (a completed protocol run).</summary>
+        [Rule("ErrorResponse")]
+        public void ErrorResponse(int msgId)
+        {
+            Require(Pending.Contains(msgId), "no matching outstanding request");
+            Pending.Remove(msgId);
+        }
+
+        /// <summary>Accepting when nothing is outstanding (a quiescent protocol point).</summary>
         [AcceptingCondition]
-        public bool SessionClosed() => !SessionUp && Trees.Count == 0;
+        public bool Quiescent() => Pending.Count == 0;
     }
 }

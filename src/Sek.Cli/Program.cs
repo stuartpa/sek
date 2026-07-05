@@ -216,13 +216,16 @@ ExplorationResult Interpret(
     var slice = TryGetSliceScenario(cord, body);
     if (slice is not null)
     {
-        var cfg = FindSliceModelConfig(cord, body)
+        var flat = FlattenSlice(cord, body);
+        var scenario = flat?.Scenario ?? slice;
+        var cfg = flat?.Config
+                  ?? FindSliceModelConfig(cord, body)
                   ?? body!.FindConstruct()?.Reference
                   ?? cord.GetMachine(machine)?.BaseConfigs.FirstOrDefault() ?? string.Empty;
         var pg = BuildParamGen(cord, cfg, machine, solverName, binds, introspector);
         var explorer = new Explorer(introspector, options, pg);
         var shortNames = introspector.Rules.Select(r => ShortLabel(r.ActionLabel)).ToHashSet(StringComparer.Ordinal);
-        var compiled = new BehaviorExplorer(name => cord.GetMachine(name)?.Body, shortNames).Compile(DesugarLet(slice));
+        var compiled = new BehaviorExplorer(name => cord.GetMachine(name)?.Body, shortNames).Compile(DesugarLet(scenario));
         return explorer.ExploreSliced(machine, compiled, ShortLabel);
     }
 
@@ -353,20 +356,46 @@ static object? ConvertLiteral(string token, Type type)
     return token;
 }
 
-// If the machine body is `A || B` where exactly one side constructs a model program,
-// returns the other side (the scenario behavior) for slicing; otherwise null.
+// If the machine body is `A || B` where exactly one side constructs a model program
+// (directly or via a nested slice), returns the other side (the scenario) for slicing.
 static Sek.Cord.Ast.Behavior? TryGetSliceScenario(CordDocument cord, Sek.Cord.Ast.Behavior? body)
+{
+    var flat = FlattenSlice(cord, body);
+    return flat?.Scenario;
+}
+
+// Flattens a (possibly nested) slice `A || B` into a single composed scenario and the model
+// config it slices. Nested slices compose: `X || (Y || model)` == `(X || Y) || model`.
+static (Sek.Cord.Ast.Behavior Scenario, string Config)? FlattenSlice(CordDocument cord, Sek.Cord.Ast.Behavior? body)
 {
     body = Unwrap(body);
     if (body is not Sek.Cord.Ast.ParallelBehavior par || par.Items.Count != 2) return null;
 
-    var b0 = ResolveSliceItem(cord, par.Items[0]);
-    var b1 = ResolveSliceItem(cord, par.Items[1]);
-    var m0 = b0?.FindConstruct()?.Kind == ConstructKind.ModelProgram;
-    var m1 = b1?.FindConstruct()?.Kind == ConstructKind.ModelProgram;
+    var a = ResolveSliceItem(cord, par.Items[0]);
+    var b = ResolveSliceItem(cord, par.Items[1]);
 
-    if (m0 && !m1) return b1;
-    if (m1 && !m0) return b0;
+    foreach (var (scenarioSide, modelSide) in new[] { (a, b), (b, a) })
+    {
+        if (scenarioSide is null || modelSide is null) continue;
+
+        // Model side is a direct model-program construct.
+        var c = modelSide.FindConstruct();
+        if (c?.Kind == ConstructKind.ModelProgram && !string.IsNullOrEmpty(c.Reference))
+        {
+            return (scenarioSide, c.Reference);
+        }
+
+        // Model side is itself a slice: compose this scenario with the nested one.
+        var nested = FlattenSlice(cord, modelSide);
+        if (nested is not null)
+        {
+            var composed = new Sek.Cord.Ast.ParallelBehavior { Op = "sync" };
+            composed.Items.Add(scenarioSide);
+            composed.Items.Add(nested.Value.Scenario);
+            return (composed, nested.Value.Config);
+        }
+    }
+
     return null;
 }
 
@@ -409,7 +438,16 @@ static Sek.Cord.Ast.Behavior DesugarLet(Sek.Cord.Ast.Behavior b)
             foreach (var v in let.Vars) da.Parameters.Add(v);
             var ac = CordConstraintExtractor.Extract(da);
             var solverParams = let.Vars.Select(v => new SolverParam { Name = v.Name, Kind = KindOf(v.Type) }).ToList();
-            var assignments = new EnumerativeSolver().Generate(solverParams, ac.Constraints, ac.Combination, 100000);
+            // Use Z3 so `let` variables bounded only by a predicate (e.g. Condition.IsTrue(id >= 1
+            // & id <= 8), with no Condition.In) are enumerated; fall back to the enumerative
+            // solver if Z3 yields nothing.
+            IReadOnlyList<IReadOnlyDictionary<string, object?>> assignments;
+            try { assignments = new Z3Solver().Generate(solverParams, ac.Constraints, ac.Combination, 100000); }
+            catch { assignments = new EnumerativeSolver().Generate(solverParams, ac.Constraints, ac.Combination, 100000); }
+            if (assignments.Count == 0)
+            {
+                assignments = new EnumerativeSolver().Generate(solverParams, ac.Constraints, ac.Combination, 100000);
+            }
 
             var inner = DesugarLet(let.Inner);
             var choices = new List<Sek.Cord.Ast.Behavior>();
@@ -442,6 +480,8 @@ static Sek.Cord.Ast.Behavior DesugarLet(Sek.Cord.Ast.Behavior b)
             return new Sek.Cord.Ast.GroupBehavior { Inner = DesugarLet(gg.Inner) };
         case Sek.Cord.Ast.PreconstraintBehavior pc:
             return new Sek.Cord.Ast.PreconstraintBehavior { Code = pc.Code, Inner = DesugarLet(pc.Inner) };
+        case Sek.Cord.Ast.FailBehavior fb:
+            return new Sek.Cord.Ast.FailBehavior { Inner = DesugarLet(fb.Inner) };
         case Sek.Cord.Ast.BindBehavior bd:
         { var n = new Sek.Cord.Ast.BindBehavior { Inner = DesugarLet(bd.Inner) }; n.Binds.AddRange(bd.Binds); return n; }
         default:
@@ -481,6 +521,8 @@ static Sek.Cord.Ast.Behavior CloneWithSubst(Sek.Cord.Ast.Behavior b, Dictionary<
             return new Sek.Cord.Ast.GroupBehavior { Inner = CloneWithSubst(gg.Inner, subst) };
         case Sek.Cord.Ast.PreconstraintBehavior pc:
             return new Sek.Cord.Ast.PreconstraintBehavior { Code = pc.Code, Inner = CloneWithSubst(pc.Inner, subst) };
+        case Sek.Cord.Ast.FailBehavior fb:
+            return new Sek.Cord.Ast.FailBehavior { Inner = CloneWithSubst(fb.Inner, subst) };
         default:
             return b;
     }

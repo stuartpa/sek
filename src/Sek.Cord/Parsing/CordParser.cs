@@ -316,6 +316,14 @@ public sealed class Parser
             else break;
         }
 
+        // `Behavior : fail` — a model-checking failure annotation.
+        if (Is(TokenKind.Colon) && Ahead().Kind == TokenKind.Identifier && Ahead().Text == "fail")
+        {
+            Take(); // ':'
+            Take(); // 'fail'
+            e = new FailBehavior { Inner = e };
+        }
+
         return e;
     }
 

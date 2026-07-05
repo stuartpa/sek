@@ -51,7 +51,7 @@ public sealed class BehaviorExplorer
 
         var dfa = ToDfa(body);
         var on = dfa.On.Select(d => new Dictionary<string, int>(d, StringComparer.Ordinal)).ToArray();
-        return new CompiledScenario(dfa.Start, dfa.Accept.ToArray(), on);
+        return new CompiledScenario(dfa.Start, dfa.Accept.ToArray(), on, dfa.Fail.ToArray());
     }
 
     /// <summary>The scenario symbol for an invocation: the bare action label, or
@@ -101,6 +101,7 @@ public sealed class BehaviorExplorer
             case RepetitionBehavior rep: foreach (var x in CollectSymbols(rep.Inner, seenMachines)) yield return x; yield break;
             case GroupBehavior g: foreach (var x in CollectSymbols(g.Inner, seenMachines)) yield return x; yield break;
             case PreconstraintBehavior pc: foreach (var x in CollectSymbols(pc.Inner, seenMachines)) yield return x; yield break;
+            case FailBehavior fb: foreach (var x in CollectSymbols(fb.Inner, seenMachines)) yield return x; yield break;
             case LetBehavior l: foreach (var x in CollectSymbols(l.Inner, seenMachines)) yield return x; yield break;
             case BindBehavior bd: foreach (var x in CollectSymbols(bd.Inner, seenMachines)) yield return x; yield break;
         }
@@ -110,18 +111,27 @@ public sealed class BehaviorExplorer
     public sealed class CompiledScenario
     {
         private readonly bool[] _accept;
+        private readonly bool[] _fail;
         private readonly Dictionary<string, int>[] _on;
 
-        public CompiledScenario(int start, bool[] accept, Dictionary<string, int>[] on)
+        public CompiledScenario(int start, bool[] accept, Dictionary<string, int>[] on, bool[]? fail = null)
         {
             Start = start;
             _accept = accept;
+            _fail = fail ?? new bool[accept.Length];
             _on = on;
         }
 
         public int Start { get; }
 
         public bool IsAccepting(int state) => state >= 0 && state < _accept.Length && _accept[state];
+
+        /// <summary>True if <paramref name="state"/> is a model-checking failure state
+        /// (reached a <c>: fail</c> annotation).</summary>
+        public bool IsFail(int state) => state >= 0 && state < _fail.Length && _fail[state];
+
+        /// <summary>True if the scenario has any failure states (a model-checking machine).</summary>
+        public bool HasFailStates => _fail.Any(f => f);
 
         /// <summary>True if the scenario permits <paramref name="label"/> from <paramref name="state"/>,
         /// yielding the next scenario state.</summary>
@@ -211,6 +221,7 @@ public sealed class BehaviorExplorer
     {
         public int Id;
         public bool Accept;
+        public bool Fail;
         public readonly List<(string? Label, NState To)> Edges = new();
     }
 
@@ -261,6 +272,13 @@ public sealed class BehaviorExplorer
 
             case PreconstraintBehavior pc:
                 return Build(pc.Inner);
+
+            case FailBehavior fb:
+            {
+                var n = Build(fb.Inner);
+                n.Accept.Fail = true;
+                return n;
+            }
 
             case LetBehavior l:
                 return Build(l.Inner);
@@ -399,12 +417,14 @@ public sealed class BehaviorExplorer
     private sealed class Dfa
     {
         public readonly List<bool> Accept = new();
+        public readonly List<bool> Fail = new();
         public readonly List<Dictionary<string, int>> On = new();
         public int Start;
 
-        public int Add(bool accept)
+        public int Add(bool accept, bool fail = false)
         {
             Accept.Add(accept);
+            Fail.Add(fail);
             On.Add(new Dictionary<string, int>(StringComparer.Ordinal));
             return Accept.Count - 1;
         }
@@ -459,7 +479,7 @@ public sealed class BehaviorExplorer
                 return id;
             }
 
-            id = dfa.Add(s.Any(x => x.Accept));
+            id = dfa.Add(s.Any(x => x.Accept), s.Any(x => x.Fail));
             keyToId[k] = id;
             idToSet.Add(s);
             return id;
@@ -535,7 +555,7 @@ public sealed class BehaviorExplorer
                 return id;
             }
 
-            id = dfa.Add(l.Accept[li] && r.Accept[ri]);
+            id = dfa.Add(l.Accept[li] && r.Accept[ri], l.Fail[li] || r.Fail[ri]);
             keyToId[k] = id;
             idToPair.Add((li, ri));
             return id;
@@ -552,8 +572,11 @@ public sealed class BehaviorExplorer
 
             foreach (var sym in union)
             {
-                var lHas = l.On[li].TryGetValue(sym, out var ln);
-                var rHas = r.On[ri].TryGetValue(sym, out var rn);
+                // A bare label transition matches any argument-pinned form of it, so a scenario
+                // over bare labels syncs with one that pins arguments (e.g. `CreateResponse`
+                // syncs with `CreateResponse(1)`), yielding the pinned symbol.
+                var lHas = SideHas(l.On[li], sym, out var ln);
+                var rHas = SideHas(r.On[ri], sym, out var rn);
                 var mustSync = op switch
                 {
                     "sync" => true,
@@ -591,6 +614,16 @@ public sealed class BehaviorExplorer
         }
 
         return dfa;
+    }
+
+    /// <summary>Looks up a transition for <paramref name="sym"/>, treating a bare label
+    /// transition as matching an argument-pinned symbol (<c>X</c> matches <c>X(args)</c>).</summary>
+    private static bool SideHas(Dictionary<string, int> on, string sym, out int next)
+    {
+        if (on.TryGetValue(sym, out next)) return true;
+        var paren = sym.IndexOf('(');
+        if (paren > 0 && on.TryGetValue(sym[..paren], out next)) return true;
+        return false;
     }
 
     private static ExplorationGraph ToGraph(string machine, Dfa dfa)

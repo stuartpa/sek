@@ -1,38 +1,109 @@
 using SMB2.Model;
 
-// SMB2 (SEK port). Session/tree/file lifecycle. Tree and SFile objects created during
-// exploration form the domains of the object-typed parameters. Pure state machine (no
-// value parameters), so no Cord `where` block is needed.
+// SMB2 (SEK port) — faithful to the classic message-based sample. Requests carry a message
+// id and are tracked as outstanding; the credit window (1 = sync, 2 = async) bounds how many
+// requests may be outstanding at once. The model-checking machines detect out-of-order
+// (asynchronous) request/response pairs via a `: fail` anti-scenario. Message ids are bounded
+// to 1..4 by Cord so parameter generation is finite.
 
 config Actions
 {
-    action void SetupConnectionAndSession();
-    action void TreeConnect();
-    action void Create(Tree tree);
-    action void Write(SFile file);
-    action void Close(SFile file);
-    action void TreeDisconnect(Tree tree);
-    action void LogOff();
+    action void AssumeShareExists(int shareId, ShareType type)
+        where {. Condition.In(shareId, 1); .};
+    action void SetupConnectionAndSession(int windowSize)
+        where {. Condition.In(windowSize, 1, 2); .};
+    action void TreeConnectRequest(int msgId)   where {. Condition.In(msgId, 1, 2); .};
+    action void TreeConnectResponse(int msgId)  where {. Condition.In(msgId, 1, 2); .};
+    action void CreateRequest(int msgId, CreateType type) where {. Condition.In(msgId, 1, 2); .};
+    action void CreateResponse(int msgId)       where {. Condition.In(msgId, 1, 2); .};
+    action void CloseRequest(int msgId)         where {. Condition.In(msgId, 1, 2); .};
+    action void CloseResponse(int msgId)        where {. Condition.In(msgId, 1, 2); .};
+    action void ErrorResponse(int msgId)        where {. Condition.In(msgId, 1, 2); .};
 
     switch StateBound = 4096;
     switch StepBound = 4096;
+    switch PathDepthBound = 24;
     switch TestEnabled = false;
 }
 
-machine Smb2Lifecycle() : Actions
+machine StateMachine() : Actions where ForExploration = false
 {
     construct model program from Actions
 }
 
-// Scenario slicing (as in the classic sample's AllSync): a synchronous session that sets
-// up, connects a tree, creates a file, reads/writes it, then tears down. The scenario
-// slices the model program.
-machine SyncSessionScenario() : Actions
+// AllSync: one share, a synchronous session (window 1), a tree connect, then any sequence of
+// create/close request/response pairs. With window 1 only one request is ever outstanding.
+machine AllSync() : Actions
 {
-    SetupConnectionAndSession; TreeConnect; Create; (Write | Close)* ; TreeDisconnect; LogOff
+    ( AssumeShareExists(1, ShareType.DISK);
+      SetupConnectionAndSession(1);
+      TreeConnectRequest(1); TreeConnectResponse(1);
+      ( CreateRequest(_, CreateType.Create) | CreateResponse | CloseRequest | CloseResponse | ErrorResponse )*
+    )
+    || StateMachine
 }
 
-machine SyncSession() : Actions
+// As AllSync, but allows two open files via a state slice.
+machine AllSyncTwoFiles() : Actions
 {
-    SyncSessionScenario || construct model program from Actions
+    {. Smb2Model.maxNoOfFiles = 2; .}: AllSync
+}
+
+// Requirement reduction for AllSync.
+machine AllSyncRequirementReduction() : Actions
+{
+    construct requirement coverage for AllSync
+}
+
+// AsyncCreateClose: an asynchronous session (window 2), so two requests may be outstanding
+// and responses can complete them out of order.
+machine AsyncCreateClose() : Actions
+{
+    ( AssumeShareExists(1, ShareType.DISK);
+      SetupConnectionAndSession(2);
+      TreeConnectRequest(1); TreeConnectResponse(1);
+      ( CreateRequest(_, CreateType.Create) | CreateResponse | CloseRequest | CloseResponse | ErrorResponse )*
+    )
+    || StateMachine
+}
+
+machine TestSuite() : Actions where TestEnabled = true
+{
+    construct test cases where strategy = "shorttests", allowundeterminedcoverage = true
+    for (AllSync | AsyncCreateClose)
+}
+
+// ============================================================================================
+// Model checking: an anti-scenario describing an out-of-order (asynchronous) request/response
+// pair — a request with id `id` immediately followed by a response with a different id. Such a
+// pair must not appear in a synchronous run.
+config ModelCheck : Actions
+{
+    switch StopAtError = true;
+    switch TestEnabled = false;
+}
+
+machine AsyncAntiScenario() : ModelCheck where ForExploration = false
+{
+    let int id, int otherId where {.
+        Condition.IsTrue(id >= 1 & id <= 2);
+        Condition.IsTrue(otherId >= 1 & otherId <= 2);
+        Condition.IsTrue(id != otherId);
+    .}
+    in
+    ...;
+    ( TreeConnectRequest(id) | CreateRequest(id, _) | CloseRequest(id) );
+    ( TreeConnectResponse(otherId) | CreateResponse(otherId) | CloseResponse(otherId) | ErrorResponse(otherId) ) : fail
+}
+
+// Expected exploration result: empty (no asynchronous pair in a synchronous run).
+machine CheckAllSyncForNoAsync() : ModelCheck
+{
+    AsyncAntiScenario || AllSync
+}
+
+// Expected result: a trace leading into a failure state (asynchronous behavior is possible).
+machine CheckAsyncCreateCloseForNoAsync() : ModelCheck
+{
+    AsyncAntiScenario || AsyncCreateClose
 }

@@ -144,7 +144,7 @@ public sealed class Explorer
         hashToId[initialHash + "@" + scenario.Start] = initialId;
         graph.InitialStateId = initialId;
         graph.States.Add(new ModelState(initialId, initialHash, Label: null,
-            Accepting: IsAccepting(initialInstance) && scenario.IsAccepting(scenario.Start), Initial: true));
+            Accepting: CombinedAccepting(scenario, initialInstance, scenario.Start), Initial: true));
         queue.Enqueue((initialId, initialJson, scenario.Start, 0));
         var nextId = 1;
 
@@ -216,8 +216,12 @@ public sealed class Explorer
                         toId = "S" + nextId++;
                         hashToId[toCombined] = toId;
                         graph.States.Add(new ModelState(toId, toHash, Label: null,
-                            Accepting: IsAccepting(target) && scenario.IsAccepting(ndfa)));
-                        queue.Enqueue((toId, toJson, ndfa, depth + 1));
+                            Accepting: CombinedAccepting(scenario, target, ndfa)));
+                        // Failure states are terminal violations: do not expand past them.
+                        if (!scenario.IsFail(ndfa))
+                        {
+                            queue.Enqueue((toId, toJson, ndfa, depth + 1));
+                        }
                     }
 
                     if (graph.Transitions.Count >= _options.MaxTransitions) { hitBound = true; break; }
@@ -232,9 +236,21 @@ public sealed class Explorer
         graph.Metadata["accepting"] = graph.States.Count(s => s.Accepting).ToString();
         graph.Metadata["hitBound"] = hitBound.ToString();
         graph.Metadata["mode"] = "sliced";
+        if (scenario.HasFailStates)
+        {
+            graph.Metadata["modelCheck"] = "true";
+        }
 
         return new ExplorationResult { Graph = graph, HitBound = hitBound };
     }
+
+    /// <summary>Whether a combined (model, scenario) state is a goal state. For a model-checking
+    /// scenario (one with <c>: fail</c> states), the goal is a reached failure state; otherwise
+    /// it is a model-accepting state at a scenario-accepting state.</summary>
+    private bool CombinedAccepting(BehaviorExplorer.CompiledScenario scenario, object model, int dfa) =>
+        scenario.HasFailStates
+            ? scenario.IsFail(dfa)
+            : IsAccepting(model) && scenario.IsAccepting(dfa);
 
     private ModelProgram CreateInstance() =>
         (ModelProgram)(Activator.CreateInstance(_model.ModelType)

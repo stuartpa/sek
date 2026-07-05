@@ -83,6 +83,9 @@ public abstract class Behavior
             case PreconstraintBehavior pc:
                 foreach (var r in pc.Inner.ReferencedTargets()) yield return r;
                 break;
+            case FailBehavior fb:
+                foreach (var r in fb.Inner.ReferencedTargets()) yield return r;
+                break;
             case LetBehavior l:
                 foreach (var r in l.Inner.ReferencedTargets()) yield return r;
                 break;
@@ -109,6 +112,7 @@ public abstract class Behavior
             case RepetitionBehavior r: return r.Inner.FindConstruct();
             case GroupBehavior g: return g.Inner.FindConstruct();
             case PreconstraintBehavior pc: return pc.Inner.FindConstruct();
+            case FailBehavior fb: return fb.Inner.FindConstruct();
             case LetBehavior l: return l.Inner.FindConstruct();
             case BindBehavior b: return b.Inner.FindConstruct();
             default: return null;
@@ -142,6 +146,13 @@ public sealed class InvocationBehavior : Behavior
 public sealed class PreconstraintBehavior : Behavior
 {
     public string Code { get; set; } = string.Empty; // embedded C# from {. .}
+    public Behavior Inner { get; set; } = null!;
+}
+
+/// <summary><c>Behavior : fail</c> — marks the accepting states reached by <see cref="Inner"/>
+/// as failure (error) states, used for model checking (a reachable fail state is a violation).</summary>
+public sealed class FailBehavior : Behavior
+{
     public Behavior Inner { get; set; } = null!;
 }
 
