@@ -147,6 +147,27 @@ int CmdInit(string[] rest)
     return (config, dir, cord);
 }
 
+// Runs the semantic-analysis phase (ARC001, phase 3) over the parsed Cord and returns the checked
+// SemanticModel. Errors abort the run (surfaced by the top-level CLI catch); warnings are printed.
+Sek.Cord.Semantics.SemanticModel AnalyzeCord(CordDocument cord, string? machine)
+{
+    var model = Sek.Cord.Semantics.SemanticAnalyzer.Analyze(cord, machine);
+    foreach (var w in model.Diagnostics.Items.Where(d => d.Severity == Sek.Cord.Semantics.DiagnosticSeverity.Warning))
+    {
+        Console.Error.WriteLine($"sek: warning: {w}");
+    }
+
+    if (model.HasErrors)
+    {
+        var errors = model.Diagnostics.Items
+            .Where(d => d.Severity == Sek.Cord.Semantics.DiagnosticSeverity.Error)
+            .Select(d => d.ToString());
+        throw new InvalidOperationException($"semantic analysis failed:{Environment.NewLine}  - {string.Join($"{Environment.NewLine}  - ", errors)}");
+    }
+
+    return model;
+}
+
 ExplorationOptions BoundsFor(CordDocument cord, string machine)
 {
     var options = new ExplorationOptions();
@@ -176,6 +197,9 @@ ExplorationGraph ExploreBehavior(CordDocument cord, string machine)
 
 ExplorationResult ExploreMachine(ProjectConfig config, string dir, CordDocument cord, string machine, string solverName)
 {
+    // Phase 3 (semantic analysis): resolve names, catch cross-reference errors, get the checked
+    // SemanticModel — the single source of truth the rest of this method resolves names through.
+    var semantics = AnalyzeCord(cord, machine);
     // Scope-aware model loading: a `construct model program … where scope = "Ns.Sub"` selects
     // the model program whose namespace is the scope; otherwise the project's default type.
     var scope = ResolveModelScope(cord, cord.GetMachine(machine)?.Body);
@@ -185,12 +209,12 @@ ExplorationResult ExploreMachine(ProjectConfig config, string dir, CordDocument 
     // Consume `action all <Adapter>` / explicit `action` declarations: restrict the model's
     // action universe to the imported actions (resolves to all rules for single-adapter models).
     options.AllowedActionLabels = ActionImportResolver.Resolve(
-        cord.ResolveMachineImportedActionTypes(machine),
-        cord.ResolveMachineDeclaredActions(machine).Keys,
+        semantics.ImportedActionTypes(machine),
+        semantics.DeclaredActions(machine).Keys,
         introspector.Rules.Select(r => r.ActionLabel));
     // Tag `action event` actions as observations so exploration/test-gen can distinguish them
     // from controllable calls.
-    options.EventActionLabels = cord.ResolveMachineEventActions(machine);
+    options.EventActionLabels = semantics.EventActions(machine);
     var binds = new Dictionary<string, List<List<string>>>(StringComparer.Ordinal);
     return Interpret(introspector, cord, machine, cord.GetMachine(machine)?.Body, options, solverName, binds);
 }
@@ -1048,25 +1072,19 @@ int CmdValidate(string[] rest)
     var introspector = new ModelIntrospector(modelType);
     var ruleLabels = introspector.Rules.Select(r => r.ActionLabel).ToHashSet();
 
-    var problems = new List<string>();
+    // Phase 3 (semantic analysis): the shared SemanticAnalyzer owns the Cord-level cross-reference
+    // checks (duplicate declarations, unknown base configs, unknown construct references) and
+    // produces a diagnostic bag we extend with the reflection-level rule-mapping check below.
+    var semantics = Sek.Cord.Semantics.SemanticAnalyzer.Analyze(cord);
+    var diagnostics = semantics.Diagnostics;
 
-    // Every declared cord action should map to a model rule.
+    // Reflection-level check (needs the loaded model): every declared cord action maps to a rule.
     foreach (var target in cord.AllDeclaredActionTargets().Distinct())
     {
         if (!ruleLabels.Contains(target))
         {
-            problems.Add($"cord action '{target}' has no matching model rule");
+            diagnostics.Error("SEM100", $"cord action '{target}' has no matching model rule");
         }
-    }
-
-    // Every construct reference should resolve to a config or machine.
-    foreach (var m in cord.Script.Machines)
-    {
-        var construct = m.Body?.FindConstruct();
-        if (construct is null) continue;
-        var refName = construct.Reference;
-        var resolves = cord.GetConfiguration(refName) is not null || cord.GetMachine(refName) is not null;
-        if (!resolves) problems.Add($"machine '{m.Name}' constructs from unknown '{refName}'");
     }
 
     Console.WriteLine($"Model:   {modelType.FullName}");
@@ -1074,14 +1092,20 @@ int CmdValidate(string[] rest)
     Console.WriteLine($"Accept:  {introspector.AcceptingConditions.Count} accepting condition(s)");
     Console.WriteLine($"Cord:    {cord.Script.Configurations.Count} config(s), {cord.Script.Machines.Count} machine(s)");
 
-    if (problems.Count == 0)
+    foreach (var w in diagnostics.Items.Where(d => d.Severity == Sek.Cord.Semantics.DiagnosticSeverity.Warning))
+    {
+        Console.Error.WriteLine($"  ~ {w}");
+    }
+
+    var errors = diagnostics.Items.Where(d => d.Severity == Sek.Cord.Semantics.DiagnosticSeverity.Error).ToList();
+    if (errors.Count == 0)
     {
         Console.WriteLine("validate: OK");
         return 0;
     }
 
-    Console.Error.WriteLine($"validate: {problems.Count} problem(s):");
-    foreach (var p in problems) Console.Error.WriteLine($"  - {p}");
+    Console.Error.WriteLine($"validate: {errors.Count} problem(s):");
+    foreach (var e in errors) Console.Error.WriteLine($"  - {e}");
     return 1;
 }
 

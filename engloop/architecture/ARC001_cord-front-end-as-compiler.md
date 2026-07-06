@@ -30,7 +30,7 @@ there is **no symbol table** and **no unified diagnostics**. Mapping the current
 |---|---|---|
 | **1. Lexical analysis** | `Sek.Cord/Lexing/CordLexer.cs`, `Token.cs` → token stream | ✅ clean phase |
 | **2. Syntax analysis** | `Sek.Cord/Parsing/CordParser.cs` (recursive descent) → AST `Sek.Cord/Ast/Nodes.cs` | ✅ clean phase; raises `CordSyntaxException` |
-| **3. Semantic analysis** | **scattered**: scope/name resolution (`Program.cs::ResolveModelScope`, `ModelLoader.LoadModelTypeInScope`), action-universe resolution (`Sek.Engine/ActionImportResolver`), event-kind resolution (`CordDocument.ResolveMachineEventActions`), domain/predicate extraction + type coercion (`Sek.Cord/ConstraintExtraction.cs`, `ExprParser.cs`, `Sek.Solver/RoslynPredicate`), `let` desugaring + probability union (`Program.cs::DesugarLet`, `ConstraintExtraction`), return-binding collection (`BehaviorExplorer.CollectReturnBindings`) | ⚠️ **no dedicated phase, no symbol table, no unified diagnostics** |
+| **3. Semantic analysis** | **`Sek.Cord/Semantics/`** — `SemanticAnalyzer` builds the `SymbolTable`, runs cross-reference checks, and produces a `SemanticModel` (`SymbolTable` + `DiagnosticBag`). Remaining resolvers (`Program.cs::ResolveModelScope`, `Sek.Engine/ActionImportResolver`, `DesugarLet`, `ConstraintExtraction`, `CollectReturnBindings`) are still called by the driver but are being pulled behind this phase's seam. | ✅ **dedicated phase + symbol table + unified diagnostics** (in place); ⏳ remaining resolver walkers migrating in |
 | **4. Intermediate representation** | `Sek.Engine/BehaviorAutomaton.cs` (Thompson NFA → lazy subset DFA → product), `CompiledScenario`, and the `Sek.Core` transition-system IR (`ExplorationGraph`) | ✅ real IR; construction is sound but is fed by the scattered phase 3 |
 | **5. Optimization** | lazy determinization, left-factoring of `let`, `MergeInConstraints` (probability union), DFA subset pruning | ✅ present, but ad-hoc / not named as a pass |
 | **6. Back end** | exploration (`Sek.Engine/Explorer`), test generation (`Sek.Cli/TestGen`), renderers (`Sek.Core/Rendering`, `Seexpl`) | ✅ clean; consumes the IR only |
@@ -82,11 +82,30 @@ symbol table, and reports precise diagnostics there.
 
 ## Refactor tasks filed (converge in Stage 3 / refactor-scan)
 
-- **REF-candidate:** introduce `Sek.Cord/Semantics/` — a `SemanticAnalyzer` producing a
-  `SemanticModel` + `SymbolTable`, absorbing `ResolveModelScope`, `ActionImportResolver`,
-  `ResolveMachineEventActions`, constraint extraction, `DesugarLet`, and return-binding collection.
-- **REF-candidate:** a unified `Diagnostic` type + collector shared by all phases (replace
-  ad-hoc exceptions / silent drops).
+- **DONE (Stage 3, first convergence):** introduced `Sek.Cord/Semantics/` — a real phase-3:
+  - `Diagnostic` + `DiagnosticBag` (a unified, collected, positioned diagnostic vocabulary shared by
+    the phase; codes `SEM001`–`SEM006` for Cord-level checks, `SEM100` for the reflection-level
+    rule-mapping check).
+  - `SymbolTable` — the single source of truth for Cord names (configs, machines, and the effective
+    per-machine facts: imported action types, declared actions, event actions). Callers now resolve
+    through it instead of re-deriving from the raw document.
+  - `SemanticModel` — the checked artifact (`SymbolTable` + `DiagnosticBag`) the back end consumes.
+  - `SemanticAnalyzer.Analyze(document, targetMachine?)` — runs cross-reference checks the lexer and
+    parser cannot see: duplicate config/machine (`SEM001`/`SEM002`), unknown base config
+    (`SEM003`/`SEM004`, warning), unknown `construct … for <ref>` (`SEM005`), unknown target machine
+    (`SEM006`).
+  - **Wired in and load-bearing:** `sek explore`/`sek test` run the phase first (`AnalyzeCord`) and
+    abort on errors with precise diagnostics (instead of a hang or a silent drop); `ExploreMachine`
+    now resolves imported types / declared actions / event actions **through the `SemanticModel`**
+    (the single access point). `sek validate` was migrated onto the same `SemanticAnalyzer` + shared
+    diagnostic bag (its former ad-hoc `problems` list is gone). 9 direct semantic-phase tests; 60-
+    sample regression + full suite green (behaviour byte-identical for valid programs).
+- **REF-candidate (remaining migration into phase 3):** absorb `ResolveModelScope`,
+  `ActionImportResolver` (the reflection-dependent action-universe step), `ResolveMachineEventActions`
+  short-name logic, `DesugarLet`, `ConstraintExtraction`, and `CollectReturnBindings` **behind** the
+  `SymbolTable`/`SemanticModel` seam so the inheritance/desugar walkers no longer live in
+  `CordDocument`/`Program.cs`/the engine. The access point is already centralized; the walkers move
+  next, one per refactor cycle, keeping the regression green.
 - **REF-candidate:** name the optimization passes explicitly (determinization, left-factoring,
   domain-union, pruning) behind an `IOptimizationPass` seam.
 
