@@ -29,7 +29,7 @@ public static class CordConstraintExtractor
 
         // A seeded gate for `Probability.IsTrue(p)` branch selection: reproducible for a given
         // `switch RandomSeed`, and consulted sequentially as the where-block is scanned.
-        var probability = new Sek.Solver.ProbabilityGate(randomSeed);
+        var probability = new SpecExplorerKit.Components.Random.ProbabilityGate(randomSeed);
 
         // Strip C# comments so a `// ...` line preceding a statement does not swallow it when
         // the block is split on `;` (a chunk beginning with a comment would fail the
@@ -243,7 +243,7 @@ public static class CordConstraintExtractor
 
     /// <summary>Evaluates a <c>Probability.IsTrue(p)</c> condition with a seeded gate, so the
     /// chosen branch is reproducible for a given <c>RandomSeed</c> and varies across seeds.</summary>
-    private static bool EvalProbability(string cond, Sek.Solver.ProbabilityGate gate)
+    private static bool EvalProbability(string cond, SpecExplorerKit.Components.Random.ProbabilityGate gate)
     {
         var inner = ArgsInside(cond);
         return double.TryParse(inner.Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var p)

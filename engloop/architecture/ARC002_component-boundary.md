@@ -62,10 +62,20 @@ vertical assemblies. The litmus test (*useful, unchanged, in an unrelated repo?*
 ## Progress & refactor tasks (converge in Stage 3 / refactor-scan)
 
 - **DONE (pilot):** `CanonicalJson` extracted → `components/SpecExplorerKit.Components.Json`
-  (`Sek.Engine` now references it; 5 direct component tests; 54 tests green; regression gate green).
-- **REF-candidate:** `ProbabilityGate`, `Combinatorics` → `components/SpecExplorerKit.Components.Combinatorics` (+ `.Random`).
-- **REF-candidate:** `GraphAnalysis` → `components/SpecExplorerKit.Components.Graphs` behind a
-  generic graph interface (decouple from `ExplorationGraph`).
+  (`Sek.Engine` now references it; 5 direct component tests; regression gate green).
+- **DONE:** `ProbabilityGate` extracted → `components/SpecExplorerKit.Components.Random`
+  (a seeded reproducible Bernoulli gate; `Sek.Cord` now references it; the pre-existing
+  probability tests exercise it directly). It carried no domain knowledge — a clean lift.
+- **DONE:** the pure directed-graph reachability algorithms extracted →
+  `components/SpecExplorerKit.Components.Graphs` (`Reachability.Backward`/`Forward` over abstract
+  `(from, to)` edges with an equality comparer). `Sek.Core.Analysis.GraphAnalysis` is now the
+  **domain adapter**: it projects `ExplorationGraph` transitions onto `(FromStateId, ToStateId)`
+  edges and delegates the fixpoint/BFS to the component (this is the "generic graph seam" the ARC
+  called for). 5 direct component tests; regression gate green.
+- **REF-candidate:** `Combinatorics` (the pairwise/expand/isolated/seeded reduction) is coupled to
+  `CombinationSpec` + `PredicateEval` (Cord domain types); only its pure pairwise-cover core is
+  generic. Extract that core to `SpecExplorerKit.Components.Combinatorics` when a second consumer
+  appears — not worth fragmenting the solver for a single caller today.
 - **REF-candidate:** renderers → `components/SpecExplorerKit.Components.GraphRendering`.
 - **REF-candidate:** Z3/Roslyn solver glue → `components/SpecExplorerKit.Components.Solving`.
 - Do **not** extract all at once — each refactor cycle pulls a little more out (per the component

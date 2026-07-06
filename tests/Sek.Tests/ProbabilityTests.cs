@@ -1,6 +1,7 @@
 using Sek.Cord;
 using Sek.Cord.Ast;
 using Sek.Solver;
+using SpecExplorerKit.Components.Random;
 using Xunit;
 
 namespace Sek.Tests;

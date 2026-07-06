@@ -1,4 +1,5 @@
 using Sek.Core.Model;
+using SpecExplorerKit.Components.Graphs;
 
 namespace Sek.Core.Analysis;
 
@@ -18,20 +19,10 @@ public static class GraphAnalysis
     public static int FilterToReaching(ExplorationGraph graph, Func<ModelState, bool> isTarget)
     {
         var targets = graph.States.Where(isTarget).Select(s => s.Id).ToHashSet(StringComparer.Ordinal);
-        var canReach = new HashSet<string>(targets, StringComparer.Ordinal);
-
-        var changed = true;
-        while (changed)
-        {
-            changed = false;
-            foreach (var t in graph.Transitions)
-            {
-                if (canReach.Contains(t.ToStateId) && canReach.Add(t.FromStateId))
-                {
-                    changed = true;
-                }
-            }
-        }
+        var canReach = Reachability.Backward(
+            graph.Transitions.Select(t => (t.FromStateId, t.ToStateId)),
+            targets,
+            StringComparer.Ordinal);
 
         graph.Transitions.RemoveAll(t => !canReach.Contains(t.FromStateId) || !canReach.Contains(t.ToStateId));
         graph.States.RemoveAll(s => !canReach.Contains(s.Id) && !s.Initial);
@@ -99,40 +90,11 @@ public static class GraphAnalysis
         var goalIds = graph.States.Where(s => goalHashes.Contains(s.Hash)).Select(s => s.Id).ToHashSet(StringComparer.Ordinal);
         if (goalIds.Count == 0) return;
 
-        var outAdj = graph.Transitions.GroupBy(t => t.FromStateId, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.ToList(), StringComparer.Ordinal);
-        var inAdj = graph.Transitions.GroupBy(t => t.ToStateId, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.ToList(), StringComparer.Ordinal);
+        var edges = graph.Transitions.Select(t => (t.FromStateId, t.ToStateId)).ToList();
 
-        HashSet<string> Backward(IEnumerable<string> seeds)
-        {
-            var set = new HashSet<string>(seeds, StringComparer.Ordinal);
-            var stack = new Stack<string>(set);
-            while (stack.Count > 0)
-            {
-                var s = stack.Pop();
-                if (!inAdj.TryGetValue(s, out var ins)) continue;
-                foreach (var t in ins) if (set.Add(t.FromStateId)) stack.Push(t.FromStateId);
-            }
-
-            return set;
-        }
-
-        HashSet<string> Forward(IEnumerable<string> seeds)
-        {
-            var set = new HashSet<string>(seeds, StringComparer.Ordinal);
-            var stack = new Stack<string>(set);
-            while (stack.Count > 0)
-            {
-                var s = stack.Pop();
-                if (!outAdj.TryGetValue(s, out var outs)) continue;
-                foreach (var t in outs) if (set.Add(t.ToStateId)) stack.Push(t.ToStateId);
-            }
-
-            return set;
-        }
-
-        var canReachGoal = Backward(goalIds);
-        var canReachAccept = Backward(graph.States.Where(s => s.Accepting).Select(s => s.Id));
-        var fromGoal = Forward(goalIds);
+        var canReachGoal = Reachability.Backward(edges, goalIds, StringComparer.Ordinal);
+        var canReachAccept = Reachability.Backward(edges, graph.States.Where(s => s.Accepting).Select(s => s.Id), StringComparer.Ordinal);
+        var fromGoal = Reachability.Forward(edges, goalIds, StringComparer.Ordinal);
 
         var keep = new HashSet<string>(canReachGoal, StringComparer.Ordinal);
         keep.UnionWith(fromGoal.Where(canReachAccept.Contains)); // goal → accepting completion

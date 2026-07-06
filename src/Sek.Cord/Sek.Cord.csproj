@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Sek.Solver\Sek.Solver.csproj" />
+    <ProjectReference Include="..\..\components\SpecExplorerKit.Components.Random\SpecExplorerKit.Components.Random.csproj" />
   </ItemGroup>
 
 </Project>

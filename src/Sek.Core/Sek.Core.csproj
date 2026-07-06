@@ -14,4 +14,8 @@
     <AssemblyName>Sek.Core</AssemblyName>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\components\SpecExplorerKit.Components.Graphs\SpecExplorerKit.Components.Graphs.csproj" />
+  </ItemGroup>
+
 </Project>

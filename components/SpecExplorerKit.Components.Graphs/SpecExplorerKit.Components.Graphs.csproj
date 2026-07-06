@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    SpecExplorerKit.Components.Graphs — a reusable component (EngLoopKit component pattern).
+
+    Generic, domain-free directed-graph reachability. Operates on abstract edges
+    (from-node -> to-node) over any node type with an equality comparer; computes forward and
+    backward reachable sets. Knows nothing about SpecExplorerKit's exploration graph, states, or
+    transitions — the vertical adapts its own graph onto these primitives. Could be lifted,
+    unchanged, into any repo needing directed-graph reachability.
+
+    Component rule (ARC002): components carry no vertical/domain knowledge; dependencies point
+    vertical -> components, never the reverse.
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>SpecExplorerKit.Components.Graphs</RootNamespace>
+    <AssemblyName>SpecExplorerKit.Components.Graphs</AssemblyName>
+  </PropertyGroup>
+
+</Project>

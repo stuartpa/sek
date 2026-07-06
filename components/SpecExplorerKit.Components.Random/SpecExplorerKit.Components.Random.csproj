@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    SpecExplorerKit.Components.Random — a reusable component (EngLoopKit component pattern).
+
+    Generic, domain-free: a reproducible, seeded Bernoulli probability gate. Given a seed it
+    always yields the same sequence of true/false decisions, so probabilistic choices are
+    replayable. Knows nothing about SpecExplorerKit's model/exploration/Cord domain — it wraps
+    only the BCL's System.Random and could be lifted, unchanged, into any repo that needs
+    reproducible probabilistic sampling.
+
+    Component rule (ARC002): components carry no vertical/domain knowledge; dependencies point
+    vertical -> components, never the reverse.
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>SpecExplorerKit.Components.Random</RootNamespace>
+    <AssemblyName>SpecExplorerKit.Components.Random</AssemblyName>
+  </PropertyGroup>
+
+</Project>
