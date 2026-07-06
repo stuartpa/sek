@@ -113,4 +113,83 @@ public class CliSamplesTests : IClassFixture<SampleModelsFixture>
         var (code, _, err) = CliHost.Run("generate", "ModelProgram", "--project", dir);
         Assert.True(code == 0, $"generate failed: {err}");
     }
+
+    // ---- Additional model samples (slicing / config parameters) ------------------------
+
+    [Theory]
+    [InlineData("samples/Account", "ModelProgram")]
+    [InlineData("samples/Account", "SlicedModelProgram")]
+    [InlineData("samples/atsvc", "ModelProgramWithConfigParameters")]
+    [InlineData("samples/atsvc", "ModelProgramWithTwoJobsPattern")]
+    [InlineData("samples/atsvc", "AddTwoJobsPattern")]
+    public void Explore_ExtraSampleMachine_InProcess_Succeeds(string project, string machine)
+    {
+        var dir = Path.Combine(_fx.RepoRoot, project.Replace('/', Path.DirectorySeparatorChar));
+        var (code, _, err) = CliHost.Run("explore", machine, "--project", dir);
+        Assert.True(code == 0, $"explore {project}/{machine} failed: {err}");
+    }
+
+    // ---- Other CLI commands ------------------------------------------------------------
+
+    [Fact]
+    public void Init_ScaffoldsProject()
+    {
+        var tmp = Path.Combine(Path.GetTempPath(), $"sek_init_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tmp);
+        try
+        {
+            var (code, _, _) = CliHost.Run("init", "--project", tmp);
+            Assert.Equal(0, code);
+            Assert.True(File.Exists(Path.Combine(tmp, ".specexplorerkit", "config.json")));
+        }
+        finally
+        {
+            try { Directory.Delete(tmp, recursive: true); } catch { /* best effort */ }
+        }
+    }
+
+    [Fact]
+    public void Test_Turnstile_Conformance_Runs()
+    {
+        var dir = Path.Combine(_fx.RepoRoot, "samples", "Turnstile");
+        var (code, output, err) = CliHost.Run("test", "ModelProgram", "--project", dir);
+        // The conformance command executes (exit 0 = conformant, 1 = mismatch reported); either is a
+        // valid run that exercises CmdTest + the conformance replay. A crash (99) is not acceptable.
+        Assert.NotEqual(99, code);
+        Assert.False(string.IsNullOrWhiteSpace(output + err));
+    }
+
+    // ---- Error paths -------------------------------------------------------------------
+
+    [Fact]
+    public void Explore_UnknownMachine_ReturnsError()
+    {
+        var dir = Path.Combine(_fx.RepoRoot, "samples", "Turnstile");
+        var (code, _, err) = CliHost.Run("explore", "NoSuchMachine", "--project", dir);
+        Assert.NotEqual(0, code);
+        Assert.NotEmpty(err);
+    }
+
+    [Fact]
+    public void View_MissingFile_ReturnsError()
+    {
+        var (code, _, _) = CliHost.Run("view", Path.Combine(Path.GetTempPath(), "does-not-exist.seexpl"));
+        Assert.NotEqual(0, code);
+    }
+
+    [Fact]
+    public void Explore_MissingProject_ReturnsError()
+    {
+        var tmp = Path.Combine(Path.GetTempPath(), $"sek_noproj_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tmp);
+        try
+        {
+            var (code, _, _) = CliHost.Run("explore", "M", "--project", tmp); // no .specexplorerkit
+            Assert.NotEqual(0, code);
+        }
+        finally
+        {
+            try { Directory.Delete(tmp, recursive: true); } catch { /* best effort */ }
+        }
+    }
 }
