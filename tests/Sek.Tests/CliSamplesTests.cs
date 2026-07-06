@@ -20,12 +20,14 @@ public sealed class SampleModelsFixture
         var samples = Path.Combine(RepoRoot, "samples");
         if (!Directory.Exists(samples)) return;
 
-        // Only samples driven in-process need building. All big samples share AssemblyName
-        // "Model", so only ONE can be loaded per process; we drive ParameterGeneration (richest
-        // parameter/struct/combination features) plus Turnstile (distinct "Turnstile.Model").
-        Build(Path.Combine(samples, "ParameterGeneration", "Model", "ParameterGeneration.Model.csproj"));
-        Build(Path.Combine(samples, "Turnstile", "Model", "Turnstile.Model.csproj"));
-        Build(Path.Combine(samples, "Turnstile", "Sut", "Turnstile.Sut.csproj"));
+        // Each sample model now has a unique assembly name, so all can be co-loaded in one process.
+        foreach (var csproj in Directory.EnumerateFiles(samples, "*.Model.csproj", SearchOption.AllDirectories))
+        {
+            Build(csproj);
+        }
+
+        var sut = Path.Combine(samples, "Turnstile", "Sut", "Turnstile.Sut.csproj");
+        if (File.Exists(sut)) Build(sut);
     }
 
     private static void Build(string csproj)
@@ -55,17 +57,13 @@ public class CliSamplesTests : IClassFixture<SampleModelsFixture>
 
     public static IEnumerable<object[]> ManifestEntries()
     {
-        // Samples that can run in-process: Operators (behavior-only, no model assembly) and one
-        // "Model"-assembly sample (ParameterGeneration) plus Turnstile (distinct assembly name).
-        // Other samples also use AssemblyName "Model", which cannot be co-loaded in one process.
-        var allowed = new HashSet<string> { "samples/Operators", "samples/ParameterGeneration", "samples/Turnstile" };
+        // Every sample model now has a unique assembly name, so all can be driven in one process.
         var root = CliHost.RepoRoot();
         var manifest = Path.Combine(root, "samples", "regression.manifest.json");
         using var doc = JsonDocument.Parse(File.ReadAllText(manifest));
         foreach (var e in doc.RootElement.GetProperty("entries").EnumerateArray())
         {
             var project = e.GetProperty("project").GetString()!;
-            if (!allowed.Contains(project)) continue;
             var machine = e.GetProperty("machine").GetString()!;
             yield return new object[] { project, machine };
         }

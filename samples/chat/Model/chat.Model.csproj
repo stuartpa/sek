@@ -11,7 +11,7 @@
 
   <PropertyGroup>
     <RootNamespace>Chat.Model</RootNamespace>
-    <AssemblyName>Model</AssemblyName>
+    <AssemblyName>chat.Model</AssemblyName>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
   </PropertyGroup>

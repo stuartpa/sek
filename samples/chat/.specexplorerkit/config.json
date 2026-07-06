@@ -1,5 +1,5 @@
 {
-  "model": { "assembly": "Model/bin/Debug/Model.dll", "type": "Chat.Model.ChatModel" },
+  "model": { "assembly": "Model/bin/Debug/chat.Model.dll", "type": "Chat.Model.ChatModel" },
   "cord":  "Model",
   "out":   ".specexplorerkit/out"
 }

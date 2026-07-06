@@ -1,5 +1,5 @@
 {
-  "model": { "assembly": "Model/bin/Debug/Model.dll", "type": "ATSvc.Model.AtsvcModel" },
+  "model": { "assembly": "Model/bin/Debug/atsvc.Model.dll", "type": "ATSvc.Model.AtsvcModel" },
   "cord":  "Model",
   "out":   ".specexplorerkit/out"
 }

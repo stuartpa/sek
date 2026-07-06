@@ -1,5 +1,5 @@
 {
-  "model": { "assembly": "Model/bin/Debug/Model.dll", "type": "SMB2.Model.Smb2Model" },
+  "model": { "assembly": "Model/bin/Debug/SMB2.Model.dll", "type": "SMB2.Model.Smb2Model" },
   "cord":  "Model",
   "out":   ".specexplorerkit/out"
 }

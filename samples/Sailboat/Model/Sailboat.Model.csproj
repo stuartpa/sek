@@ -11,7 +11,7 @@
 
   <PropertyGroup>
     <RootNamespace>Sailboat.Model</RootNamespace>
-    <AssemblyName>Model</AssemblyName>
+    <AssemblyName>Sailboat.Model</AssemblyName>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
   </PropertyGroup>

@@ -12,7 +12,7 @@
 
   <PropertyGroup>
     <RootNamespace>ATSvc.Model</RootNamespace>
-    <AssemblyName>Model</AssemblyName>
+    <AssemblyName>atsvc.Model</AssemblyName>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
   </PropertyGroup>

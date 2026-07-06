@@ -12,7 +12,7 @@
 
   <PropertyGroup>
     <RootNamespace>SMB2.Model</RootNamespace>
-    <AssemblyName>Model</AssemblyName>
+    <AssemblyName>SMB2.Model</AssemblyName>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
   </PropertyGroup>

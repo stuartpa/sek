@@ -13,7 +13,7 @@
 
   <PropertyGroup>
     <RootNamespace>PG</RootNamespace>
-    <AssemblyName>Model</AssemblyName>
+    <AssemblyName>ParameterGeneration.Model</AssemblyName>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
   </PropertyGroup>
