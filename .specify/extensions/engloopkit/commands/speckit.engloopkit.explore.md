@@ -8,6 +8,9 @@ description: Stage 5 — Author CORD models against a SEK model, run Z3 explorat
 $ARGUMENTS
 ```
 
+> **Explore the domain vertical, not pure components (PM002).** A `CRD` belongs to a stateful,
+> domain-specific model. Pure `components/*` code is unit/property-tested, not explored.
+
 You **MUST** consider the user input before proceeding (if not empty). It names the
 model (`MDLxxx`) or the coverage gap (`COVxxx`) to target.
 

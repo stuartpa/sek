@@ -34,8 +34,9 @@ project's `<ARTIFACT_ROOT>/numbering-registry.md`, not the bundle's copy.
   is already satisfied. All tests green and within the time budget throughout.
 - **Actions:** run the test suite under real coverage tooling, build the whole-product Readiness
   Inventory, diff against the goal, point `explore` at the largest remaining gap.
-- **Verification:** the **Readiness Gate** (Step 3.5) returns **PASS** — every module modelled
-  (`MDL`), explored (`CRD`), covered ≥95% line & branch, architecture-conformant, gates green.
+- **Verification:** the **Readiness Gate** (Step 3.5) returns **PASS** — every module ≥95% line &
+  branch, architecture-conformant, green; verified by the method for its class (components →
+  unit/property; vertical → SEK `MDL`+`CRD` generating conformance tests).
 - **Memory:** `docs/coverage/COVxxx_<slug>.md`.
 
 ## The Readiness Gate (Definition of Ready-for-Incidents)
@@ -46,18 +47,26 @@ project's `<ARTIFACT_ROOT>/numbering-registry.md`, not the bundle's copy.
 > or apparent doneness. If the gate has not been computed and PASSed, the honest status is
 > **NOT READY**, and that is the only statement allowed. (See PM001.)
 
-The gate **PASSES** iff, for **every** module of the product (each `components/*` component **and**
-the vertical), ALL of the following are true — proven by evidence, not opinion:
+The gate **PASSES** iff **every** module of the product (each `components/*` component **and** the
+vertical) is **≥95% line & branch covered**, **architecture-conformant**, and **green** — with the
+verification *method* keyed to the module's **class** (ARC002 litmus test: *generic, domain-free code
+useful unchanged in an unrelated repo?*):
 
-1. **Modelled** — the module has an `MDL` (a SEK model of its behavior).
-2. **Explored** — the module has a `CRD` (a CORD exploration that generated or drove its tests).
-3. **Covered** — **measured** line coverage ≥95% **and** branch coverage ≥95% (from real
-   coverage tooling output, attached), or every shortfall line is listed with a rationale.
-4. **Architecture-conformant** — the module honors every applicable `ARC` / architecture-guard
-   check (no boundary violations, no leaked components).
+1. **Covered** — **measured** line coverage ≥95% **and** branch coverage ≥95% (from real coverage
+   tooling output, attached), or every shortfall line is listed with a rationale.
+2. **Verified by the right method for its class:**
+   - **Component** (`components/*`, domain-free): **unit / property tests**. **No `MDL`/`CRD`** — a
+     model of domain-free code is tautological; authoring one to tick a box is the PM001 failure in
+     disguise (see PM002).
+   - **Vertical** (`src/*`, domain behavior): a SEK **`MDL`** + a **`CRD`** that **generates** the
+     conformance tests (SEK self-modelling).
+3. **Domain-only vertical (precondition, not an escape hatch):** any generic/domain-free code still
+   in the vertical is an **ARC002 violation and a FAIL** — extract it to a component first.
+4. **Architecture-conformant** — the module honors every applicable `ARC` / architecture-guard check.
 5. **Green** — the full unit-test suite and any exploration-regression gate pass.
 
-If **any** module fails **any** criterion, the gate is **FAIL** and the product is **NOT READY**.
+If **any** module fails **any** applicable criterion, the gate is **FAIL** and the product is
+**NOT READY**.
 
 ## Step 0 — Assign the COV number
 
@@ -77,13 +86,16 @@ the vertical) and overall:
 
 Build the **Readiness Inventory** — one row per module of the product:
 
-| Module | MDL? | CRD? | Line% | Branch% | Conformant? | PASS/FAIL |
-|---|---|---|---|---|---|---|
-| components/<Name> | | | | | | |
-| <vertical> | | | | | | |
+| Module | Class | MDL? | CRD? | Line% | Branch% | Conformant? | PASS/FAIL |
+|---|---|---|---|---|---|---|---|
+| components/<Name> | component | n/a | n/a | | | | |
+| <vertical module> | vertical | | | | | | |
 
-A module with **no tests at all** is `Line 0% / FAIL` — it does not get to be absent from the
-table. The product's module list comes from the repo (every `components/*` project and every
+**Class** is decided by the ARC002 litmus test. For a **component**, `MDL?`/`CRD?` are `n/a`
+(unit/property-tested); for a **vertical** module they are required. A module with **no tests at
+all** is `Line 0% / FAIL` — it does not get to be absent from the table. If a **vertical** row is
+actually generic/domain-free code, that is an ARC002 violation → `FAIL` (extract it to a component
+first). The product's module list comes from the repo (every `components/*` project and every
 vertical assembly), not from "which ones happen to have a model."
 
 ## Step 2 — Find the gap (Reason)
@@ -109,9 +121,11 @@ uncovered lines with a rationale in the COV doc.
 
 ## Step 3.5 — Compute the Readiness Gate (Evaluate)
 
-Walk the Readiness Inventory. The gate is **PASS** only if **every** row satisfies all five gate
-criteria (Modelled, Explored, Covered ≥95% line & branch, Conformant, Green). Otherwise it is
-**FAIL**. Record the verdict and, if FAIL, the exact failing rows and why.
+Walk the Readiness Inventory. The gate is **PASS** only if **every** row satisfies its class's
+criteria — ≥95% line & branch + conformant + green for all; **components** need no MDL/CRD;
+**vertical** rows need an MDL + a CRD (generated conformance) and must be genuine domain behavior
+(generic code in the vertical → FAIL). Otherwise it is **FAIL**. Record the verdict and, if FAIL, the
+exact failing rows and why.
 
 **This verdict is the only source of a "ready" statement.** If FAIL, the product is NOT READY and
 the loop continues (hand the largest gap back to `explore`/`model`). Do not soften, round up, or

@@ -17,12 +17,13 @@
 
 > One row per module of the product — every `components/*` component AND the vertical. A module
 > with no tests is `Line 0% / FAIL`; no module may be omitted. The gate PASSES only if every row
-> passes all five criteria.
+> passes its class's criteria (all: ≥95% line/branch + conformant + green; **component** →
+> unit/property, no MDL/CRD; **vertical** → MDL + CRD generating conformance, and domain-only).
 
-| Module | MDL? | CRD? | Line% | Branch% | Conformant? | PASS/FAIL |
-|---|---|---|---|---|---|---|
-| components/<Name> | | | | | | |
-| <vertical> | | | | | | |
+| Module | Class | MDL? | CRD? | Line% | Branch% | Conformant? | PASS/FAIL |
+|---|---|---|---|---|---|---|---|
+| components/<Name> | component | n/a | n/a | | | | |
+| <vertical module> | vertical | | | | | | |
 
 ## Remaining gaps
 

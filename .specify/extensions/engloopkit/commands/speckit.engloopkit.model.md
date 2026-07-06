@@ -8,6 +8,11 @@ description: Stage 4 — Build a SEK model of the implementation's state space (
 $ARGUMENTS
 ```
 
+> **Model the domain vertical, not pure components (PM002).** Do **not** author an `MDL` for a
+> `components/*` module or any pure, domain-free code — a model of it is tautological. Extract such
+> code to a component (ARC002) and unit/property-test it instead. Model only stateful, domain-
+> specific behavior in the vertical.
+
 You **MUST** consider the user input before proceeding (if not empty). It names the
 component or subsystem to model.
 
