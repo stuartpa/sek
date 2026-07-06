@@ -1,0 +1,78 @@
+# ARC002: Component boundary — reusable components live in `components/`, the vertical composes them
+
+- **Created:** 2026-07-06
+- **Status:** ACCEPTED
+- **Governs:** the whole repository — the split between `components/` and `src/`
+- **Constitution ref:** architecture-guard (to be encoded); enforced per the EngLoopKit component pattern
+
+## Decision
+
+SpecExplorerKit is built as **a vertical that composes components**. Code that would be useful,
+**unchanged, in a repo solving a totally different problem** (it wraps only the .NET runtime / BCL /
+third-party libraries and carries **no SpecExplorerKit domain knowledge**) is a **component** and
+lives as its own class-library project under **`components/`**, named
+`SpecExplorerKit.Components.<Name>`. Everything that *is* SpecExplorerKit — the Cord language, the
+model/exploration semantics, the `sek` CLI — is the **vertical** and stays under `src/`.
+
+**Dependencies point one way: vertical → components (and component → component), never the reverse.**
+
+## Context (from the bridging code)
+
+The bridging code already contains several clearly-generic building blocks tangled into the
+vertical assemblies. The litmus test (*useful, unchanged, in an unrelated repo?*) classifies them:
+
+| Module (today) | Assembly | Classification | Why |
+|---|---|---|---|
+| `CanonicalJson` (JSON canonicalize + SHA-256 hash) | was `Sek.Engine` | **component** ✅ *extracted* | generic content hashing; no model/exploration concept |
+| `ProbabilityGate` (seeded reproducible Bernoulli gate) | `Sek.Solver` | **component** (candidate) | generic seeded RNG; no domain |
+| `Combinatorics` (pairwise / interaction / isolated / seeded / expand over columns) | `Sek.Solver` | **component** (candidate) | generic combinatorial test design |
+| `GraphAnalysis` (reachability prune / merge-by-key) | `Sek.Core/Analysis` | **component** (candidate, needs a generic graph seam) | generic directed-graph algorithms; currently coupled to `ExplorationGraph` |
+| NFA→DFA subset construction / product (the automaton core) | `Sek.Engine/BehaviorAutomaton` | **component** (candidate, hard) | generic finite-automata theory; entangled with scenario semantics |
+| Z3 glue (`Z3Solver` translation), Roslyn predicate host | `Sek.Solver` | **component** (candidate) | generic "constraint spec → satisfying assignments" |
+| Renderers (DOT / Mermaid / seexpl) | `Sek.Core/Rendering` | **component** (candidate) | generic graph rendering |
+| Cord lexer/parser, AST, semantics | `Sek.Cord` | **vertical** | *is* the Cord language |
+| `ModelProgram`, attributes, `Requirement`, exploration `Explorer`, `ModelIntrospector` | `Sek.Modeling`, `Sek.Engine` | **vertical** | *is* SpecExplorerKit's model + exploration domain |
+| `sek` CLI, `TestGen`, `Conformance`, `ProjectConfig` | `Sek.Cli` | **vertical** | *is* the tool |
+
+## The rule
+
+1. A module that passes the litmus test **must** live in `components/<Name>` as
+   `SpecExplorerKit.Components.<Name>` (its own project/assembly).
+2. **Components carry no domain knowledge.** Domain specifics (e.g. what a "state" or an "action"
+   is) are passed in by the vertical; a component may know the BCL and third-party libs only.
+3. **One component, one folder, one job.**
+4. **No component depends on the vertical.** A component may depend on another component.
+5. The vertical (`src/…`) composes the components it needs.
+
+## Enforcement
+
+- architecture-guard: a dependency-direction rule — no `ProjectReference` from
+  `components/**` to `src/**`; the review flags any generic (domain-free) code still living under
+  `src/` as a refactor task.
+- CI already builds `src/Sek.Cli` (which transitively builds every component) and runs the unit
+  suite + the sample-exploration regression gate, so extractions are guarded.
+
+## Consequences
+
+- **Easier:** generic building blocks get isolated, independently-tested assemblies; the vertical's
+  intent is clearer; components are liftable into other repos.
+- **Constrained:** new generic code must go to `components/`, not be dropped into an engine
+  assembly; extractions must preserve the one-way dependency rule.
+
+## Progress & refactor tasks (converge in Stage 3 / refactor-scan)
+
+- **DONE (pilot):** `CanonicalJson` extracted → `components/SpecExplorerKit.Components.Json`
+  (`Sek.Engine` now references it; 5 direct component tests; 54 tests green; regression gate green).
+- **REF-candidate:** `ProbabilityGate`, `Combinatorics` → `components/SpecExplorerKit.Components.Combinatorics` (+ `.Random`).
+- **REF-candidate:** `GraphAnalysis` → `components/SpecExplorerKit.Components.Graphs` behind a
+  generic graph interface (decouple from `ExplorationGraph`).
+- **REF-candidate:** renderers → `components/SpecExplorerKit.Components.GraphRendering`.
+- **REF-candidate:** Z3/Roslyn solver glue → `components/SpecExplorerKit.Components.Solving`.
+- Do **not** extract all at once — each refactor cycle pulls a little more out (per the component
+  pattern's "converge toward" rule).
+
+## Related
+
+- Component pattern: EngLoopKit `docs/component-pattern.md`
+- SEED001; BRG001/BRG002; ARC001 (compiler phases — its extracted phases will surface more components)
+- Supersedes: none

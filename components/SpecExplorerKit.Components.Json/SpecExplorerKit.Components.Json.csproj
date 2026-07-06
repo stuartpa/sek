@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    SpecExplorerKit.Components.Json — a reusable component (EngLoopKit component pattern).
+
+    Generic, domain-free: canonicalizes JSON so logically-equal documents compare/hash
+    identically (object keys sorted, array elements sorted for set semantics) and hashes the
+    result with SHA-256. Knows nothing about SpecExplorerKit's model/exploration domain — it
+    could be lifted, unchanged, into any repo that needs stable content hashing of JSON state.
+
+    Component rule (ARC002): components carry no vertical/domain knowledge; dependencies point
+    vertical -> components, never the reverse.
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>SpecExplorerKit.Components.Json</RootNamespace>
+    <AssemblyName>SpecExplorerKit.Components.Json</AssemblyName>
+  </PropertyGroup>
+
+</Project>

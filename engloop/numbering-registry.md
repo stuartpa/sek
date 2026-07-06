@@ -11,7 +11,7 @@ definitions. Artifact root is `engloop/` (see standards.md).
 | `SEED` | Gathering docs | `SEED001` | SEED001 = Spec Explorer → SEK port |
 | `BRG` | Bridging-stage records | `BRG002` | BRG001 = Cord implementation state; BRG002 = parity & sample audit |
 | `SP` | Specs | `SP000` | none yet (bridging code predates a recorded specify loop) |
-| `ARC` | Architecture decisions | `ARC000` | none yet — Stage 2 is next |
+| `ARC` | Architecture decisions | `ARC002` | ARC001 = Cord front-end as a compiler; ARC002 = component boundary (components/ vs vertical) |
 | `MDL` | SEK models | `MDL000` | none yet |
 | `CRD` | CORD explorations | `CRD000` | none yet |
 | `COV` | Coverage reports | `COV000` | none yet |

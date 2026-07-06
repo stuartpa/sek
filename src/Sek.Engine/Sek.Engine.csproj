@@ -19,6 +19,7 @@
     <ProjectReference Include="..\Sek.Cord\Sek.Cord.csproj" />
     <ProjectReference Include="..\Sek.Modeling\Sek.Modeling.csproj" />
     <ProjectReference Include="..\Sek.Solver\Sek.Solver.csproj" />
+    <ProjectReference Include="..\..\components\SpecExplorerKit.Components.Json\SpecExplorerKit.Components.Json.csproj" />
   </ItemGroup>
 
 </Project>

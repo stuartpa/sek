@@ -1,0 +1,51 @@
+schema_version: "1.0"
+
+extension:
+  id: "engloopkit"
+  name: "EngLoopKit"
+  version: "1.2.0"
+  description: "Loop-engineering stage commands: seed, architect, model, explore, coverage, incident, postmortem, repair, refactor-scan."
+  author: "stuartpa"
+  repository: "https://github.com/stuartpa/engloopkit"
+  license: "MIT"
+  homepage: "https://github.com/stuartpa/engloopkit"
+
+requires:
+  speckit_version: ">=0.12.0"
+
+provides:
+  commands:
+    - name: "speckit.engloopkit.seed"
+      file: "commands/speckit.engloopkit.seed.md"
+      description: "Gather everything known about a thing to build into one numbered SEED document."
+    - name: "speckit.engloopkit.architect"
+      file: "commands/speckit.engloopkit.architect.md"
+      description: "Derive the long-lived architecture from bridging code via architecture-guard (produces an ARC)."
+    - name: "speckit.engloopkit.model"
+      file: "commands/speckit.engloopkit.model.md"
+      description: "Build the SEK model (MDL) of the implementation's state space."
+    - name: "speckit.engloopkit.explore"
+      file: "commands/speckit.engloopkit.explore.md"
+      description: "Author CORD models (CRD), run Z3 exploration, and generate test cases."
+    - name: "speckit.engloopkit.coverage"
+      file: "commands/speckit.engloopkit.coverage.md"
+      description: "Measure coverage (COV) and close the SEK-to-coverage loop to 95%+ line, then functional."
+    - name: "speckit.engloopkit.incident"
+      file: "commands/speckit.engloopkit.incident.md"
+      description: "Live incident response: mitigate fast (no permanent fix), log an IN doc with MIT actions."
+    - name: "speckit.engloopkit.postmortem"
+      file: "commands/speckit.engloopkit.postmortem.md"
+      description: "5-whys over a set of incidents; produce a PM with LRN learnings and RPI repair items."
+    - name: "speckit.engloopkit.repair"
+      file: "commands/speckit.engloopkit.repair.md"
+      description: "Route each repair item to tinyspec (small) or specify (large) and update model/tests."
+    - name: "speckit.engloopkit.refactor-scan"
+      file: "commands/speckit.engloopkit.refactor-scan.md"
+      description: "Monthly: walk a refactoring decision tree, pick the next refactor (REF), emit a SEED."
+
+tags:
+  - "loop-engineering"
+  - "spec-driven"
+  - "model-checking"
+  - "operations"
+  - "refactoring"

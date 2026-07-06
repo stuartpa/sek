@@ -1,0 +1,35 @@
+{
+  "schema_version": "1.0",
+  "extensions": {
+    "architecture-guard": {
+      "version": "1.11.0",
+      "source": "local",
+      "manifest_hash": "sha256:65cca6373b4f7ed106aa1f5fad6d2713d532fd03ecc3febd3f585ad91b547278",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {},
+      "registered_skills": [],
+      "installed_at": "2026-07-06T16:47:45.869437+00:00"
+    },
+    "tinyspec": {
+      "version": "1.0.0",
+      "source": "local",
+      "manifest_hash": "sha256:a78c4ede6a5e07f1430e187be0269b910dcef3e75f4e0609588e58fbce48b742",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {},
+      "registered_skills": [],
+      "installed_at": "2026-07-06T16:52:45.540243+00:00"
+    },
+    "engloopkit": {
+      "version": "1.2.0",
+      "source": "local",
+      "manifest_hash": "sha256:955d3c5ca513fc4b4ccba68e3752d1df629675d4a0babf368e491f39d5f678bd",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {},
+      "registered_skills": [],
+      "installed_at": "2026-07-06T16:53:05.626456+00:00"
+    }
+  }
+}

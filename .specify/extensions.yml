@@ -1,0 +1,44 @@
+installed:
+- architecture-guard
+- engloopkit
+- tinyspec
+settings:
+  auto_execute_hooks: true
+hooks:
+  after_plan:
+  - extension: architecture-guard
+    command: speckit.architecture-guard.violation-detection
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Would you like to scan the technical plan for architectural drift and
+      Constitution violations?
+    description: ''
+    condition: null
+  after_tasks:
+  - extension: architecture-guard
+    command: speckit.architecture-guard.refactor-generator
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Would you like to generate architectural refactor tasks before implementation?
+    description: ''
+    condition: null
+  after_implement:
+  - extension: architecture-guard
+    command: speckit.architecture-guard.architecture-review
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Would you like to run a post-implementation architecture review?
+    description: ''
+    condition: null
+  before_specify:
+  - extension: tinyspec
+    command: speckit.tinyspec.classify
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Check if this task is small enough for the lightweight tinyspec workflow?
+    description: Auto-classify task complexity before starting the full SDD workflow
+    condition: null

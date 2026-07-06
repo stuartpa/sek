@@ -4,6 +4,7 @@ using System.Text.Json;
 using Sek.Core.Model;
 using Sek.Modeling;
 using Sek.Solver;
+using SpecExplorerKit.Components.Json;
 
 namespace Sek.Engine;
 

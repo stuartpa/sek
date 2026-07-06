@@ -1,14 +1,16 @@
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 
-namespace Sek.Engine;
+namespace SpecExplorerKit.Components.Json;
 
 /// <summary>
-/// Canonicalizes model-state JSON so that logically-equal states hash identically:
-/// object properties are sorted by name and array elements are sorted by their own
-/// canonical form (giving set semantics to collections regardless of insertion order).
+/// Canonicalizes JSON so that logically-equal documents hash identically: object properties are
+/// sorted by name and array elements are sorted by their own canonical form (giving set semantics
+/// to collections regardless of order). Then hashes the canonical text with SHA-256.
+///
+/// This is a generic, domain-free <em>component</em> (see ARC002 / the EngLoopKit component
+/// pattern): it knows nothing about SpecExplorerKit's model or exploration concepts.
 /// </summary>
 public static class CanonicalJson
 {
