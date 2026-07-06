@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The system-under-test (SUT / binding) for the Turnstile sample. The generated xUnit
+       tests reflect into this assembly by path and replay the explored action sequences. -->
+
+  <PropertyGroup>
+    <RootNamespace>Turnstile.Sut</RootNamespace>
+    <AssemblyName>Turnstile.Sut</AssemblyName>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>

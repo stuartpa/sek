@@ -299,6 +299,7 @@ public static class TestGen
         sb.AppendLine("#nullable disable");
         sb.AppendLine("using System;");
         sb.AppendLine("using System.IO;");
+        sb.AppendLine("using System.Collections.Generic;");
         sb.AppendLine("using System.Reflection;");
         sb.AppendLine("using System.Runtime.Loader;");
         sb.AppendLine("using Xunit;");
@@ -347,6 +348,10 @@ public static class TestGen
                 {
                     private readonly Assembly _asm;
                     private readonly string _ns;
+                    // One instance per SUT type, reused across the steps of a test path so a
+                    // stateful SUT is driven correctly (xUnit news up the test class — hence a
+                    // fresh Sut and fresh instances — per test).
+                    private readonly Dictionary<Type, object> _instances = new Dictionary<Type, object>();
 
                     public Sut(string path, string ns)
                     {
@@ -378,7 +383,7 @@ public static class TestGen
                         var call = new object[ps.Length];
                         for (var i = 0; i < ps.Length && i < args.Length; i++)
                             call[i] = Coerce(args[i], ps[i].ParameterType);
-                        var target = method.IsStatic ? null : Activator.CreateInstance(type);
+                        var target = method.IsStatic ? null : Instance(type);
                         method.Invoke(target, call);
                     }
 
@@ -386,6 +391,17 @@ public static class TestGen
                     // tests exercises the same transition; a live conformance harness would instead
                     // wait for and verify the event. Kept distinct from Step for that semantics.
                     public void Observe(string label, params string[] args) => Step(label, args);
+
+                    private object Instance(Type type)
+                    {
+                        if (!_instances.TryGetValue(type, out var inst))
+                        {
+                            inst = Activator.CreateInstance(type);
+                            _instances[type] = inst;
+                        }
+
+                        return inst;
+                    }
 
                     private static object Coerce(string v, Type t)
                     {

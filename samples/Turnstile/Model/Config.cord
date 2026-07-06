@@ -1,0 +1,24 @@
+using Turnstile.Sut;
+
+/// The turnstile behaviour surface and exploration bounds.
+config Actions
+{
+    action all Turnstile;
+
+    switch StateBound = 128;
+    switch StepBound = 128;
+    switch PathDepthBound = 32;
+    switch TestEnabled = false;
+}
+
+/// The full reachable behaviour of the turnstile.
+machine ModelProgram() : Actions
+{
+    construct model program from Actions
+}
+
+/// Generate replayable test cases that drive the SUT through the turnstile lifecycle.
+machine TestSuite() : Actions where TestEnabled = true
+{
+    construct test cases where Strategy = "longtests" for ModelProgram
+}

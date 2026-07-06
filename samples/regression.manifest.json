@@ -413,6 +413,13 @@
       "states": 89,
       "transitions": 120,
       "accepting": 2
+    },
+    {
+      "project": "samples/Turnstile",
+      "machine": "ModelProgram",
+      "states": 2,
+      "transitions": 3,
+      "accepting": 1
     }
   ]
 }

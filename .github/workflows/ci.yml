@@ -43,3 +43,13 @@ jobs:
       - name: Sample-exploration regression gate
         shell: pwsh
         run: pwsh scripts/regression.ps1
+
+      - name: Generated-test loop (Turnstile binding sample)
+        shell: bash
+        run: |
+          set -e
+          SEK=src/Sek.Cli/bin/Debug/sek.dll
+          dotnet build samples/Turnstile/Sut/Turnstile.Sut.csproj -c Debug
+          dotnet build samples/Turnstile/Model/Turnstile.Model.csproj -c Debug
+          dotnet "$SEK" generate ModelProgram --project samples/Turnstile
+          dotnet test samples/Turnstile/.specexplorerkit/out/ModelProgramTests --nologo
