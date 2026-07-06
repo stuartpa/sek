@@ -1,0 +1,45 @@
+name: ci
+
+# Continuous integration: on every push / PR, build the engine, run the unit-test
+# suite, build every sample model, and run the sample-exploration regression gate
+# (scripts/regression.ps1 against samples/regression.manifest.json). This protects the
+# engine against regressions as new Cord sample projects are added.
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Build CLI
+        run: dotnet build src/Sek.Cli/Sek.Cli.csproj -c Debug
+
+      - name: Unit tests
+        run: dotnet test tests/Sek.Tests/Sek.Tests.csproj -c Debug --nologo
+
+      - name: Build sample models
+        shell: bash
+        run: |
+          for proj in samples/*/Model/*.csproj; do
+            echo "== building $proj =="
+            dotnet build "$proj" -c Debug
+          done
+
+      - name: Sample-exploration regression gate
+        shell: pwsh
+        run: pwsh scripts/regression.ps1

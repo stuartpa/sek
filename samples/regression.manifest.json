@@ -1,0 +1,418 @@
+{
+  "//": "SEK sample-exploration regression baseline. Add a sample by appending entries with -1 counts, then run: pwsh scripts/regression.ps1 -Update. TPC-C validated separately (external repo).",
+  "entries": [
+    {
+      "project": "samples/Operators",
+      "machine": "Party",
+      "states": 6,
+      "transitions": 6,
+      "accepting": 3
+    },
+    {
+      "project": "samples/Operators",
+      "machine": "NoParty",
+      "states": 5,
+      "transitions": 5,
+      "accepting": 3
+    },
+    {
+      "project": "samples/Operators",
+      "machine": "SyncParallel",
+      "states": 3,
+      "transitions": 2,
+      "accepting": 1
+    },
+    {
+      "project": "samples/Operators",
+      "machine": "InterleavedParallel",
+      "states": 27,
+      "transitions": 50,
+      "accepting": 9
+    },
+    {
+      "project": "samples/Operators",
+      "machine": "SyncInterleavedParallel",
+      "states": 16,
+      "transitions": 23,
+      "accepting": 7
+    },
+    {
+      "project": "samples/Operators",
+      "machine": "TightSequence",
+      "states": 10,
+      "transitions": 15,
+      "accepting": 3
+    },
+    {
+      "project": "samples/Operators",
+      "machine": "LooseSequence",
+      "states": 11,
+      "transitions": 68,
+      "accepting": 3
+    },
+    {
+      "project": "samples/Operators",
+      "machine": "Permutation",
+      "states": 9,
+      "transitions": 8,
+      "accepting": 2
+    },
+    {
+      "project": "samples/Operators",
+      "machine": "ZeroOrMore",
+      "states": 6,
+      "transitions": 12,
+      "accepting": 4
+    },
+    {
+      "project": "samples/Operators",
+      "machine": "OneOrMore",
+      "states": 6,
+      "transitions": 12,
+      "accepting": 3
+    },
+    {
+      "project": "samples/Operators",
+      "machine": "Optional",
+      "states": 10,
+      "transitions": 17,
+      "accepting": 4
+    },
+    {
+      "project": "samples/Operators",
+      "machine": "BoundedRepetitionExact",
+      "states": 9,
+      "transitions": 14,
+      "accepting": 3
+    },
+    {
+      "project": "samples/Operators",
+      "machine": "BoundedRepetitionLeast",
+      "states": 13,
+      "transitions": 29,
+      "accepting": 6
+    },
+    {
+      "project": "samples/Operators",
+      "machine": "BoundedRepetitionRange",
+      "states": 13,
+      "transitions": 23,
+      "accepting": 6
+    },
+    {
+      "project": "samples/Operators",
+      "machine": "AnyAction",
+      "states": 4,
+      "transitions": 13,
+      "accepting": 1
+    },
+    {
+      "project": "samples/Operators",
+      "machine": "RepetitionOfAnyAction",
+      "states": 3,
+      "transitions": 13,
+      "accepting": 2
+    },
+    {
+      "project": "samples/Operators",
+      "machine": "Negation",
+      "states": 3,
+      "transitions": 11,
+      "accepting": 2
+    },
+    {
+      "project": "samples/Operators",
+      "machine": "Truncation",
+      "states": 1,
+      "transitions": 0,
+      "accepting": 1
+    },
+    {
+      "project": "samples/ParameterGeneration",
+      "machine": "Product",
+      "states": 2,
+      "transitions": 27,
+      "accepting": 1
+    },
+    {
+      "project": "samples/ParameterGeneration",
+      "machine": "Interaction",
+      "states": 2,
+      "transitions": 27,
+      "accepting": 1
+    },
+    {
+      "project": "samples/ParameterGeneration",
+      "machine": "Pairwise",
+      "states": 2,
+      "transitions": 7,
+      "accepting": 1
+    },
+    {
+      "project": "samples/ParameterGeneration",
+      "machine": "Isolated",
+      "states": 2,
+      "transitions": 13,
+      "accepting": 1
+    },
+    {
+      "project": "samples/ParameterGeneration",
+      "machine": "Seeded",
+      "states": 2,
+      "transitions": 13,
+      "accepting": 1
+    },
+    {
+      "project": "samples/ParameterGeneration",
+      "machine": "Constraint",
+      "states": 2,
+      "transitions": 9,
+      "accepting": 1
+    },
+    {
+      "project": "samples/ParameterGeneration",
+      "machine": "Expand",
+      "states": 2,
+      "transitions": 27,
+      "accepting": 1
+    },
+    {
+      "project": "samples/ParameterGeneration",
+      "machine": "Struct",
+      "states": 2,
+      "transitions": 36,
+      "accepting": 1
+    },
+    {
+      "project": "samples/ParameterGeneration",
+      "machine": "Bitmask",
+      "states": 2,
+      "transitions": 8,
+      "accepting": 1
+    },
+    {
+      "project": "samples/ParameterGeneration",
+      "machine": "Flags",
+      "states": 2,
+      "transitions": 10,
+      "accepting": 1
+    },
+    {
+      "project": "samples/ParameterGeneration",
+      "machine": "Let",
+      "states": 15,
+      "transitions": 14,
+      "accepting": 8
+    },
+    {
+      "project": "samples/ParameterGeneration",
+      "machine": "Probability",
+      "states": 6,
+      "transitions": 30,
+      "accepting": 1
+    },
+    {
+      "project": "samples/ParameterGeneration",
+      "machine": "EquivalenceClass",
+      "states": 2,
+      "transitions": 36,
+      "accepting": 1
+    },
+    {
+      "project": "samples/Account",
+      "machine": "ModelProgram",
+      "states": 10,
+      "transitions": 78,
+      "accepting": 10
+    },
+    {
+      "project": "samples/Account",
+      "machine": "SlicedModelProgram",
+      "states": 11,
+      "transitions": 55,
+      "accepting": 1
+    },
+    {
+      "project": "samples/PubSub",
+      "machine": "TwoSubscribersSlice",
+      "states": 11,
+      "transitions": 13,
+      "accepting": 1
+    },
+    {
+      "project": "samples/PubSub",
+      "machine": "TwoSubscribersWithParametersSlice",
+      "states": 90,
+      "transitions": 137,
+      "accepting": 8
+    },
+    {
+      "project": "samples/atsvc",
+      "machine": "ModelProgramWithConfigParameters",
+      "states": 10,
+      "transitions": 42,
+      "accepting": 10
+    },
+    {
+      "project": "samples/atsvc",
+      "machine": "ModelProgramWithBoundParameters",
+      "states": 15,
+      "transitions": 68,
+      "accepting": 15
+    },
+    {
+      "project": "samples/atsvc",
+      "machine": "ModelProgramWithJobBound",
+      "states": 10,
+      "transitions": 42,
+      "accepting": 10
+    },
+    {
+      "project": "samples/atsvc",
+      "machine": "ModelProgramWithTwoJobsPattern",
+      "states": 35,
+      "transitions": 72,
+      "accepting": 10
+    },
+    {
+      "project": "samples/chat",
+      "machine": "BoundModelProgram",
+      "states": 1,
+      "transitions": 0,
+      "accepting": 1
+    },
+    {
+      "project": "samples/chat",
+      "machine": "LogOnOffListSlice",
+      "states": 35,
+      "transitions": 53,
+      "accepting": 15
+    },
+    {
+      "project": "samples/chat",
+      "machine": "BroadcastOrderedSlice",
+      "states": 15,
+      "transitions": 18,
+      "accepting": 1
+    },
+    {
+      "project": "samples/chat",
+      "machine": "BroadcastUnorderedSlice",
+      "states": 15,
+      "transitions": 18,
+      "accepting": 1
+    },
+    {
+      "project": "samples/chat",
+      "machine": "CombinedSlices",
+      "states": 57,
+      "transitions": 83,
+      "accepting": 17
+    },
+    {
+      "project": "samples/chat",
+      "machine": "ReqCoverage",
+      "states": 57,
+      "transitions": 83,
+      "accepting": 17
+    },
+    {
+      "project": "samples/chat",
+      "machine": "MinimumReqCoverage",
+      "states": 57,
+      "transitions": 83,
+      "accepting": 17
+    },
+    {
+      "project": "samples/Sailboat",
+      "machine": "ShootCompleter",
+      "states": 5,
+      "transitions": 5,
+      "accepting": 1
+    },
+    {
+      "project": "samples/Sailboat",
+      "machine": "Point",
+      "states": 12,
+      "transitions": 22,
+      "accepting": 1
+    },
+    {
+      "project": "samples/Sailboat",
+      "machine": "BoundedShoot",
+      "states": 9,
+      "transitions": 24,
+      "accepting": 3
+    },
+    {
+      "project": "samples/Sailboat",
+      "machine": "BoundedShoot1",
+      "states": 74,
+      "transitions": 117,
+      "accepting": 3
+    },
+    {
+      "project": "samples/Sailboat",
+      "machine": "BoundedShoot2",
+      "states": 74,
+      "transitions": 117,
+      "accepting": 3
+    },
+    {
+      "project": "samples/Sailboat",
+      "machine": "PointAndShoot",
+      "states": 19,
+      "transitions": 46,
+      "accepting": 3
+    },
+    {
+      "project": "samples/Sailboat",
+      "machine": "PointAndShoot2",
+      "states": 329,
+      "transitions": 1018,
+      "accepting": 3
+    },
+    {
+      "project": "samples/SMB2",
+      "machine": "AllSync",
+      "states": 15,
+      "transitions": 60,
+      "accepting": 5
+    },
+    {
+      "project": "samples/SMB2",
+      "machine": "AllSyncTwoFiles",
+      "states": 21,
+      "transitions": 98,
+      "accepting": 7
+    },
+    {
+      "project": "samples/SMB2",
+      "machine": "AllSyncRequirementReduction",
+      "states": 15,
+      "transitions": 60,
+      "accepting": 5
+    },
+    {
+      "project": "samples/SMB2",
+      "machine": "AsyncCreateClose",
+      "states": 24,
+      "transitions": 60,
+      "accepting": 5
+    },
+    {
+      "project": "samples/SMB2",
+      "machine": "CheckAllSyncForNoAsync",
+      "states": 55,
+      "transitions": 134,
+      "accepting": 0
+    },
+    {
+      "project": "samples/SMB2",
+      "machine": "CheckAsyncCreateCloseForNoAsync",
+      "states": 89,
+      "transitions": 120,
+      "accepting": 2
+    }
+  ]
+}
