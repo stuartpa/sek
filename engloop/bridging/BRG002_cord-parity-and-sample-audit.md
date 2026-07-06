@@ -4,8 +4,8 @@
 > content** to their originals (`Operators`, `Sailboat`, `atsvc`, `PubSub`, `chat`, `Account`,
 > `ParameterGeneration`, `SMB2` are 0-diff; `RequirementReport` has no Cord). The differences
 > below have been eliminated by implementing the engine features cleanly; the only remaining
-> deltas are *references* (usings/config/model type names) documented in
-> [porting-from-spec-explorer.md](porting-from-spec-explorer.md). Every machine — including the
+> deltas are *references* (usings/config/model type names) documented in the seed
+> [SEED001_spec-explorer-port.md](../seeds/SEED001_spec-explorer-port.md). Every machine — including the
 > SMB2 model-checks at the full `id∈1..8` range — explores correctly in seconds (see that guide
 > §4). The sections below are retained as the historical audit that drove the work.
 

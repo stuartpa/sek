@@ -1,9 +1,25 @@
-# Porting a Spec Explorer project to SEK
+# SEED001: Spec Explorer → SEK port
 
-_This guide accompanies the SEK sample ports. Every sample's Cord script uses **identical
-Cord‑language content** to the original Spec Explorer 2010 sample; only *references* differ, and
-only where a clean SEK implementation requires it. This document lists those reference deltas so
-the mapping from an original project to a SEK project is explicit and reproducible._
+- **Created:** 2026-07-05 (retroactively filed 2026-07-06)
+- **Author:** stuartpa
+- **Origin:** new build (SpecExplorerKit)
+- **Status:** CONSUMED (bridging code complete)
+- **Stage:** 0 · Seed → fed the bridging specify loop (Stage 1)
+
+> This is the gathering document (SEED) for building SEK: everything needed to port a
+> Spec Explorer 2010 project to a clean SEK implementation, collected in one place so the
+> bridging code could be built from a single source. The reference-delta mapping below is the
+> core gathered material; the bridging-stage records it produced are
+> [BRG001](../bridging/BRG001_cord-implementation-state.md) and
+> [BRG002](../bridging/BRG002_cord-parity-and-sample-audit.md). See
+> [../standards.md](../standards.md) for how EngLoopKit artifacts are numbered and located.
+
+## The ask
+
+Port the Spec Explorer 2010 samples to SEK such that every sample's Cord script uses **identical
+Cord‑language content** to the original; only *references* differ, and only where a clean SEK
+implementation requires it. The reference deltas below make the mapping from an original project
+to a SEK project explicit and reproducible.
 
 The engine changes that make the identical Cord work are all pure language features (no
 special‑casing): implicit instance‑method receivers, model `scope` resolution, `action all`,

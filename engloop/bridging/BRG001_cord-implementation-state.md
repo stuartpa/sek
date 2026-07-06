@@ -7,8 +7,9 @@ SpecExplorerKit (SEK): what is implemented to production quality, what deeper se
 simplified to the depth the samples exercise, and which niche constructs remain unimplemented.
 
 It is the authoritative "where are we" reference for the engine. For the historical port audit
-see [cord-parity-and-sample-audit.md](cord-parity-and-sample-audit.md); for reference deltas when
-porting from Spec Explorer see [porting-from-spec-explorer.md](porting-from-spec-explorer.md).
+see [BRG002_cord-parity-and-sample-audit.md](BRG002_cord-parity-and-sample-audit.md); for reference
+deltas when porting from Spec Explorer see the seed
+[SEED001_spec-explorer-port.md](../seeds/SEED001_spec-explorer-port.md).
 
 Legend: ✅ implemented (systems-engineering quality, unit-tested) · ❌ not implemented (no
 sample uses it).
