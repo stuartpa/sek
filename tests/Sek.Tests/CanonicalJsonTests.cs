@@ -50,4 +50,21 @@ public class CanonicalJsonTests
     {
         Assert.Equal("null", CanonicalJson.Canonicalize("null"));
     }
+
+    [Fact]
+    public void Canonicalize_ArrayWithNullElements_SortsStably()
+    {
+        // Exercises the null-element branch of the array element comparer.
+        Assert.Equal(
+            CanonicalJson.Canonicalize("[null,2,null,1]"),
+            CanonicalJson.Canonicalize("[1,null,null,2]"));
+    }
+
+    [Fact]
+    public void Canonicalize_NestedArraysAndObjects_WithNulls()
+    {
+        var a = CanonicalJson.Canonicalize("{\"k\":[null,{\"z\":1,\"a\":null}]}");
+        var b = CanonicalJson.Canonicalize("{\"k\":[{\"a\":null,\"z\":1},null]}");
+        Assert.Equal(a, b);
+    }
 }
