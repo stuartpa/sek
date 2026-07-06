@@ -66,7 +66,7 @@ sample uses it).
 
 ### 2.4 Constructs & reporting
 - `construct model program / accepting paths / bounded exploration / test cases`.
-- `construct point shoot / accept completion` — goal-directed steering (see §4.1).
+- `construct point shoot / accept completion` — goal-directed steering (see §2.7).
 - `construct requirement coverage` — tracks `Requirement.Capture(id)`; reports covered ids,
   `RequirementsToCover` hit/missing, and whether `MinimumRequirementCount` is met.
 - Test strategies: `shorttests` (many short witnesses) / `longtests` (few long covering tours).
@@ -81,9 +81,9 @@ sample uses it).
   observations (`ActionInvocation.Kind`) and emitted as `Observe` (vs `Step`) in generated tests.
 - Return-binding `Action(args) / var` — parsed and retained; return values captured onto the
   transition (`ActionInvocation.Result`) **and substituted into downstream consumers during
-  slicing** (see §2.4).
+  slicing** (see §2.7).
 
-### 2.4 Fully-composed constructs (previously simplified, now complete)
+### 2.7 Fully-composed constructs (previously simplified, now complete)
 - **point-shoot** — a genuine 3-phase composition: explore the Point target; from each launch
   state resume the `Shoot` machine (bounded by `PathDepth`) to the `with (. expr .)` goal; from
   each goal resume the `Completer` machine to an accepting state. Phases are stitched by
