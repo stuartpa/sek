@@ -1,11 +1,11 @@
 using System.Text;
-using Sek.Solver;
+using SpecExplorerKit.Components.Solving;
 
 namespace Sek.Cord;
 
 /// <summary>
 /// Minimal recursive-descent parser for the boolean/arithmetic expressions used inside
-/// <c>Condition.IsTrue(...)</c>. Produces a <see cref="Sek.Solver.Expr"/> tree and the
+/// <c>Condition.IsTrue(...)</c>. Produces a <see cref="SpecExplorerKit.Components.Solving.Expr"/> tree and the
 /// set of referenced identifiers. Best-effort: returns ok=false if it cannot parse.
 /// </summary>
 internal static class ExprParser

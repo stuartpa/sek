@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    SpecExplorerKit.Components.Solving — a reusable component (EngLoopKit component pattern).
+
+    Generic, domain-free "constraint spec -> satisfying assignments" engine plus combinatorial
+    test-design (pairwise / interaction / isolated / seeded / expand). Given typed parameters,
+    a set of constraints (In / predicate / compiled-C# predicate) and a combination strategy, it
+    enumerates concrete value combinations — via Z3 (the default) or a dependency-free enumerative
+    fallback — and compiles arbitrary embedded C# boolean predicates with Roslyn.
+
+    It knows nothing about SpecExplorerKit's model/exploration/Cord domain: the vertical maps its
+    own parameter/constraint concepts onto these generic types. Could be lifted, unchanged, into
+    any repo that needs constraint-driven value generation.
+
+    Component rule (ARC002): components carry no vertical/domain knowledge; dependencies point
+    vertical -> components, never the reverse.
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>SpecExplorerKit.Components.Solving</RootNamespace>
+    <AssemblyName>SpecExplorerKit.Components.Solving</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Z3" Version="4.12.2" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.8.0" />
+  </ItemGroup>
+
+</Project>

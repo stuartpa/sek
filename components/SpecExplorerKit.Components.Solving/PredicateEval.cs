@@ -1,4 +1,4 @@
-namespace Sek.Solver;
+namespace SpecExplorerKit.Components.Solving;
 
 /// <summary>Evaluates a predicate <see cref="Expr"/> against a concrete assignment (C# side).</summary>
 public static class PredicateEval

@@ -5,7 +5,7 @@ using Sek.Core.Model;
 using Sek.Core.Rendering;
 using Sek.Core.Seexpl;
 using Sek.Engine;
-using Sek.Solver;
+using SpecExplorerKit.Components.Solving;
 using System.Reflection;
 
 // SpecExplorerKit (sek) — CLI entry point.
@@ -64,7 +64,7 @@ int CmdVersion()
 
 int CmdZ3()
 {
-    Console.WriteLine(Sek.Solver.Z3Probe.SelfTest());
+    Console.WriteLine(SpecExplorerKit.Components.Solving.Z3Probe.SelfTest());
     return 0;
 }
 

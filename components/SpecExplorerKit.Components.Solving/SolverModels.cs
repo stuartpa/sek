@@ -1,4 +1,4 @@
-namespace Sek.Solver;
+namespace SpecExplorerKit.Components.Solving;
 
 /// <summary>The value kinds the solver understands.</summary>
 public enum ValueKind

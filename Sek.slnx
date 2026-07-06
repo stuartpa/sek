@@ -3,6 +3,7 @@
     <Project Path="components/SpecExplorerKit.Components.Graphs/SpecExplorerKit.Components.Graphs.csproj" />
     <Project Path="components/SpecExplorerKit.Components.Json/SpecExplorerKit.Components.Json.csproj" />
     <Project Path="components/SpecExplorerKit.Components.Random/SpecExplorerKit.Components.Random.csproj" />
+    <Project Path="components/SpecExplorerKit.Components.Solving/SpecExplorerKit.Components.Solving.csproj" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Sek.Cli/Sek.Cli.csproj" />
@@ -10,7 +11,6 @@
     <Project Path="src/Sek.Core/Sek.Core.csproj" />
     <Project Path="src/Sek.Engine/Sek.Engine.csproj" />
     <Project Path="src/Sek.Modeling/Sek.Modeling.csproj" />
-    <Project Path="src/Sek.Solver/Sek.Solver.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Sek.Tests/Sek.Tests.csproj" />

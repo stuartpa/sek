@@ -1,6 +1,6 @@
 using Microsoft.Z3;
 
-namespace Sek.Solver;
+namespace SpecExplorerKit.Components.Solving;
 
 /// <summary>
 /// Z3-backed parameter generator. Each parameter becomes an SMT constant (integers for

@@ -1,4 +1,4 @@
-using Sek.Solver;
+using SpecExplorerKit.Components.Solving;
 
 namespace Sek.Engine;
 

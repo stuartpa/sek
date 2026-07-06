@@ -1,6 +1,6 @@
 using System.Text;
 using Sek.Cord.Ast;
-using Sek.Solver;
+using SpecExplorerKit.Components.Solving;
 
 namespace Sek.Cord;
 
@@ -156,7 +156,7 @@ public static class CordConstraintExtractor
             }
             else if (s.StartsWith("Combination.Seeded", StringComparison.Ordinal))
             {
-                var conj = new List<Sek.Solver.Expr>();
+                var conj = new List<SpecExplorerKit.Components.Solving.Expr>();
                 var okAll = true;
                 foreach (var a in SplitArgs(ArgsInside(s)))
                 {

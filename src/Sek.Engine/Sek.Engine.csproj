@@ -18,7 +18,7 @@
     <ProjectReference Include="..\Sek.Core\Sek.Core.csproj" />
     <ProjectReference Include="..\Sek.Cord\Sek.Cord.csproj" />
     <ProjectReference Include="..\Sek.Modeling\Sek.Modeling.csproj" />
-    <ProjectReference Include="..\Sek.Solver\Sek.Solver.csproj" />
+    <ProjectReference Include="..\..\components\SpecExplorerKit.Components.Solving\SpecExplorerKit.Components.Solving.csproj" />
     <ProjectReference Include="..\..\components\SpecExplorerKit.Components.Json\SpecExplorerKit.Components.Json.csproj" />
   </ItemGroup>
 

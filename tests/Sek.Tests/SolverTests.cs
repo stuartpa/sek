@@ -1,12 +1,12 @@
 using System.Collections.Generic;
 using System.Linq;
-using Sek.Solver;
+using SpecExplorerKit.Components.Solving;
 using Xunit;
 
 namespace Sek.Tests;
 
 /// <summary>
-/// Coverage for <c>Sek.Solver</c>: the predicate evaluator, the dependency-free enumerative
+/// Coverage for <c>SpecExplorerKit.Components.Solving</c>: the predicate evaluator, the dependency-free enumerative
 /// solver, the combinatorial reducer, and the Roslyn predicate compiler. These were almost
 /// entirely uncovered (~1.4% line) before this suite (readiness-gate coverage drive).
 /// </summary>

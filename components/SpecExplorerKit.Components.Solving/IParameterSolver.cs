@@ -1,4 +1,4 @@
-namespace Sek.Solver;
+namespace SpecExplorerKit.Components.Solving;
 
 /// <summary>Generates concrete parameter-value combinations that satisfy constraints.</summary>
 public interface IParameterSolver

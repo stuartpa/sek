@@ -27,7 +27,7 @@
     <ProjectReference Include="..\..\src\Sek.Core\Sek.Core.csproj" />
     <ProjectReference Include="..\..\src\Sek.Engine\Sek.Engine.csproj" />
     <ProjectReference Include="..\..\src\Sek.Modeling\Sek.Modeling.csproj" />
-    <ProjectReference Include="..\..\src\Sek.Solver\Sek.Solver.csproj" />
+    <ProjectReference Include="..\..\components\SpecExplorerKit.Components.Solving\SpecExplorerKit.Components.Solving.csproj" />
   </ItemGroup>
 
 </Project>

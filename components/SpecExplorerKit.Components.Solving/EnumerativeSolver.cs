@@ -1,4 +1,4 @@
-namespace Sek.Solver;
+namespace SpecExplorerKit.Components.Solving;
 
 /// <summary>
 /// Dependency-free fallback solver: forms the cartesian product of each parameter's

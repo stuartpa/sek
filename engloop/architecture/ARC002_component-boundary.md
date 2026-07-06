@@ -24,11 +24,11 @@ vertical assemblies. The litmus test (*useful, unchanged, in an unrelated repo?*
 | Module (today) | Assembly | Classification | Why |
 |---|---|---|---|
 | `CanonicalJson` (JSON canonicalize + SHA-256 hash) | was `Sek.Engine` | **component** ✅ *extracted* | generic content hashing; no model/exploration concept |
-| `ProbabilityGate` (seeded reproducible Bernoulli gate) | `Sek.Solver` | **component** (candidate) | generic seeded RNG; no domain |
-| `Combinatorics` (pairwise / interaction / isolated / seeded / expand over columns) | `Sek.Solver` | **component** (candidate) | generic combinatorial test design |
+| `ProbabilityGate` (seeded reproducible Bernoulli gate) | `Sek.Solver` | **component** ✅ *extracted* (`Components.Random`) | generic seeded RNG; no domain |
+| `Combinatorics` (pairwise / interaction / isolated / seeded / expand over columns) | `Sek.Solver` | **component** ✅ *extracted* (in `Components.Solving`) | generic combinatorial test design |
 | `GraphAnalysis` (reachability prune / merge-by-key) | `Sek.Core/Analysis` | **component** (candidate, needs a generic graph seam) | generic directed-graph algorithms; currently coupled to `ExplorationGraph` |
 | NFA→DFA subset construction / product (the automaton core) | `Sek.Engine/BehaviorAutomaton` | **component** (candidate, hard) | generic finite-automata theory; entangled with scenario semantics |
-| Z3 glue (`Z3Solver` translation), Roslyn predicate host | `Sek.Solver` | **component** (candidate) | generic "constraint spec → satisfying assignments" |
+| Z3 glue (`Z3Solver` translation), Roslyn predicate host | `Sek.Solver` | **component** ✅ *extracted* (`Components.Solving`) | generic "constraint spec → satisfying assignments" |
 | Renderers (DOT / Mermaid / seexpl) | `Sek.Core/Rendering` | **component** (candidate) | generic graph rendering |
 | Cord lexer/parser, AST, semantics | `Sek.Cord` | **vertical** | *is* the Cord language |
 | `ModelProgram`, attributes, `Requirement`, exploration `Explorer`, `ModelIntrospector` | `Sek.Modeling`, `Sek.Engine` | **vertical** | *is* SpecExplorerKit's model + exploration domain |
@@ -72,12 +72,16 @@ vertical assemblies. The litmus test (*useful, unchanged, in an unrelated repo?*
   **domain adapter**: it projects `ExplorationGraph` transitions onto `(FromStateId, ToStateId)`
   edges and delegates the fixpoint/BFS to the component (this is the "generic graph seam" the ARC
   called for). 5 direct component tests; regression gate green.
-- **REF-candidate:** `Combinatorics` (the pairwise/expand/isolated/seeded reduction) is coupled to
-  `CombinationSpec` + `PredicateEval` (Cord domain types); only its pure pairwise-cover core is
-  generic. Extract that core to `SpecExplorerKit.Components.Combinatorics` when a second consumer
-  appears — not worth fragmenting the solver for a single caller today.
-- **REF-candidate:** renderers → `components/SpecExplorerKit.Components.GraphRendering`.
-- **REF-candidate:** Z3/Roslyn solver glue → `components/SpecExplorerKit.Components.Solving`.
+- **DONE:** the entire constraint-solving backend extracted → `components/SpecExplorerKit.Components.Solving`
+  (was the whole `src/Sek.Solver` project). It is a generic *constraint spec → satisfying
+  assignments* engine + combinatorial test design (`SolverParam`/`SolverConstraint`/`Expr`/
+  `CombinationSpec`, `PredicateEval`, `Combinatorics`, `EnumerativeSolver`, `Z3Solver`,
+  `RoslynPredicate`, `Z3Probe`) — no SEK domain concept, so it moved wholesale. `Sek.Cord` and
+  `Sek.Engine` reference it; 141 unit tests + 60-sample regression green after the move. This is a
+  large step of the "vertical → domain-only" convergence (PM002): the solver was generic code
+  living in the vertical.
+- **REF-candidate:** renderers → `components/SpecExplorerKit.Components.GraphRendering` (generic
+  graph rendering behind a small seam; the IR types stay vertical).
 - Do **not** extract all at once — each refactor cycle pulls a little more out (per the component
   pattern's "converge toward" rule).
 

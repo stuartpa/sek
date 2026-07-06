@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
 
-namespace Sek.Solver;
+namespace SpecExplorerKit.Components.Solving;
 
 /// <summary>
 /// Globals object handed to a compiled predicate script. Exposes the current parameter

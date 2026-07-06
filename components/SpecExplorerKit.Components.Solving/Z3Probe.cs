@@ -1,6 +1,6 @@
 using Microsoft.Z3;
 
-namespace Sek.Solver;
+namespace SpecExplorerKit.Components.Solving;
 
 /// <summary>Quick diagnostic that the native Z3 library loads and can solve.</summary>
 public static class Z3Probe
