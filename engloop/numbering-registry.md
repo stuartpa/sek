@@ -17,7 +17,7 @@ definitions. Artifact root is `engloop/` (see standards.md).
 | `COV` | Coverage reports | `COV001` | COV001 = Turnstile generated-test coverage |
 | `IN` | Incidents | `IN001` | IN001 = sek generate could not drive stateful SUTs (fixed) |
 | `PM` | Post-mortems | `PM000` | none yet |
-| `REF` | Refactor decisions | `REF000` | none yet |
+| `REF` | Refactor decisions | `REF002` | REF001 = extract generic components (Random, Graphs) per ARC002; REF002 = introduce Cord semantic-analysis phase per ARC001 |
 
 ## Local counters
 
