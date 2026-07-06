@@ -22,6 +22,13 @@ If an incident document path is not provided, **ask the user** which incidents t
 post-mortem covers. A post-mortem may cover a **set** of related incidents — that is the
 intended granularity.
 
+## Readiness precondition (PM001)
+
+> "Ready for incidents" / "ready to operate" is the **verdict of the Readiness Gate**
+> (`/speckit.engloopkit.coverage`, Step 3.5), never a narrated claim. A repair item that would
+> let any command or agent assert readiness *without* a PASSing whole-product gate re-introduces
+> the PM001 defect — do not design one.
+
 ## Artifact root
 
 Where a path below is written `docs/…`, read it as `<ARTIFACT_ROOT>/…` — the project's

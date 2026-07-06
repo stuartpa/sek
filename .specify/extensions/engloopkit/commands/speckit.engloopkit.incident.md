@@ -17,6 +17,14 @@ symptom.
 > Restore service first. Permanent fixes come later, through the post-mortem → repair →
 > specify loop. Do **not** commit a permanent fix during an incident.
 
+## Readiness precondition (PM001)
+
+> A project only *reaches* the operate stage after the **Readiness Gate** passes
+> (`/speckit.engloopkit.coverage` — every module modelled + explored + ≥95% line/branch +
+> conformant + green). "Ready for incidents" is the gate's verdict, **never** a narrated claim
+> from stage completion or a pilot. If you are tempted to say a project is ready without a PASSing
+> gate, that is the PM001 defect — the honest status is NOT READY.
+
 ## Artifact root
 
 Where a path below is written `docs/…`, read it as `<ARTIFACT_ROOT>/…` — the project's

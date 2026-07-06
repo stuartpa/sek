@@ -26,6 +26,14 @@ Stages 1 (bridge) and 3 (refactor to final) use core Spec Kit commands directly;
 have no engloopkit command of their own by design — see
 [the engineering loop](../../docs/engineering-loop.md).
 
+## The Readiness Gate (Stage 5 → Stage 6)
+
+`coverage` computes a **Readiness Gate**: the hard precondition for entering the operate stage.
+A project is **"ready for incidents" iff** every module (each `components/*` component **and** the
+vertical) is modelled (`MDL`), explored (`CRD`), covered **≥95% line & branch** (measured, not
+estimated), architecture-conformant, and green. **"Ready" is the gate's verdict — never a claim an
+agent narrates from stage completion or a pilot** (see the EngLoopKit post-mortem `PM001`).
+
 ## Install (dev)
 
 ```bash

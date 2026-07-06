@@ -1,5 +1,5 @@
 ---
-description: Stage 5 — Measure code coverage of the generated tests and close the SEK-to-coverage loop, driving line/branch coverage to 95%+ first, then functional coverage.
+description: Stage 5 — Measure WHOLE-PRODUCT code coverage, close the SEK-to-coverage loop to 95%+ line/branch then functional, and compute the Readiness Gate that is the hard precondition for Stage 6 (operate). "Ready for incidents" is the OUTPUT of this gate, never a narrated claim.
 ---
 
 ## User Input
@@ -28,13 +28,36 @@ project's `<ARTIFACT_ROOT>/numbering-registry.md`, not the bundle's copy.
 ## Loop definition
 
 - **Trigger:** generated tests exist (from one or more `CRDxxx`).
-- **Goal (ordered):** (1) **95%+ line/branch coverage**; then (2) **functional
-  coverage** — the behaviors that matter are exercised even where line coverage is
-  already satisfied. All tests green and within the time budget throughout.
-- **Actions:** run the test suite under coverage, diff against the goal, point
-  `explore` at the largest remaining gap.
-- **Verification:** coverage thresholds met; suite green and fast.
+- **Goal (ordered):** (1) **95%+ line/branch coverage across the WHOLE product** — every
+  module (each `components/*` and the vertical), not just whatever tests happen to exist; then
+  (2) **functional coverage** — the behaviors that matter are exercised even where line coverage
+  is already satisfied. All tests green and within the time budget throughout.
+- **Actions:** run the test suite under real coverage tooling, build the whole-product Readiness
+  Inventory, diff against the goal, point `explore` at the largest remaining gap.
+- **Verification:** the **Readiness Gate** (Step 3.5) returns **PASS** — every module modelled
+  (`MDL`), explored (`CRD`), covered ≥95% line & branch, architecture-conformant, gates green.
 - **Memory:** `docs/coverage/COVxxx_<slug>.md`.
+
+## The Readiness Gate (Definition of Ready-for-Incidents)
+
+> **"Ready for incidents" / "ready to operate" is the OUTPUT of this gate — never an input the
+> agent asserts.** A project may NOT enter Stage 6 (operate) until this gate returns **PASS**.
+> No command and no agent may state a project is ready on the basis of stage completion, a pilot,
+> or apparent doneness. If the gate has not been computed and PASSed, the honest status is
+> **NOT READY**, and that is the only statement allowed. (See PM001.)
+
+The gate **PASSES** iff, for **every** module of the product (each `components/*` component **and**
+the vertical), ALL of the following are true — proven by evidence, not opinion:
+
+1. **Modelled** — the module has an `MDL` (a SEK model of its behavior).
+2. **Explored** — the module has a `CRD` (a CORD exploration that generated or drove its tests).
+3. **Covered** — **measured** line coverage ≥95% **and** branch coverage ≥95% (from real
+   coverage tooling output, attached), or every shortfall line is listed with a rationale.
+4. **Architecture-conformant** — the module honors every applicable `ARC` / architecture-guard
+   check (no boundary violations, no leaked components).
+5. **Green** — the full unit-test suite and any exploration-regression gate pass.
+
+If **any** module fails **any** criterion, the gate is **FAIL** and the product is **NOT READY**.
 
 ## Step 0 — Assign the COV number
 
@@ -42,12 +65,26 @@ Read the `COV` "Last used" value in
 [`docs/numbering-registry.md`](../../docs/numbering-registry.md); new number = +1,
 zero-padded. **Increment the registry first.**
 
-## Step 1 — Measure (Observe)
+## Step 1 — Measure the WHOLE product (Observe)
 
-Run the test suite under coverage. Record:
-- line and branch coverage overall and per file,
-- total suite runtime (the "fast" constraint),
-- any tests that are slow outliers.
+Run the **entire** test suite under **real coverage tooling** (e.g. coverlet /
+`dotnet test --collect:"XPlat Code Coverage"`, `go test -cover`, `coverage.py`, etc. — whatever
+is idiomatic for the stack). Do **not** estimate. Record, **per module** (each `components/*` and
+the vertical) and overall:
+- line and branch coverage,
+- whether the module has an `MDL` and a `CRD`,
+- total suite runtime (the "fast" constraint) and any slow outliers.
+
+Build the **Readiness Inventory** — one row per module of the product:
+
+| Module | MDL? | CRD? | Line% | Branch% | Conformant? | PASS/FAIL |
+|---|---|---|---|---|---|---|
+| components/<Name> | | | | | | |
+| <vertical> | | | | | | |
+
+A module with **no tests at all** is `Line 0% / FAIL` — it does not get to be absent from the
+table. The product's module list comes from the repo (every `components/*` project and every
+vertical assembly), not from "which ones happen to have a model."
 
 ## Step 2 — Find the gap (Reason)
 
@@ -70,6 +107,16 @@ Do not chase 100% blindly — after 95%+ line/branch, prioritize functional cove
 behaviors that matter over the last few unreachable/trivial lines. Mark deliberately
 uncovered lines with a rationale in the COV doc.
 
+## Step 3.5 — Compute the Readiness Gate (Evaluate)
+
+Walk the Readiness Inventory. The gate is **PASS** only if **every** row satisfies all five gate
+criteria (Modelled, Explored, Covered ≥95% line & branch, Conformant, Green). Otherwise it is
+**FAIL**. Record the verdict and, if FAIL, the exact failing rows and why.
+
+**This verdict is the only source of a "ready" statement.** If FAIL, the product is NOT READY and
+the loop continues (hand the largest gap back to `explore`/`model`). Do not soften, round up, or
+narrate around a FAIL.
+
 ## Step 4 — Record the COV (Memory)
 
 Create `docs/coverage/COV<NNN>_<slug>.md` from
@@ -79,23 +126,39 @@ after), suite runtime, remaining gaps with rationale, and which `CRDxxx` to exte
 
 ## Step 5 — Report
 
-```
-COV<NNN>: line <x>% / branch <y>%   suite <time>
-Phase: <line-driving | functional | COMPLETE>
-Largest remaining gap: <file/behavior>  →  next: /speckit.engloopkit.explore
-```
+Always attach the **Readiness Inventory** table and the **gate verdict**. Use exactly one of the
+two templates below — the choice is dictated by the gate, not by judgement.
 
-If complete:
+**Gate FAIL (the common case while building out):**
 
 ```
-COV<NNN>: coverage goal met (line <x>%, functional behaviors covered), suite <time>.
-The product is implemented, governed, modeled, explored, and covered. Ready to operate.
+COV<NNN>: line <x>% / branch <y>% (whole product)   suite <time>
+Readiness Gate: FAIL — NOT READY FOR INCIDENTS
+Failing modules: <module: reason> (e.g. "vertical: no MDL/CRD, line 12%"; "components/Foo: branch 88%")
+Phase: <line-driving | functional>
+Next: /speckit.engloopkit.model or /speckit.engloopkit.explore on the largest gap.
 ```
+
+**Gate PASS (only when EVERY inventory row passes):**
+
+```
+COV<NNN>: line <x>% / branch <y>% (whole product, every module ≥95%)   suite <time>
+Readiness Gate: PASS
+Every module: modelled + explored + covered ≥95% line & branch + architecture-conformant + green.
+The product is implemented, governed, modelled, explored, and covered. READY FOR INCIDENTS.
+```
+
+> **Anti-narration rule (PM001):** you may emit the PASS template ONLY after Step 3.5 computed PASS
+> against a complete Readiness Inventory backed by real coverage-tool output. "Ready for incidents"
+> stated any other way — from stage completion, a pilot, or a feeling of doneness — is the exact
+> defect PM001 exists to prevent. When in doubt, the status is NOT READY.
 
 ## Done when
 
 - [ ] `COV` counter incremented
-- [ ] Coverage measured (line/branch + runtime)
-- [ ] Gaps identified and either closed (via explore) or justified
-- [ ] `docs/coverage/COV<NNN>_<slug>.md` created
-- [ ] Either handed back to explore, or Verification loop declared complete
+- [ ] WHOLE-PRODUCT coverage measured with real tooling (line/branch + runtime), per module
+- [ ] Readiness Inventory built (one row per `components/*` + the vertical; no module omitted)
+- [ ] Readiness Gate computed (Step 3.5): explicit PASS or FAIL with failing rows named
+- [ ] Gaps identified and either closed (via model/explore) or justified per line
+- [ ] `docs/coverage/COV<NNN>_<slug>.md` created with the inventory + verdict attached
+- [ ] A "ready for incidents" statement made ONLY if the gate PASSED; otherwise reported NOT READY

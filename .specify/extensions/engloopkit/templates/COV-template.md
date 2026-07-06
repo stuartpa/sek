@@ -3,8 +3,9 @@
 - **Created:** <date>
 - **Phase:** <line-driving | functional | COMPLETE>
 - **Status:** OPEN | COMPLETE
+- **Readiness Gate:** PASS | FAIL — NOT READY
 
-## Coverage
+## Coverage (whole product)
 
 | Metric | Before | After | Target |
 |---|---|---|---|
@@ -12,23 +13,36 @@
 | Branch | | | 95%+ |
 | Suite runtime | | | (fast) |
 
+## Readiness Inventory
+
+> One row per module of the product — every `components/*` component AND the vertical. A module
+> with no tests is `Line 0% / FAIL`; no module may be omitted. The gate PASSES only if every row
+> passes all five criteria.
+
+| Module | MDL? | CRD? | Line% | Branch% | Conformant? | PASS/FAIL |
+|---|---|---|---|---|---|---|
+| components/<Name> | | | | | | |
+| <vertical> | | | | | | |
+
 ## Remaining gaps
 
 | File / behavior | Line/branch | Missing behavior | Action |
 |---|---|---|---|
-| | | | extend CRD<NNN> / justify |
+| | | | extend CRD<NNN> / add MDL<NNN> / justify |
 
 ## Deliberately uncovered (with rationale)
 
 - <file:line> — <why it is acceptable to leave uncovered>
 
-## Decision
+## Readiness Gate verdict
 
-- [ ] Goal not met → hand back to `/speckit.engloopkit.explore` on the largest gap.
-- [ ] Phase 1 met (95%+ line/branch) → move to functional coverage.
-- [ ] Goal met → Verification loop COMPLETE; product ready to operate.
+- [ ] **PASS** — every inventory row passes; product is READY FOR INCIDENTS.
+- [ ] **FAIL** — NOT READY. Failing rows: <module: reason>. Next: `/speckit.engloopkit.model` or
+  `/speckit.engloopkit.explore` on the largest gap.
+
+> "Ready for incidents" may be stated ONLY when this verdict is PASS (PM001 anti-narration rule).
 
 ## Related
 
 - Explorations: CRD<NNN>, …
-- Model: MDL<NNN>
+- Models: MDL<NNN>, …
