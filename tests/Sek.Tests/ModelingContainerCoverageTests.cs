@@ -77,10 +77,12 @@ public class ModelingContainerCoverageTests
         var s = new Set<string?>("a", null);
         _ = s.GetHashCode();
         Assert.True(s.Contains(null));
+        _ = s.ToString();          // enumerates → OrderBy(x?.ToString()) null-element branch
 
         var q = new Sequence<string?>("a", null);
         _ = q.GetHashCode();
         Assert.True(q.Contains(null));
+        _ = q.ToString();
 
         // Map with a null value → equality's value comparison handles null.
         var m1 = new Map<string, string?>().Add("k", null);
