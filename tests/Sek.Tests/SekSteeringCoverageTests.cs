@@ -43,6 +43,17 @@ public class SekSteeringCoverageTests
         public bool Done() => Step >= 1;
     }
 
+    public sealed class GoalM : ModelProgram
+    {
+        public bool AtGoal { get; set; }
+
+        [Rule("GoalM.Go")]
+        public void Go() { AtGoal = true; }
+
+        [AcceptingCondition]
+        public bool Done() => true;
+    }
+
     private static ExplorationResult RunRequirementCoverage(Type modelType, string modelName, IDictionary<string, string>? extraParams = null)
     {
         var intro = new ModelIntrospector(modelType);
@@ -104,5 +115,23 @@ public class SekSteeringCoverageTests
         // No Requirement.Capture calls → falls back to reporting the covered action set.
         Assert.True(r.Graph.Metadata.ContainsKey("requirements"));
         Assert.True(r.Graph.Metadata.ContainsKey("requirementCount"));
+    }
+
+    [Fact]
+    public void PointShoot_Degenerate_SteersToGoal()
+    {
+        // A point-shoot construct with a `with (. AtGoal .)` goal predicate but no Shoot/Completer
+        // machines → the degenerate branch prunes the point graph to goal-reaching states.
+        var intro = new ModelIntrospector(typeof(GoalM));
+        var cord = CordDocument.ParseText(
+            "config C { action all GoalM; }\nmachine M() : C { construct model program from C }\n");
+        var cb = new ConstructBehavior { Kind = ConstructKind.PointShoot, Reference = "C" };
+        cb.Params["with"] = "AtGoal";
+
+        var options = new ExplorationOptions { MaxStates = 16, MaxTransitions = 16, MaxDepth = 8 };
+        var binds = new Dictionary<string, List<List<string>>>(StringComparer.Ordinal);
+        var r = SekCli.InterpretConstruct(intro, cord, "M", cb, options, "enum", binds);
+
+        Assert.True(r.Graph.Metadata.ContainsKey("goalCount"));
     }
 }
