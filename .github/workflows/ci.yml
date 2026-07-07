@@ -26,6 +26,10 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
+      - name: Fetch Linux Z3 native (Microsoft.Z3 ships no linux-x64 libz3)
+        shell: pwsh
+        run: pwsh scripts/fetch-z3-linux.ps1
+
       - name: Build CLI
         run: dotnet build src/Sek.Cli/Sek.Cli.csproj -c Debug
 
