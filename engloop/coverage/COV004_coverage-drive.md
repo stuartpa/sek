@@ -5,6 +5,18 @@
 - **Status:** OPEN
 - **Readiness Gate:** **FAIL — NOT READY** (large progress; two criteria still unmet — see below)
 
+## Update (self-model landed + real bug found & fixed)
+
+- **SEK now self-models SEK (MDL002/CRD002):** `samples/SelfHost/` models SEK's own CLI workflow
+  (validate/explore/view with the real `view`-needs-`explore` guard); the SUT drives the **real**
+  `sek` CLI. SEK explored it (2/5/2), generated conformance tests, and they **pass** — the recursion
+  is proven end-to-end for the `Sek.Cli` vertical. CI-protected ("SEK self-validation loop").
+- **The self-model found a real SEK bug (IN002):** `sek test`'s conformance replayed each transition
+  on a **fresh** SUT instance, spuriously failing guarded actions. Fixed to replay witness paths with
+  one instance per path. `sek test` now passes for SelfHost (5/5) and Turnstile (3/3). This is the
+  intended "SEK validates SEK finds real bugs" outcome.
+- 331 tests; 61-sample regression green.
+
 ## Coverage (whole product, measured with coverlet)
 
 | Metric | Session start | Now | Target |
