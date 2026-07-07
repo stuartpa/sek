@@ -1,0 +1,25 @@
+using SelfHost.Sut;
+
+/// SEK modelling SEK: the tool's own CLI workflow (validate / explore / view), where `view`
+/// requires a graph produced by a prior `explore`.
+config Actions
+{
+    action all SekSession;
+
+    switch StateBound = 16;
+    switch StepBound = 16;
+    switch PathDepthBound = 8;
+    switch TestEnabled = false;
+}
+
+/// The full reachable workflow behaviour.
+machine ModelProgram() : Actions
+{
+    construct model program from Actions
+}
+
+/// Generate replayable conformance tests that drive the real sek CLI through the workflow.
+machine TestSuite() : Actions where TestEnabled = true
+{
+    construct test cases for ModelProgram
+}

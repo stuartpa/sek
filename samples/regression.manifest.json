@@ -420,6 +420,13 @@
       "states": 2,
       "transitions": 3,
       "accepting": 1
+    },
+    {
+      "project": "samples/SelfHost",
+      "machine": "ModelProgram",
+      "states": 2,
+      "transitions": 5,
+      "accepting": 2
     }
   ]
 }

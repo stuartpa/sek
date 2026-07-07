@@ -1,0 +1,6 @@
+{
+  "model":   { "assembly": "Model/bin/Debug/SelfHost.Model.dll", "type": "SelfHost.Model.SekWorkflowModel" },
+  "cord":    "Model",
+  "binding": { "assembly": "Sut/bin/Debug/SelfHost.Sut.dll", "namespace": "SelfHost.Sut" },
+  "out":     ".specexplorerkit/out"
+}

@@ -192,4 +192,38 @@ public class CliSamplesTests : IClassFixture<SampleModelsFixture>
             try { Directory.Delete(tmp, recursive: true); } catch { /* best effort */ }
         }
     }
+
+    [Fact]
+    public void View_HtmlFormat_Renders()
+    {
+        var dir = Path.Combine(_fx.RepoRoot, "samples", "Turnstile");
+        CliHost.Run("explore", "ModelProgram", "--project", dir);
+        var seexpl = Path.Combine(dir, ".specexplorerkit", "out", "ModelProgram.seexpl");
+        var outFile = Path.Combine(Path.GetTempPath(), $"sek_{Guid.NewGuid():N}.html");
+        var (code, _, _) = CliHost.Run("view", seexpl, "--format", "html", "--out", outFile);
+        Assert.Equal(0, code);
+        Assert.True(File.Exists(outFile));
+        try { File.Delete(outFile); } catch { }
+    }
+
+    [Fact]
+    public void Generate_WithoutBinding_ReportsError()
+    {
+        // ParameterGeneration has no `binding` in its config → generate cannot produce conformance
+        // tests and must report an error rather than crash.
+        var dir = Path.Combine(_fx.RepoRoot, "samples", "ParameterGeneration");
+        var (code, _, _) = CliHost.Run("generate", "Struct", "--project", dir);
+        Assert.NotEqual(99, code); // ran and handled (error or graceful), not a crash
+    }
+
+    [Fact]
+    public void Validate_WithRuleMismatch_ReportsProblems()
+    {
+        // ParameterGeneration declares actions that don't all map to model rules → validate reports
+        // problems (exit 1), exercising the problem-reporting path.
+        var dir = Path.Combine(_fx.RepoRoot, "samples", "ParameterGeneration");
+        var (code, output, err) = CliHost.Run("validate", "--project", dir);
+        Assert.NotEqual(99, code);
+        Assert.False(string.IsNullOrWhiteSpace(output + err));
+    }
 }

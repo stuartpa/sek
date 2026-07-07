@@ -53,3 +53,15 @@ jobs:
           dotnet build samples/Turnstile/Model/Turnstile.Model.csproj -c Debug
           dotnet "$SEK" generate ModelProgram --project samples/Turnstile
           dotnet test samples/Turnstile/.specexplorerkit/out/ModelProgramTests --nologo
+
+      - name: SEK self-validation loop (SelfHost — SEK models + tests its own CLI workflow)
+        shell: bash
+        run: |
+          set -e
+          SEK=src/Sek.Cli/bin/Debug/sek.dll
+          # The SelfHost SUT drives the real sek CLI against the Turnstile sample.
+          dotnet build samples/Turnstile/Model/Turnstile.Model.csproj -c Debug
+          dotnet build samples/SelfHost/Sut/SelfHost.Sut.csproj -c Debug
+          dotnet build samples/SelfHost/Model/SelfHost.Model.csproj -c Debug
+          dotnet "$SEK" generate ModelProgram --project samples/SelfHost
+          dotnet test samples/SelfHost/.specexplorerkit/out/ModelProgramTests --nologo

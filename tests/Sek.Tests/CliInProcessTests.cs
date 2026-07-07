@@ -48,4 +48,31 @@ public class CliInProcessTests
         Assert.Equal(0, code);
         Assert.Contains("Z3", output);
     }
+
+    [Theory]
+    [InlineData("explore")]
+    [InlineData("view")]
+    [InlineData("test")]
+    [InlineData("generate")]
+    public void PerCommand_Help_PrintsUsage(string command)
+    {
+        var (code, output, _) = Run(command, "-h");
+        Assert.Equal(0, code);
+        Assert.False(string.IsNullOrWhiteSpace(output));
+    }
+
+    [Fact]
+    public void Explore_NoArgs_PrintsUsageOrError()
+    {
+        var (code, output, err) = Run("explore");
+        // no machine given → usage (0) or error (non-zero); either exercises the arg-check branch
+        Assert.False(string.IsNullOrWhiteSpace(output + err));
+    }
+
+    [Fact]
+    public void View_NoArgs_IsHandled()
+    {
+        var (_, output, err) = Run("view");
+        Assert.False(string.IsNullOrWhiteSpace(output + err));
+    }
 }
