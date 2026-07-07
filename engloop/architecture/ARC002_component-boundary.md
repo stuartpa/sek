@@ -80,10 +80,34 @@ vertical assemblies. The litmus test (*useful, unchanged, in an unrelated repo?*
   `Sek.Engine` reference it; 141 unit tests + 60-sample regression green after the move. This is a
   large step of the "vertical → domain-only" convergence (PM002): the solver was generic code
   living in the vertical.
-- **REF-candidate:** renderers → `components/SpecExplorerKit.Components.GraphRendering` (generic
-  graph rendering behind a small seam; the IR types stay vertical).
+- **REF-candidate (RESOLVED — kept vertical):** renderers (`DotRenderer`/`MermaidRenderer`/
+  `HtmlRenderer`). Re-scan verdict below.
 - Do **not** extract all at once — each refactor cycle pulls a little more out (per the component
   pattern's "converge toward" rule).
+
+## Final re-scan (2026-07-07) — no residual generic code remains
+
+A full re-scan of `src/**` (litmus test: *useful, unchanged, in an unrelated repo, carrying no
+SpecExplorerKit domain knowledge?*) was performed. Every generic primitive is already extracted;
+the residual candidates each **fail** the litmus test and are correctly vertical:
+
+- **Renderers** (`DotRenderer`, `MermaidRenderer`, `HtmlRenderer`): they render the **domain IR**
+  (`ExplorationGraph`/`ModelState`/`Transition`) using **domain conventions** — accepting state →
+  `doublecircle`/`--> [*]`, the initial `__start` seam, edge labels = `Action.Display`. They are not
+  usable *unchanged* elsewhere (they name the domain types directly). Introducing a generic
+  graph-render seam for three 40–53-line renderers whose entire value is the domain-specific output
+  would be over-engineering with no reuse payoff. **Kept vertical.**
+- **`GraphAnalysis`**: already the domain adapter over `Components.Graphs.Reachability` (projects
+  `ExplorationGraph` → abstract edges, delegates the fixpoint). The generic part is extracted; the
+  remainder is domain graph-steering (accepting / point-shoot / goal). **Kept vertical.**
+- **`BehaviorAutomaton` (NFA→DFA)**: entangled with scenario semantics (accepting conditions, action
+  guards, action-kind matching); not usable unchanged as pure automata theory. **Kept vertical.**
+- Confirmed by search: **no** stand-alone generic helpers (sort/hash/combinatorics/permutation/
+  shuffle/topological/edit-distance) remain under `src/**` — all such primitives live in
+  `components/`. Dependency direction verified one-way (no `components/** → src/**` ProjectReference).
+
+**Verdict: ARC002 component boundary is satisfied.** No further extraction is warranted; new generic
+code must still go to `components/`.
 
 ## Related
 

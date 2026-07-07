@@ -1,13 +1,14 @@
 using SelfHost.Sut;
 
-/// SEK modelling SEK: the tool's own CLI workflow (validate / explore / view), where `view`
-/// requires a graph produced by a prior `explore`.
+/// SEK modelling SEK: the tool's own CLI surface (init / validate / explore / view / generate /
+/// test) plus its error behaviour (view-missing, explore-unknown), where `view` requires a graph
+/// produced by a prior `explore`.
 config Actions
 {
     action all SekSession;
 
     switch StateBound = 16;
-    switch StepBound = 16;
+    switch StepBound = 32;
     switch PathDepthBound = 8;
     switch TestEnabled = false;
 }

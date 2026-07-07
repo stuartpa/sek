@@ -8,20 +8,24 @@
 ## Exploration
 
 `construct model program from Actions` over `action all SekSession` →
-**2 states / 5 transitions / 2 accepting** (bounds StateBound=16, StepBound=16, PathDepthBound=8).
-The state space is the `Explored` toggle: from the initial state `Validate`/`Explore` are enabled;
-once `Explored`, `View` is additionally enabled — matching the modelled guard.
+**2 states / 15 transitions / 1 accepting** (bounds StateBound=16, StepBound=32, PathDepthBound=8).
+The state space is the `Explored` toggle. From the initial state the always-runnable commands
+(`Init`/`Validate`/`Explore`/`Generate`/`Test`) and both error transitions
+(`ViewMissing`/`ExploreUnknown`) are enabled; once `Explored`, `View` is additionally enabled —
+matching the modelled guard. The single accepting state is the explored state.
 
 ## Conformance generation
 
-`construct test cases for ModelProgram` (Long strategy) → **2 test paths covering 5/5 transitions**,
-emitted as an xUnit project bound to the `SelfHost.Sut.SekSession` SUT.
+`construct test cases for ModelProgram` (Long strategy) → **2 test paths covering 15/15 transitions**,
+emitted as an xUnit project bound to the `SelfHost.Sut.SekSession` SUT. `sek test` replays the same
+graph directly for **16/16** transitions across **8** actions (TEST PASSED).
 
 ## Conformance result
 
-`dotnet test` on the generated project → **PASS (2/2)**. Each path instantiated `SekSession` and
-replayed the modelled action sequence, which drove the **real `sek` CLI** (validate/explore/view)
-against the Turnstile sample. The `View`-after-`Explore` ordering held against the actual tool.
+`dotnet test` on the generated project (in-repo) → **PASS (2/2)**. Each path instantiated `SekSession`
+and replayed the modelled action sequence, which drove the **real `sek` CLI** — the full command
+surface (init/validate/explore/view/generate/test) plus both error paths — against the Turnstile
+sample. The `View`-after-`Explore` ordering held against the actual tool.
 
 ## Coverage contribution
 
@@ -31,5 +35,5 @@ CLI integration tests — see COV004.)
 
 ## Related
 
-- MDL002; COV004; regression manifest entry `samples/SelfHost / ModelProgram = 2/5/2`
+- MDL002; COV004; regression manifest entry `samples/SelfHost / ModelProgram = 2/15/1`
 - CI: "SEK self-validation loop" step

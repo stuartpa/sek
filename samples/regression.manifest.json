@@ -425,8 +425,8 @@
       "project": "samples/SelfHost",
       "machine": "ModelProgram",
       "states": 2,
-      "transitions": 5,
-      "accepting": 2
+      "transitions": 15,
+      "accepting": 1
     }
   ]
 }
