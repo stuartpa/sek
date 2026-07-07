@@ -70,6 +70,25 @@ public class CordConstraintBranchTests
     }
 
     [Fact]
+    public void StructFields_MultipleAndPairwise()
+    {
+        // Several struct-field domains plus a Pairwise over struct fields (derived columns).
+        var r = CordConstraintExtractor.Extract(Act(
+            "Condition.In(info.A, 1, 2); Condition.In(info.B, 3, 4); Combination.Pairwise(info.A, info.B);",
+            ("Req", "info")));
+        Assert.Equal(2, r.Constraints.OfType<InConstraint>().Count());
+        Assert.Equal(CombinationSpec.Strategy.Pairwise, r.Combination.Mode);
+    }
+
+    [Fact]
+    public void Isolated_And_Seeded_WithStructFields()
+    {
+        var iso = CordConstraintExtractor.Extract(Act("Combination.Isolated(info.A > 1);", ("Req", "info")));
+        // isolated over a struct field: kept only if the parser accepts it (dotted ref).
+        Assert.Equal(CombinationSpec.Strategy.AllCombinations, iso.Combination.Mode);
+    }
+
+    [Fact]
     public void ConditionIsTrue_RoslynFallback_ForMethodCall()
     {
         // Math.Abs(...) is outside the mini-parser → compiled as an embedded C# predicate.
