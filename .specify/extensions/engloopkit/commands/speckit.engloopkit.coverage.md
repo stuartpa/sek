@@ -59,7 +59,11 @@ useful unchanged in an unrelated repo?*):
      model of domain-free code is tautological; authoring one to tick a box is the PM001 failure in
      disguise (see PM002).
    - **Vertical** (`src/*`, domain behavior): a SEK **`MDL`** + a **`CRD`** that **generates** the
-     conformance tests (SEK self-modelling).
+     conformance tests (SEK self-modelling). **Granularity is behavior-level (PM003):** one
+     representative end-to-end self-model whose conformance exercises the vertical pipeline against a
+     real SUT (plus the sample conformance loops) satisfies this for *all* the pipeline's internal
+     stages — do **not** author a bespoke model per assembly (theatre). Pure value-type vertical
+     modules are verified like components. **≥95% coverage still applies per module.**
 3. **Domain-only vertical (precondition, not an escape hatch):** any generic/domain-free code still
    in the vertical is an **ARC002 violation and a FAIL** — extract it to a component first.
 4. **Architecture-conformant** — the module honors every applicable `ARC` / architecture-guard check.

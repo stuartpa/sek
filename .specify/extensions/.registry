@@ -22,14 +22,14 @@
       "installed_at": "2026-07-06T16:52:45.540243+00:00"
     },
     "engloopkit": {
-      "version": "1.4.0",
+      "version": "1.5.0",
       "source": "local",
-      "manifest_hash": "sha256:0c926bf8d4a311164fe1481ec45dc0399851dd08f78915ad0a35ae739f5c0f94",
+      "manifest_hash": "sha256:aff878fcbd570689b0132ea22d479775dd09c9397b758d7ac26236998739d596",
       "enabled": true,
       "priority": 10,
       "registered_commands": {},
       "registered_skills": [],
-      "installed_at": "2026-07-06T21:25:04.645461+00:00"
+      "installed_at": "2026-07-07T07:18:57.335796+00:00"
     }
   }
 }

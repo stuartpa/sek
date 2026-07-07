@@ -244,4 +244,65 @@ public class CliSamplesTests : IClassFixture<SampleModelsFixture>
         var (code, _, err) = CliHost.Run("generate", "ModelProgram", "--project", dir, "--namespace", "Custom.Ns", "--max", "5");
         Assert.True(code == 0, $"generate with options failed: {err}");
     }
+
+    // ---- CLI option / format / error branch coverage ------------------------------------
+
+    [Fact]
+    public void Explore_WithOutOption_WritesToNamedFile()
+    {
+        var dir = Path.Combine(_fx.RepoRoot, "samples", "Turnstile");
+        var outFile = Path.Combine(Path.GetTempPath(), $"sek_{Guid.NewGuid():N}.seexpl");
+        var (code, _, err) = CliHost.Run("explore", "ModelProgram", "--project", dir, "--out", outFile);
+        Assert.True(code == 0, err);
+        Assert.True(File.Exists(outFile));
+        try { File.Delete(outFile); } catch { }
+    }
+
+    [Fact]
+    public void Explore_WithEnumerativeSolver()
+    {
+        var dir = Path.Combine(_fx.RepoRoot, "samples", "ParameterGeneration");
+        var (code, _, err) = CliHost.Run("explore", "Struct", "--project", dir, "--solver", "enumerative");
+        Assert.True(code == 0, err);
+    }
+
+    [Fact]
+    public void View_UnknownFormat_IsHandled()
+    {
+        var dir = Path.Combine(_fx.RepoRoot, "samples", "Turnstile");
+        CliHost.Run("explore", "ModelProgram", "--project", dir);
+        var seexpl = Path.Combine(dir, ".specexplorerkit", "out", "ModelProgram.seexpl");
+        var (code, output, err) = CliHost.Run("view", seexpl, "--format", "bogusformat");
+        // unknown format → handled (error or fallback), not a crash
+        Assert.NotEqual(99, code);
+        Assert.False(string.IsNullOrWhiteSpace(output + err));
+    }
+
+    [Theory]
+    [InlineData("shorttests")]
+    [InlineData("longtests")]
+    public void Generate_WithStrategyOption(string strategy)
+    {
+        var dir = Path.Combine(_fx.RepoRoot, "samples", "Turnstile");
+        var outDir = Path.Combine(Path.GetTempPath(), $"sek_gen_{Guid.NewGuid():N}");
+        var (code, _, err) = CliHost.Run("generate", "ModelProgram", "--project", dir, "--strategy", strategy, "--out", outDir);
+        Assert.True(code == 0, $"generate --strategy {strategy} failed: {err}");
+        try { Directory.Delete(outDir, recursive: true); } catch { }
+    }
+
+    [Fact]
+    public void Explore_Sailboat_PointAndShoot_SteeringConstruct()
+    {
+        var dir = Path.Combine(_fx.RepoRoot, "samples", "Sailboat");
+        var (code, _, err) = CliHost.Run("explore", "PointAndShoot", "--project", dir);
+        Assert.True(code == 0, err);
+    }
+
+    [Fact]
+    public void Explore_Chat_RequirementCoverage()
+    {
+        var dir = Path.Combine(_fx.RepoRoot, "samples", "chat");
+        var (code, _, err) = CliHost.Run("explore", "ReqCoverage", "--project", dir);
+        Assert.True(code == 0, err);
+    }
 }

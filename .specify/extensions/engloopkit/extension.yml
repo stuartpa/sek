@@ -3,7 +3,7 @@ schema_version: "1.0"
 extension:
   id: "engloopkit"
   name: "EngLoopKit"
-  version: "1.4.0"
+  version: "1.5.0"
   description: "Loop-engineering stage commands: seed, architect, model, explore, coverage, incident, postmortem, repair, refactor-scan."
   author: "stuartpa"
   repository: "https://github.com/stuartpa/engloopkit"
