@@ -115,6 +115,35 @@ public class CordConstraintBranchTests
     }
 
     [Fact]
+    public void ExprParser_LiteralForms_ViaConditionIsTrue()
+    {
+        // Hex literal → ParseIntLiteral hex path.
+        Assert.NotEmpty(CordConstraintExtractor.Extract(Act("Condition.IsTrue(a == 0xFF);", ("int", "a")))
+            .Constraints.OfType<PredicateConstraint>());
+        // Negative literal after an operator → the negative-number lexer branch.
+        Assert.NotEmpty(CordConstraintExtractor.Extract(Act("Condition.IsTrue(a > -5);", ("int", "a")))
+            .Constraints.OfType<PredicateConstraint>());
+        // Parenthesised sub-expression.
+        Assert.NotEmpty(CordConstraintExtractor.Extract(Act("Condition.IsTrue((a > 1) && a < 9);", ("int", "a")))
+            .Constraints.OfType<PredicateConstraint>());
+        // String literal comparison.
+        Assert.NotEmpty(CordConstraintExtractor.Extract(Act("Condition.IsTrue(s == \"x\");", ("string", "s")))
+            .Constraints.OfType<PredicateConstraint>());
+        // Boolean literal.
+        Assert.NotEmpty(CordConstraintExtractor.Extract(Act("Condition.IsTrue(b == true);", ("bool", "b")))
+            .Constraints.OfType<PredicateConstraint>());
+    }
+
+    [Fact]
+    public void ExprParser_BadChar_FallsThrough()
+    {
+        // '@' is not a valid operator → the mini-parser throws → not kept as a mini-parsed predicate
+        // (and Roslyn also rejects it), so no PredicateConstraint is produced.
+        var r = CordConstraintExtractor.Extract(Act("Condition.IsTrue(a @ 2);", ("int", "a")));
+        Assert.Empty(r.Constraints.OfType<PredicateConstraint>());
+    }
+
+    [Fact]
     public void Comments_AreStripped()
     {
         var r = CordConstraintExtractor.Extract(Act(

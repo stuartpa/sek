@@ -1,0 +1,14 @@
+
+[7mPassed! [0m[7m [0m[7m[0m- [0m[7m[0mFailed: [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m[0m0, [0m[7m[0mPassed: [0m[7m [0m[7m [0m[7m[0m519, [0m[7m[0mSkipped: [0m[7m [0m[7m [0m[7m [0m[7m [0m[7m[0m0, [0m[7m[0mTotal: [0m[7m [0m[7m [0m[7m[0m519, [0m
+[7m[0mDuration: [0m[7m[0m4 [0m[7m[0mm [0m[7m[0m21 [0m[7m[0ms [0m[7m[0m- [0m[7m[0mSek.Tests.dll [0m[7m[0m(net8.0)[0m
+OVERALL L=96.7% B=89.8%
+sek                                      L= 96.3% B= 89.5%
+Sek.Cord                                 L= 96.2% B= 88.7%
+Sek.Core                                 L=100.0% B= 97.5%
+Sek.Engine                               L= 96.0% B= 88.8%
+Sek.Modeling                             L= 98.4% B= 95.3%
+SpecExplorerKit.Components.Graphs        L=100.0% B=100.0%
+SpecExplorerKit.Components.Json          L=100.0% B=100.0%
+SpecExplorerKit.Components.Random        L=100.0% B=100.0%
+SpecExplorerKit.Components.Solving       L= 98.6% B= 91.6%
+
