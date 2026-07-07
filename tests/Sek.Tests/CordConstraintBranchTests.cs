@@ -33,6 +33,23 @@ public class CordConstraintBranchTests
         Assert.Equal(4, inC.Values.Count); // {1,2} ∪ {3,4}
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(7)]
+    [InlineData(11)]
+    public void ProbabilisticIfElse_SeededOrdering(int seed)
+    {
+        // Varying the seed flips the gate, exercising both branch-ordering arms of MergeInConstraints
+        // (gate-preferred `then` first vs `else` first). The union is the same set regardless.
+        var da = Act("if (Probability.IsTrue(0.5)) Condition.In(a, 1, 2); else Condition.In(a, 3, 4);", ("int", "a"));
+        var r = CordConstraintExtractor.Extract(da, seed);
+        var inC = Assert.Single(r.Constraints.OfType<InConstraint>());
+        Assert.Equal(4, inC.Values.Count);
+    }
+
     [Fact]
     public void ProbabilisticIf_NoSpace_And_NonNumericProbability()
     {
