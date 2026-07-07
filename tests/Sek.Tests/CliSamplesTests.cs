@@ -26,8 +26,13 @@ public sealed class SampleModelsFixture
             Build(csproj);
         }
 
-        var sut = Path.Combine(samples, "Turnstile", "Sut", "Turnstile.Sut.csproj");
-        if (File.Exists(sut)) Build(sut);
+        // Build every sample SUT/adapter (e.g. Turnstile.Sut, SelfHost.Sut) so conformance/test
+        // runs can load their binding assemblies — the unit-test step runs before the CI
+        // "Build sample models" step, so the fixture must produce these itself.
+        foreach (var sut in Directory.EnumerateFiles(samples, "*.Sut.csproj", SearchOption.AllDirectories))
+        {
+            Build(sut);
+        }
     }
 
     private static void Build(string csproj)
