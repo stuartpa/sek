@@ -5,6 +5,27 @@
 - **Status:** OPEN
 - **Readiness Gate:** **FAIL — NOT READY** (large progress; two criteria still unmet — see below)
 
+## Final state (this drive)
+
+Measured with coverlet; 387 tests; 61-sample exploration regression green. **Overall: 93.3% line /
+83.7% branch** (from 32.2% / 24.0% at session start).
+
+- **Line ≥95%: 7 / 9 modules** — all components + Core (98.8), Engine (95.5), Modeling (95.3).
+  Cord (93.2) and sek (87.3) remain just below.
+- **Branch ≥95%: 3 / 9 modules** (the components; Solving 91.4, Modeling 92.2 near). The vertical is
+  75–92% branch — the honest remaining gap.
+- **The CLI (`sek`, 75% branch) is the dominant blocker:** its branch gap is the deep
+  `Interpret`/construct/slice/point-shoot branches + per-command error paths in the 1249-line
+  top-level `Program.cs`. The clean fix is a **REF: extract the command bodies out of `Program.cs`
+  into a testable `Sek.Cli` library type** (ARC001 wants this too). Until then `sek` can't reasonably
+  reach ≥95% branch, and treating 25% of a module as "documented shortfall" would violate PM001/PM002.
+
+### Item 2 (self-model granularity) — DONE
+
+Resolved via EngLoopKit **PM003 / v1.5.0** (behavior-level self-model criterion): the vertical is
+self-validated by the SelfHost end-to-end self-model (MDL002/CRD002) + the sample conformance loops;
+internal pipeline stages are transitive; ≥95% coverage stays per module. SEK upgraded to v1.5.0.
+
 ## Update (self-model landed + real bug found & fixed)
 
 - **SEK now self-models SEK (MDL002/CRD002):** `samples/SelfHost/` models SEK's own CLI workflow
