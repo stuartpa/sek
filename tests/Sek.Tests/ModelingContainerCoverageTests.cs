@@ -71,6 +71,26 @@ public class ModelingContainerCoverageTests
     }
 
     [Fact]
+    public void Containers_NullElements_HashAndEquality()
+    {
+        // GetHashCode's `i?.GetHashCode() ?? 0` null-element branch for each container.
+        var s = new Set<string?>("a", null);
+        _ = s.GetHashCode();
+        Assert.True(s.Contains(null));
+
+        var q = new Sequence<string?>("a", null);
+        _ = q.GetHashCode();
+        Assert.True(q.Contains(null));
+
+        // Map with a null value → equality's value comparison handles null.
+        var m1 = new Map<string, string?>().Add("k", null);
+        var m2 = new Map<string, string?>().Add("k", null);
+        Assert.True(m1.Equals(m2));
+        Assert.False(m1.Equals(new Map<string, string?>().Add("k", "v")));
+        _ = m1.GetHashCode();
+    }
+
+    [Fact]
     public void Containers_JsonRoundTrip()
     {
         var opts = new JsonSerializerOptions { Converters = { new ContainerJsonConverterFactory() } };
