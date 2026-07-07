@@ -17,7 +17,7 @@ definitions. Artifact root is `engloop/` (see standards.md).
 | `COV` | Coverage reports | `COV004` | COV001=Turnstile; COV002=v1.3 baseline FAIL; COV003=v1.4 re-baseline; COV004=coverage drive (32→92% line) |
 | `IN` | Incidents | `IN002` | IN001 = sek generate couldn't drive stateful SUTs (fixed); IN002 = sek test conformance replayed fresh SUT per transition (fixed, found by self-model) |
 | `PM` | Post-mortems | `PM000` | none yet |
-| `REF` | Refactor decisions | `REF002` | REF001 = extract generic components (Random, Graphs) per ARC002; REF002 = introduce Cord semantic-analysis phase per ARC001 |
+| `REF` | Refactor decisions | `REF003` | REF001 = extract generic components (Random, Graphs) per ARC002; REF002 = introduce Cord semantic-analysis phase per ARC001; REF003 = extract CLI command bodies from top-level Program.cs into a testable Sek.Cli library type |
 
 ## Local counters
 
