@@ -153,9 +153,9 @@ public class CliSamplesTests : IClassFixture<SampleModelsFixture>
     {
         var dir = Path.Combine(_fx.RepoRoot, "samples", "Turnstile");
         var (code, output, err) = CliHost.Run("test", "ModelProgram", "--project", dir);
-        // The conformance command executes (exit 0 = conformant, 1 = mismatch reported); either is a
-        // valid run that exercises CmdTest + the conformance replay. A crash (99) is not acceptable.
-        Assert.NotEqual(99, code);
+        // Path-based conformance replay (one SUT instance per witness path) makes this conformant:
+        // Coin precedes Push, so Push is never replayed on a locked turnstile.
+        Assert.True(code == 0, $"turnstile conformance failed: {err}");
         Assert.False(string.IsNullOrWhiteSpace(output + err));
     }
 
@@ -225,5 +225,23 @@ public class CliSamplesTests : IClassFixture<SampleModelsFixture>
         var (code, output, err) = CliHost.Run("validate", "--project", dir);
         Assert.NotEqual(99, code);
         Assert.False(string.IsNullOrWhiteSpace(output + err));
+    }
+
+    [Fact]
+    public void Test_SelfHost_Conformance_Passes()
+    {
+        // The SelfHost self-model conforms to the real CLI workflow (unlike Turnstile), so `sek test`
+        // exercises the conformance-replay success path.
+        var dir = Path.Combine(_fx.RepoRoot, "samples", "SelfHost");
+        var (code, _, err) = CliHost.Run("test", "ModelProgram", "--project", dir);
+        Assert.True(code == 0, $"self-host conformance failed: {err}");
+    }
+
+    [Fact]
+    public void Generate_WithNamespaceAndMaxOptions()
+    {
+        var dir = Path.Combine(_fx.RepoRoot, "samples", "Turnstile");
+        var (code, _, err) = CliHost.Run("generate", "ModelProgram", "--project", dir, "--namespace", "Custom.Ns", "--max", "5");
+        Assert.True(code == 0, $"generate with options failed: {err}");
     }
 }
