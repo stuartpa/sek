@@ -89,6 +89,23 @@ public class CordConstraintBranchTests
     }
 
     [Fact]
+    public void StructField_StringDomain_And_SeededAndLocal()
+    {
+        // String domain on a struct field.
+        var s = CordConstraintExtractor.Extract(Act("Condition.In(info.C, \"x\", \"y\");", ("Req", "info")));
+        Assert.Single(s.Constraints.OfType<InConstraint>());
+
+        // Seeded over a struct field.
+        var seeded = CordConstraintExtractor.Extract(Act("Combination.Seeded(info.A == 1);", ("Req", "info")));
+        Assert.NotNull(seeded);
+
+        // A where-local derived from a struct field feeding a Pairwise column.
+        var local = CordConstraintExtractor.Extract(Act(
+            "uint m = info.Flags & 1; Combination.Pairwise(info.Flags, m);", ("Req", "info")));
+        Assert.Equal(CombinationSpec.Strategy.Pairwise, local.Combination.Mode);
+    }
+
+    [Fact]
     public void ConditionIsTrue_RoslynFallback_ForMethodCall()
     {
         // Math.Abs(...) is outside the mini-parser → compiled as an embedded C# predicate.

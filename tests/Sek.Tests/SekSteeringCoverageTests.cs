@@ -85,6 +85,19 @@ public class SekSteeringCoverageTests
     }
 
     [Fact]
+    public void RequirementCoverage_MinimumCount_NoToCover_UsesCapturedBasis()
+    {
+        // MinimumRequirementCount without RequirementsToCover → basis is the captured count.
+        var r = RunRequirementCoverage(typeof(ReqModel), "ReqModel", new Dictionary<string, string>
+        {
+            ["MinimumRequirementCount"] = "1",
+        });
+        Assert.Equal("1", r.Graph.Metadata["minimumRequirementCount"]);
+        Assert.Equal("True", r.Graph.Metadata["minimumRequirementCountMet"]);
+        Assert.False(r.Graph.Metadata.ContainsKey("requirementsToCover"));
+    }
+
+    [Fact]
     public void RequirementCoverage_NoCapture_FallsBackToActionSet()
     {
         var r = RunRequirementCoverage(typeof(PlainModel), "PlainModel");

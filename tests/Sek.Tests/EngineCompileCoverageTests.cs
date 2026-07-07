@@ -30,6 +30,13 @@ public class EngineCompileCoverageTests
         var letB = new LetBehavior { Inner = Inv("A") };
         letB.Vars.Add(new Parameter { Type = "int", Name = "x" });
         Assert.NotNull(Explorer().Compile(letB));
+
+        // LooseSequence and Permutation arms (in the binding/fail collectors).
+        Assert.NotNull(Explorer().Compile(new LooseSequenceBehavior { Items = { Inv("A"), Inv("B") } }));
+        Assert.NotNull(Explorer().Compile(new PermutationBehavior { Items = { Inv("A"), Inv("B") } }));
+        // Fail nested inside a choice/parallel so the collectors recurse those arms too.
+        Assert.True(Explorer().Compile(new ChoiceBehavior { Items = { new FailBehavior { Inner = Inv("A") }, Inv("B") } }).HasFailStates);
+        Assert.True(Explorer().Compile(new ParallelBehavior { Items = { new FailBehavior { Inner = Inv("A") }, Inv("B") } }).HasFailStates);
     }
 
     [Fact]
