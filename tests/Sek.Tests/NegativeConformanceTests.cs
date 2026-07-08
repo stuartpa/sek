@@ -141,5 +141,91 @@ namespace Sek.Tests
             Assert.False(report.Passed);                  // the SUT wrongly accepted a model-forbidden action
             Assert.Contains(report.Failures, f => f.Contains("was ACCEPTED"));
         }
+
+        // ---- edge cases over crafted graphs (negative replay branches) ---------------------
+
+        private static ExplorationGraph GraphWithNegative(ActionInvocation neg)
+        {
+            var g = new ExplorationGraph { Machine = "M", InitialStateId = "S0" };
+            g.States.Add(new ModelState("S0", "h0", Label: null, Accepting: true, Initial: true));
+            g.NegativeTransitions.Add(new NegativeTransition("S0", neg, "forbidden here"));
+            return g;
+        }
+
+        [Fact]
+        public void Conformance_Negative_ThrowingMethod_IsRejected()
+        {
+            // Widget.Boom throws → a correct rejection of the illegal action.
+            var report = Conformance.Replay(GraphWithNegative(ActionInvocation.Of("Widget.Boom")), ThisAssembly, "Sek.Tests.ConfSut");
+            Assert.True(report.Passed, string.Join("; ", report.Failures));
+            Assert.Equal(1, report.NegativeRejected);
+        }
+
+        [Fact]
+        public void Conformance_Negative_AcceptingMethod_Fails()
+        {
+            // Widget.Ping does not throw → the SUT wrongly accepted a forbidden action.
+            var report = Conformance.Replay(GraphWithNegative(ActionInvocation.Of("Widget.Ping")), ThisAssembly, "Sek.Tests.ConfSut");
+            Assert.False(report.Passed);
+            Assert.Contains(report.Failures, f => f.Contains("was ACCEPTED"));
+        }
+
+        [Fact]
+        public void Conformance_Negative_MissingMethod_Fails()
+        {
+            // No such SUT method for the negative action → a setup failure (not a silent pass).
+            var report = Conformance.Replay(GraphWithNegative(ActionInvocation.Of("Widget.Nope")), ThisAssembly, "Sek.Tests.ConfSut");
+            Assert.False(report.Passed);
+            Assert.Contains(report.Failures, f => f.Contains("negative 'Widget.Nope'"));
+        }
+
+        // ---- TestGen emits a NEGATIVE test with a legal prefix (non-initial forbidding state) ----
+
+        public sealed class LifecycleModel : ModelProgram
+        {
+            public bool IsOpen { get; set; }
+
+            [Rule("W.Open")]
+            public void Open() { Require(!IsOpen, "already open"); IsOpen = true; }
+
+            [Rule("W.Use")]
+            public void Use() => Require(IsOpen, "use requires open");
+
+            [Rule("W.Close")]
+            public void Close() { Require(IsOpen, "close requires open"); IsOpen = false; }
+
+            [AcceptingCondition]
+            public bool Done() => true;
+        }
+
+        [Fact]
+        public void TestGen_NegativeTest_HasLegalPrefix_ForNonInitialForbiddingState()
+        {
+            var intro = new ModelIntrospector(typeof(LifecycleModel));
+            var cord = CordDocument.ParseText("config C { action all W; }\nmachine M() : C { construct model program from C }\n");
+            var cb = new ConstructBehavior { Kind = ConstructKind.ModelProgram, Reference = "C" };
+            var options = new ExplorationOptions { MaxStates = 8, MaxTransitions = 24, MaxDepth = 8 };
+            var g = SekCli.InterpretConstruct(intro, cord, "M", cb, options, "enum",
+                new Dictionary<string, List<List<string>>>(StringComparer.Ordinal)).Graph;
+
+            // "Open" is forbidden once already open — a negative edge at a NON-initial state, so its
+            // rejection test must first drive the legal prefix (Open) to reach that state.
+            var reopen = g.NegativeTransitions.FirstOrDefault(n => n.Action.Name == "W.Open");
+            Assert.NotNull(reopen);
+            Assert.NotEqual(g.InitialStateId, reopen!.FromStateId);
+            Assert.NotEmpty(TestGen.LegalPrefixTo(g, reopen.FromStateId));
+
+            var paths = TestGen.SelectPaths(g, 5, TestGen.TestStrategy.Long);
+            var outDir = Path.Combine(Path.GetTempPath(), "neg_pre_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                var res = TestGen.EmitXunit(g, paths, outDir, "Gen.Tests", ThisAssembly, "Sek.Tests.GateSut");
+                Assert.True(res.NegativeTestCount >= 1);
+                var src = File.ReadAllText(res.TestFile);
+                Assert.Contains("Reject_W_Open", src);
+                Assert.Contains("StepExpectingError(\"W.Open\"", src);
+            }
+            finally { try { Directory.Delete(outDir, true); } catch { } }
+        }
     }
 }

@@ -17,10 +17,18 @@ committed scripts under `scripts/` so you don't re-type ~300-character command l
 ```powershell
 pwsh scripts/coverage.ps1                 # run the full suite under coverage; print OVERALL + per-module L=line% B=branch%
 pwsh scripts/coverage.ps1 -Package sek    # ... and also list sek's fully-uncovered lines per file
+pwsh scripts/coverage.ps1 -Stable -Bar 90 # STABLE (excl. flaky subprocess self-model test) + PASS/FAIL per module vs 90%; exit 1 on any FAIL
 ```
 `coverage.ps1` kills stray dotnet processes (they lock the coverage file), clears the previous
 `tests/Sek.Tests/TestResults`, collects "XPlat Code Coverage", and parses the newest cobertura report.
-Runtime ≈ 2–4 min (the in-process CLI integration tests build sample models + drive samples).
+Runtime ≈ 2–5 min (the in-process CLI integration tests build sample models + drive samples).
+
+- **`-Stable`** excludes `Test_SelfHost_Conformance` — it spawns the real `sek` CLI as subprocesses
+  (whose coverage coverlet can't capture) and makes the numbers non-deterministic (±0.5%). Use it for
+  a fast, reproducible measurement. (Runs faster too.)
+- **`-Bar <n>`** (e.g. `90` or `95`) appends a **PASS/FAIL** column per module (PASS iff line% AND
+  branch% ≥ the bar) and sets the process **exit code to 1** if any module FAILs — handy as a gate.
+- Combine, e.g. `pwsh scripts/coverage.ps1 -Stable -Bar 90 -Package sek`.
 
 ## Uncovered lines / partial branches (no re-run — reads the last report)
 
