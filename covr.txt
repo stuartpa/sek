@@ -1,0 +1,10 @@
+OVERALL B=90.8%
+sek                                    L= 96.9% B= 90.7%
+Sek.Cord                               L= 96.6% B= 89.9%
+Sek.Core                               L=100.0% B= 97.5%
+Sek.Engine                             L= 96.5% B= 90.0%
+Sek.Modeling                           L= 98.4% B= 95.3%
+SpecExplorerKit.Components.Graphs      L=100.0% B=100.0%
+SpecExplorerKit.Components.Json        L=100.0% B=100.0%
+SpecExplorerKit.Components.Random      L=100.0% B=100.0%
+SpecExplorerKit.Components.Solving     L= 98.6% B= 91.6%

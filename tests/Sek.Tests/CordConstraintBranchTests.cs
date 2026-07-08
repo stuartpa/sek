@@ -234,6 +234,23 @@ public class CordConstraintBranchTests
     }
 
     [Fact]
+    public void ConditionIn_SingleArg_ProducesNoConstraint()
+    {
+        // Condition.In with fewer than 2 args (no values) → ParseIn returns null → nothing kept.
+        var r = CordConstraintExtractor.Extract(Act("Condition.In(a); Condition.In(a, 1, 2);", ("int", "a")));
+        Assert.Single(r.Constraints.OfType<InConstraint>());
+    }
+
+    [Fact]
+    public void ConditionIsTrue_NoParamMention_IsDropped()
+    {
+        // A Condition.IsTrue that the mini-parser rejects (a method call) and mentions no parameter
+        // is neither mini-parsed nor Roslyn-compiled → dropped.
+        var r = CordConstraintExtractor.Extract(Act("Condition.IsTrue(System.Math.Abs(5) > 2);", ("int", "a")));
+        Assert.Empty(r.Constraints);
+    }
+
+    [Fact]
     public void Comments_AreStripped()
     {
         var r = CordConstraintExtractor.Extract(Act(
