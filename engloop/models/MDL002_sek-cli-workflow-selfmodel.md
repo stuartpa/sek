@@ -14,40 +14,43 @@ generated conformance tests — not by hand-written unit tests (per the v1.4.0 g
 
 ## The model (`samples/SelfHost/Model/SelfHostModel.cs`)
 
-`SekWorkflowModel : ModelProgram` — state: `bool Explored`. Enriched (2026-07-07) to the **full CLI
-command surface** plus the tool's **error behaviour** as first-class transitions:
-- `SekSession.Init` / `Validate` / `Explore` / `Generate` / `Test` — always available (each is
-  independently runnable against a pre-initialised project). `Explore` sets `Explored`.
-- `SekSession.View` — **guarded** on `Explored` (a graph must exist to render).
-- `SekSession.ViewMissing` — **error transition**: `sek view <missing>` must fail (non-zero exit).
-- `SekSession.ExploreUnknown` — **error transition**: `sek explore <unknown-machine>` must fail.
-- `[AcceptingCondition] Done() => Explored` — the accepting scenario is "the core exploration loop
-  has run" (a graph exists).
+`SekWorkflowModel : ModelProgram` — state: **`bool Initialized; bool Explored`** (rebuilt 2026-07-08
+for EngLoopKit **PM004**: a self-model must be behaviorally rich **and** prove model-derived negative
+conformance). The guards encode the CLI's *real* ordering rules against a **fresh** project:
+- `SekSession.Init` — always legal; sets `Initialized` (writes the project config).
+- `SekSession.Validate` / `Explore` / `Generate` / `Test` — **guarded on `Initialized`** (the CLI has
+  no config to load before `init`). `Explore` sets `Explored`.
+- `SekSession.View` — **guarded on `Explored`** (only an `explore` produces a graph to render).
+- `[AcceptingCondition] Done() => Explored`.
 
-This captures the tool's **one real ordering constraint** (`sek view` can only render a graph a
-prior `sek explore` produced) while exercising every command. Adding further ordering would be
-fiction against a pre-initialised project (PM003: behaviour-level, non-theatre).
+The two interacting bits give **genuine branching** (init → {validate/explore/generate/test} → view),
+and — crucially — the guards let SEK **derive the illegal (state, action) pairs** (e.g. `explore`
+before `init`, `view` before `explore`). No error case is hand-coded (the old `ViewMissing`/
+`ExploreUnknown` shortcut is gone): the model's guards do the work, and `sek generate`/`sek test` turn
+the illegal pairs into **negative conformance** tests that assert the real CLI rejects them.
 
 ## The SUT (`samples/SelfHost/Sut/SekSession.cs`)
 
-`SelfHost.Sut.SekSession` drives the **real** `sek` CLI (subprocess) against the Turnstile sample:
-`Init/Validate/Explore/View/Generate/Test` invoke the corresponding `sek` commands and assert exit 0;
-`ViewMissing`/`ExploreUnknown` invoke `sek` and assert a **non-zero** exit (the tool's error paths).
-`View` throws if no prior explore, mirroring the modelled guard. The SUT is the actual tool, so the
-generated tests validate SEK's genuine behavior — not a re-implementation (avoids the PM002 theatre
-trap).
+`SelfHost.Sut.SekSession` drives the **real** `sek` CLI (subprocess). Each instance owns a **fresh,
+un-initialised** workspace (the Turnstile Cord, pointed at the real Turnstile model/adapter
+assemblies), so the ordering rules are exercised *for real*: before `Init()` there is no config, so
+`validate`/`explore`/`generate`/`test` genuinely error; `view` errors until an `explore` wrote a
+graph. Every action either succeeds or **throws** — so the model-derived negative tests (attempt an
+illegal action, assert rejection) verify the real CLI's real error behaviour, not a hand-coded assert.
 
 ## Result
 
-- `sek explore ModelProgram --project samples/SelfHost` → **2 states, 15 transitions, 1 accepting**
-  (recorded in the regression manifest; CI-protected).
-- `sek test ModelProgram --project samples/SelfHost` → conformance **16/16 transitions replayed,
-  8 actions covered, TEST PASSED**.
-- `sek generate ModelProgram --project samples/SelfHost` (Long strategy) → 2 xUnit conformance tests
-  covering **15/15** transitions.
-- `dotnet test` on the generated project (in-repo) → **PASS (2/2)**: the generated tests drove the
-  real `sek` CLI through the full command surface — including both error paths — and conformed.
+- `sek explore ModelProgram --project samples/SelfHost` → **3 states, 12 transitions, 1 accepting**
+  (plus **6 model-derived negative edges**; recorded in the regression manifest; CI-protected).
+- `sek test ModelProgram --project samples/SelfHost` → conformance **14/14 positive replayed,
+  6 negative replayed / 6 rejected (SUT correctly refused), TEST PASSED**.
+- `sek generate ModelProgram --project samples/SelfHost` → **2 positive** tests covering 12/12
+  transitions **plus 6 negative** (illegal-action rejection) tests.
+- `dotnet test` on the generated project → **PASS (8/8)**: positive paths drove the real CLI through
+  the branching lifecycle; the 6 negative tests asserted the real CLI **rejects** each illegal action.
 - CI runs the full loop ("SEK self-validation loop" step in `.github/workflows/ci.yml`).
+- **PM004 adequacy:** Negative-conformance? **Y** (6 model-derived rejection tests). Branches? **Y**
+  (2 interacting state bits → 3 reachable states, distinct interleavings).
 
 ## Significance
 

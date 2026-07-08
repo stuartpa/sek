@@ -9,6 +9,13 @@ public sealed class ConformanceReport
     public int TransitionsReplayed { get; set; }
     public int Succeeded { get; set; }
     public int Failed { get; set; }
+
+    /// <summary>Model-derived negative edges replayed (illegal actions attempted).</summary>
+    public int NegativeReplayed { get; set; }
+
+    /// <summary>Illegal actions the SUT correctly rejected.</summary>
+    public int NegativeRejected { get; set; }
+
     public HashSet<string> ActionsCovered { get; } = new();
     public List<string> Failures { get; } = new();
     public bool Passed => Failed == 0;
@@ -54,49 +61,57 @@ public static class Conformance
                 foreach (var t in path.Steps)
                 {
                     report.TransitionsReplayed++;
-                    var label = t.Action.Name;
-                    var dot = label.LastIndexOf('.');
-                    if (dot <= 0)
+                    var outcome = InvokeStep(asm, ns, t.Action, instances, out var msg);
+                    if (outcome == StepOutcome.Ok)
                     {
-                        report.Failed++;
-                        report.Failures.Add($"malformed action label '{label}'");
-                        break; // path state is now indeterminate
-                    }
-
-                    var typeName = $"{ns}.{label[..dot]}";
-                    var methodName = label[(dot + 1)..];
-                    var type = asm.GetType(typeName);
-                    var method = type?.GetMethod(
-                        methodName,
-                        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
-
-                    if (method is null)
-                    {
-                        report.Failed++;
-                        report.Failures.Add($"no SUT method for action '{label}' (looked for {typeName}.{methodName})");
-                        break;
-                    }
-
-                    try
-                    {
-                        var ps = method.GetParameters();
-                        var args = new object?[ps.Length];
-                        for (var k = 0; k < ps.Length && k < t.Action.Arguments.Count; k++)
-                        {
-                            args[k] = Coerce(t.Action.Arguments[k], ps[k].ParameterType);
-                        }
-
-                        var target = method.IsStatic ? null : Instance(instances, type!);
-                        method.Invoke(target, args);
                         report.Succeeded++;
-                        report.ActionsCovered.Add(label);
+                        report.ActionsCovered.Add(t.Action.Name);
                     }
-                    catch (Exception ex)
+                    else
                     {
                         report.Failed++;
-                        report.Failures.Add($"{label}: {ex.InnerException?.Message ?? ex.Message}");
+                        report.Failures.Add(outcome == StepOutcome.Rejected ? $"{t.Action.Name}: {msg}" : msg);
                         break; // stop this path: the SUT state no longer matches the model
                     }
+                }
+            }
+
+            // NEGATIVE conformance (model-derived): for each illegal (state, action) pair, drive the
+            // legal prefix to that state then attempt the action — a conforming SUT must REJECT it.
+            // An illegal action the SUT accepts is a conformance failure.
+            foreach (var neg in graph.NegativeTransitions)
+            {
+                var instances = new Dictionary<Type, object?>();
+                var prefixOk = true;
+                foreach (var t in TestGen.LegalPrefixTo(graph, neg.FromStateId))
+                {
+                    if (InvokeStep(asm, ns, t.Action, instances, out var pmsg) != StepOutcome.Ok)
+                    {
+                        report.Failed++;
+                        report.Failures.Add($"negative setup: could not reach {neg.FromStateId} to test '{neg.Action.Name}': {pmsg}");
+                        prefixOk = false;
+                        break;
+                    }
+                }
+
+                if (!prefixOk) continue;
+
+                report.NegativeReplayed++;
+                var negOutcome = InvokeStep(asm, ns, neg.Action, instances, out var nmsg);
+                if (negOutcome == StepOutcome.Rejected)
+                {
+                    report.NegativeRejected++;
+                    report.ActionsCovered.Add(neg.Action.Name);
+                }
+                else if (negOutcome == StepOutcome.Ok)
+                {
+                    report.Failed++;
+                    report.Failures.Add($"illegal action '{neg.Action.Name}' was ACCEPTED at {neg.FromStateId} — the model forbids it ({neg.Reason}).");
+                }
+                else
+                {
+                    report.Failed++;
+                    report.Failures.Add($"negative '{neg.Action.Name}': {nmsg}");
                 }
             }
         }
@@ -106,6 +121,55 @@ public static class Conformance
         }
 
         return report;
+    }
+
+    private enum StepOutcome { Ok, Rejected, Malformed, NoMethod }
+
+    /// <summary>Invokes one action against the SUT (reusing per-type instances). <see
+    /// cref="StepOutcome.Ok"/> = accepted (ran); <see cref="StepOutcome.Rejected"/> = the SUT threw
+    /// (a rejection — the expected outcome for a negative edge); the others are setup problems.</summary>
+    private static StepOutcome InvokeStep(Assembly asm, string ns, ActionInvocation action, Dictionary<Type, object?> instances, out string message)
+    {
+        message = string.Empty;
+        var label = action.Name;
+        var dot = label.LastIndexOf('.');
+        if (dot <= 0)
+        {
+            message = $"malformed action label '{label}'";
+            return StepOutcome.Malformed;
+        }
+
+        var typeName = $"{ns}.{label[..dot]}";
+        var methodName = label[(dot + 1)..];
+        var type = asm.GetType(typeName);
+        var method = type?.GetMethod(
+            methodName,
+            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
+
+        if (method is null)
+        {
+            message = $"no SUT method for action '{label}' (looked for {typeName}.{methodName})";
+            return StepOutcome.NoMethod;
+        }
+
+        try
+        {
+            var ps = method.GetParameters();
+            var args = new object?[ps.Length];
+            for (var k = 0; k < ps.Length && k < action.Arguments.Count; k++)
+            {
+                args[k] = Coerce(action.Arguments[k], ps[k].ParameterType);
+            }
+
+            var target = method.IsStatic ? null : Instance(instances, type!);
+            method.Invoke(target, args);
+            return StepOutcome.Ok;
+        }
+        catch (Exception ex)
+        {
+            message = ex.InnerException?.Message ?? ex.Message;
+            return StepOutcome.Rejected;
+        }
     }
 
     /// <summary>One SUT instance per type, reused across a path's steps (get-or-create).</summary>

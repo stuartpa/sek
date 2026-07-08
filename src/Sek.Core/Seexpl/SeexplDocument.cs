@@ -31,6 +31,9 @@ public sealed class SeexplDocument
     [JsonPropertyName("transitions")]
     public List<SeexplTransition> Transitions { get; set; } = new();
 
+    [JsonPropertyName("negativeTransitions")]
+    public List<SeexplNegativeTransition> NegativeTransitions { get; set; } = new();
+
     [JsonPropertyName("metadata")]
     public Dictionary<string, string> Metadata { get; set; } = new();
 
@@ -74,6 +77,17 @@ public sealed class SeexplDocument
             });
         }
 
+        foreach (var n in graph.NegativeTransitions)
+        {
+            doc.NegativeTransitions.Add(new SeexplNegativeTransition
+            {
+                From = n.FromStateId,
+                Action = n.Action.Name,
+                Arguments = n.Action.Arguments.Count == 0 ? null : n.Action.Arguments.ToList(),
+                Reason = n.Reason,
+            });
+        }
+
         return doc;
     }
 
@@ -96,6 +110,14 @@ public sealed class SeexplDocument
                 t.From,
                 new ActionInvocation(t.Action, t.Arguments ?? new List<string>(), t.Kind ?? "call", t.Result),
                 t.To));
+        }
+
+        foreach (var n in NegativeTransitions)
+        {
+            graph.NegativeTransitions.Add(new NegativeTransition(
+                n.From,
+                new ActionInvocation(n.Action, n.Arguments ?? new List<string>()),
+                n.Reason ?? string.Empty));
         }
 
         return graph;
@@ -130,4 +152,14 @@ public sealed class SeexplTransition
     [JsonPropertyName("arguments")] public List<string>? Arguments { get; set; }
     [JsonPropertyName("kind")] public string? Kind { get; set; }
     [JsonPropertyName("result")] public string? Result { get; set; }
+}
+
+/// <summary>A model-derived illegal (state, action) pair persisted in the <c>.seexpl</c>: the action
+/// is forbidden from <see cref="From"/> (its guard is false there) and a SUT must reject it.</summary>
+public sealed class SeexplNegativeTransition
+{
+    [JsonPropertyName("from")] public string From { get; set; } = string.Empty;
+    [JsonPropertyName("action")] public string Action { get; set; } = string.Empty;
+    [JsonPropertyName("arguments")] public List<string>? Arguments { get; set; }
+    [JsonPropertyName("reason")] public string? Reason { get; set; }
 }

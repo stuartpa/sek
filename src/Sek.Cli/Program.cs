@@ -1154,6 +1154,8 @@ namespace Sek.Cli
             Console.WriteLine($"  transitions replayed : {report.TransitionsReplayed}");
             Console.WriteLine($"  succeeded            : {report.Succeeded}");
             Console.WriteLine($"  failed               : {report.Failed}");
+            Console.WriteLine($"  negative replayed    : {report.NegativeReplayed} (illegal actions attempted)");
+            Console.WriteLine($"  negative rejected    : {report.NegativeRejected} (SUT correctly refused)");
             Console.WriteLine($"  actions covered      : {report.ActionsCovered.Count} ({string.Join(", ", report.ActionsCovered.OrderBy(x => x))})");
 
             if (!report.Passed)
@@ -1218,7 +1220,7 @@ namespace Sek.Cli
 
             var gen = TestGen.EmitXunit(graph, paths, outDir, testNs, bindingAsm, config.Binding.Namespace);
 
-            Console.WriteLine($"Generated {gen.TestCount} xUnit test(s) covering {gen.CoveredTransitions}/{gen.TotalTransitions} transitions.");
+            Console.WriteLine($"Generated {gen.TestCount} positive xUnit test(s) covering {gen.CoveredTransitions}/{gen.TotalTransitions} transitions, plus {gen.NegativeTestCount} negative (illegal-action rejection) test(s).");
             Console.WriteLine($"Wrote {gen.TestFile}");
             Console.WriteLine($"Run with: dotnet test \"{gen.ProjectDir}\"");
             return 0;

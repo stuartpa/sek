@@ -8,24 +8,27 @@
 ## Exploration
 
 `construct model program from Actions` over `action all SekSession` →
-**2 states / 15 transitions / 1 accepting** (bounds StateBound=16, StepBound=32, PathDepthBound=8).
-The state space is the `Explored` toggle. From the initial state the always-runnable commands
-(`Init`/`Validate`/`Explore`/`Generate`/`Test`) and both error transitions
-(`ViewMissing`/`ExploreUnknown`) are enabled; once `Explored`, `View` is additionally enabled —
+**3 states / 12 transitions / 1 accepting**, plus **6 model-derived negative edges** (bounds
+StateBound=16, StepBound=32, PathDepthBound=8). The state space is the pair `(Initialized, Explored)`.
+From the fresh state only `Init` is enabled (the other commands are guard-disabled → negative edges);
+once `Initialized`, `Validate`/`Explore`/`Generate`/`Test` are enabled; once `Explored`, `View` is
+too — matching the modelled guards. The accepting state is the explored state.
 matching the modelled guard. The single accepting state is the explored state.
 
 ## Conformance generation
 
-`construct test cases for ModelProgram` (Long strategy) → **2 test paths covering 15/15 transitions**,
-emitted as an xUnit project bound to the `SelfHost.Sut.SekSession` SUT. `sek test` replays the same
-graph directly for **16/16** transitions across **8** actions (TEST PASSED).
+`construct test cases for ModelProgram` (Long strategy) → **2 positive test paths covering 12/12
+transitions PLUS 6 negative (illegal-action rejection) tests**, emitted as an xUnit project bound to
+the `SelfHost.Sut.SekSession` SUT. `sek test` replays the same graph directly: **14/14 positive +
+6 negative replayed / 6 rejected** (TEST PASSED).
 
 ## Conformance result
 
-`dotnet test` on the generated project (in-repo) → **PASS (2/2)**. Each path instantiated `SekSession`
-and replayed the modelled action sequence, which drove the **real `sek` CLI** — the full command
-surface (init/validate/explore/view/generate/test) plus both error paths — against the Turnstile
-sample. The `View`-after-`Explore` ordering held against the actual tool.
+`dotnet test` on the generated project → **PASS (8/8)**. The 2 positive paths instantiated
+`SekSession` and drove the **real `sek` CLI** through the branching lifecycle; the 6 **model-derived
+negative** tests drove the legal prefix to each forbidding state then asserted the real CLI **rejects**
+the illegal action (`explore`/`validate`/`generate`/`test` before `init`; `view` before `explore`).
+No error case is hand-coded — the negatives fall out of the model's guards (EngLoopKit PM004).
 
 ## Coverage contribution
 
@@ -35,5 +38,5 @@ CLI integration tests — see COV004.)
 
 ## Related
 
-- MDL002; COV004; regression manifest entry `samples/SelfHost / ModelProgram = 2/15/1`
+- MDL002; COV004; regression manifest entry `samples/SelfHost / ModelProgram = 3/12/1`
 - CI: "SEK self-validation loop" step

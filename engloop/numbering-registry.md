@@ -15,7 +15,7 @@ definitions. Artifact root is `engloop/` (see standards.md).
 | `MDL` | SEK models | `MDL002` | MDL001 = Turnstile pilot; MDL002 = SEK CLI-workflow self-model (SEK validates SEK) |
 | `CRD` | CORD explorations | `CRD002` | CRD001 = Turnstile explore + generate loop; CRD002 = SEK self-model explore + conformance |
 | `COV` | Coverage reports | `COV004` | COV001=Turnstile; COV002=v1.3 baseline FAIL; COV003=v1.4 re-baseline; COV004=coverage drive (32→92% line) |
-| `IN` | Incidents | `IN002` | IN001 = sek generate couldn't drive stateful SUTs (fixed); IN002 = sek test conformance replayed fresh SUT per transition (fixed, found by self-model) |
+| `IN` | Incidents | `IN003` | IN001 = sek generate couldn't drive stateful SUTs (fixed); IN002 = sek test conformance replayed fresh SUT per transition (fixed, found by self-model); IN003 = engine/generate/test do only POSITIVE conformance — no model-derived negative testing (illegal seq → assert error) [EngLoopKit PM004] |
 | `PM` | Post-mortems | `PM000` | none yet |
 | `REF` | Refactor decisions | `REF003` | REF001 = extract generic components (Random, Graphs) per ARC002; REF002 = introduce Cord semantic-analysis phase per ARC001; REF003 = extract CLI command bodies from top-level Program.cs into a testable Sek.Cli library type |
 

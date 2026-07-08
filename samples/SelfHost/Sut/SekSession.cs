@@ -5,99 +5,91 @@ using System.IO;
 namespace SelfHost.Sut
 {
     /// <summary>
-    /// A stateful system-under-test that drives the <b>real</b> <c>sek</c> CLI against the Turnstile
-    /// sample. It is SEK validating SEK — the SUT is the actual tool, not a re-implementation. It
-    /// exercises the full command surface (init/validate/explore/view/generate/test) plus the tool's
-    /// error behaviour (view of a missing file, explore of an unknown machine). The one genuine
-    /// ordering constraint it captures is that <c>view</c> can only render a graph a prior
-    /// <c>explore</c> produced.
+    /// A stateful system-under-test that drives the <b>real</b> <c>sek</c> CLI through a project
+    /// lifecycle. It is SEK validating SEK — the SUT is the actual tool. Each instance owns a
+    /// <b>fresh, un-initialised</b> workspace (a copy of the Turnstile sample's Cord, pointed at the
+    /// real Turnstile model/adapter assemblies) so that the CLI's ordering rules are exercised for
+    /// real: before <c>init</c> there is no project config, so <c>validate</c>/<c>explore</c>/
+    /// <c>generate</c>/<c>test</c> genuinely fail; and <c>view</c> fails until an <c>explore</c> has
+    /// written a graph. Every action either succeeds or throws — so the model-derived negative tests
+    /// (attempt an illegal action, assert rejection) verify the real CLI's real error behaviour.
     /// </summary>
     public sealed class SekSession
     {
         private readonly string _repoRoot;
         private readonly string _sekDll;
-        private readonly string _turnstile;
-        private bool _explored;
+        private readonly string _work;      // this session's fresh workspace
+        private readonly string _configJson;
 
         public SekSession()
         {
             _repoRoot = FindRepoRoot();
             _sekDll = Path.Combine(_repoRoot, "src", "Sek.Cli", "bin", "Debug", "sek.dll");
-            _turnstile = Path.Combine(_repoRoot, "samples", "Turnstile");
-        }
 
-        /// <summary>Rule <c>SekSession.Init</c>: `sek init` is idempotent against an existing project.</summary>
-        public void Init() => RunOk("init", "--project", _turnstile);
+            var turnstile = Path.Combine(_repoRoot, "samples", "Turnstile");
 
-        /// <summary>Rule <c>SekSession.Validate</c>: the CLI validates the Turnstile project.</summary>
-        public void Validate() => RunOk("validate", "--project", _turnstile);
-
-        /// <summary>Rule <c>SekSession.Explore</c>: explore Turnstile's ModelProgram → a .seexpl graph.</summary>
-        public void Explore()
-        {
-            RunOk("explore", "ModelProgram", "--project", _turnstile);
-            _explored = true;
-        }
-
-        /// <summary>Rule <c>SekSession.View</c>: render the produced graph. The graph only exists after
-        /// a prior explore, so this is the workflow's real ordering constraint.</summary>
-        public void View()
-        {
-            var seexpl = Path.Combine(_turnstile, ".specexplorerkit", "out", "ModelProgram.seexpl");
-            if (!_explored || !File.Exists(seexpl))
+            // A fresh, deliberately UN-initialised workspace: the Cord is present, but there is no
+            // .specexplorerkit/config.json until Init() writes one. Assembly paths are absolute, so
+            // the workspace reuses the real (already-built) Turnstile model + adapter.
+            _work = Path.Combine(Path.GetTempPath(), "sek_selfhost_" + Guid.NewGuid().ToString("N"));
+            var modelDir = Path.Combine(_work, "Model");
+            Directory.CreateDirectory(modelDir);
+            Directory.CreateDirectory(Path.Combine(_work, ".specexplorerkit", "out"));
+            foreach (var cord in Directory.EnumerateFiles(Path.Combine(turnstile, "Model"), "*.cord"))
             {
-                throw new InvalidOperationException("view requires a graph produced by a prior explore");
+                File.Copy(cord, Path.Combine(modelDir, Path.GetFileName(cord)), overwrite: true);
             }
 
-            var outFile = Path.Combine(Path.GetTempPath(), "selfhost_" + Guid.NewGuid().ToString("N") + ".dot");
+            var modelDll = Path.Combine(turnstile, "Sut", "..", "Model", "bin", "Debug", "Turnstile.Model.dll");
+            var sutDll = Path.Combine(turnstile, "Sut", "bin", "Debug", "Turnstile.Sut.dll");
+            _configJson =
+                "{\n" +
+                $"  \"model\":   {{ \"assembly\": {Json(Path.GetFullPath(modelDll))}, \"type\": \"Turnstile.Model.TurnstileModel\" }},\n" +
+                "  \"cord\":    \"Model\",\n" +
+                $"  \"binding\": {{ \"assembly\": {Json(Path.GetFullPath(sutDll))}, \"namespace\": \"Turnstile.Sut\" }},\n" +
+                "  \"out\":     \".specexplorerkit/out\"\n" +
+                "}\n";
+        }
+
+        /// <summary>Rule <c>SekSession.Init</c>: `sek init` — write the project config (idempotent).
+        /// Always legal; establishes the project.</summary>
+        public void Init()
+        {
+            // Mirror what `sek init` does, but with a config wired to the real Turnstile assemblies
+            // (a bare `sek init` scaffolds a placeholder config that wouldn't resolve a real model).
+            File.WriteAllText(Path.Combine(_work, ".specexplorerkit", "config.json"), _configJson);
+        }
+
+        /// <summary>Rule <c>SekSession.Validate</c>: `sek validate` — needs an initialized project.</summary>
+        public void Validate() => RunOk("validate", "--project", _work);
+
+        /// <summary>Rule <c>SekSession.Explore</c>: `sek explore` → a .seexpl graph. Needs init.</summary>
+        public void Explore() => RunOk("explore", "ModelProgram", "--project", _work);
+
+        /// <summary>Rule <c>SekSession.View</c>: `sek view` the produced graph. Needs a prior explore.</summary>
+        public void View()
+        {
+            var seexpl = Path.Combine(_work, ".specexplorerkit", "out", "ModelProgram.seexpl");
+            var outFile = Path.Combine(Path.GetTempPath(), "selfhost_view_" + Guid.NewGuid().ToString("N") + ".dot");
             RunOk("view", seexpl, "--format", "dot", "--out", outFile);
             try { File.Delete(outFile); } catch { /* best effort */ }
         }
 
-        /// <summary>Rule <c>SekSession.Generate</c>: `sek generate` explores internally and emits an
-        /// xUnit test project (written to a throwaway temp dir here).</summary>
+        /// <summary>Rule <c>SekSession.Generate</c>: `sek generate` an xUnit project. Needs init.</summary>
         public void Generate()
         {
             var outDir = Path.Combine(Path.GetTempPath(), "selfhost_gen_" + Guid.NewGuid().ToString("N"));
-            RunOk("generate", "ModelProgram", "--project", _turnstile, "--out", outDir, "--max", "3");
+            RunOk("generate", "ModelProgram", "--project", _work, "--out", outDir, "--max", "3");
             try { Directory.Delete(outDir, recursive: true); } catch { /* best effort */ }
         }
 
-        /// <summary>Rule <c>SekSession.Test</c>: `sek test` explores internally and replays conformance
-        /// against the Turnstile SUT.</summary>
-        public void Test() => RunOk("test", "ModelProgram", "--project", _turnstile);
+        /// <summary>Rule <c>SekSession.Test</c>: `sek test` — explore + replay conformance. Needs init.</summary>
+        public void Test() => RunOk("test", "ModelProgram", "--project", _work);
 
-        /// <summary>Rule <c>SekSession.ViewMissing</c>: error transition — `sek view` of a missing file
-        /// must fail cleanly with a non-zero exit.</summary>
-        public void ViewMissing()
-        {
-            var missing = Path.Combine(Path.GetTempPath(), "selfhost_missing_" + Guid.NewGuid().ToString("N") + ".seexpl");
-            RunFail("view", missing);
-        }
-
-        /// <summary>Rule <c>SekSession.ExploreUnknown</c>: error transition — `sek explore` of an unknown
-        /// machine must fail cleanly with a non-zero exit.</summary>
-        public void ExploreUnknown() => RunFail("explore", "NoSuchMachine", "--project", _turnstile);
-
+        /// <summary>Runs the real `sek` CLI and throws on a non-zero exit (a rejection). This is what
+        /// makes the model-derived negative tests meaningful: an illegal action drives the CLI to a
+        /// real error, which surfaces here as an exception the test harness asserts.</summary>
         private void RunOk(params string[] args)
-        {
-            var (exit, err) = Run(args);
-            if (exit != 0)
-            {
-                throw new InvalidOperationException("sek " + string.Join(' ', args) + " failed: " + err);
-            }
-        }
-
-        private void RunFail(params string[] args)
-        {
-            var (exit, _) = Run(args);
-            if (exit == 0)
-            {
-                throw new InvalidOperationException("sek " + string.Join(' ', args) + " was expected to fail but exited 0");
-            }
-        }
-
-        private (int exit, string err) Run(string[] args)
         {
             var psi = new ProcessStartInfo("dotnet")
             {
@@ -107,12 +99,17 @@ namespace SelfHost.Sut
             };
             psi.ArgumentList.Add(_sekDll);
             foreach (var a in args) psi.ArgumentList.Add(a);
-            using var p = Process.Start(psi);
+            using var p = Process.Start(psi)!;
             var err = p.StandardError.ReadToEnd();
             p.StandardOutput.ReadToEnd();
             p.WaitForExit();
-            return (p.ExitCode, err);
+            if (p.ExitCode != 0)
+            {
+                throw new InvalidOperationException("sek " + string.Join(' ', args) + " failed: " + err.Trim());
+            }
         }
+
+        private static string Json(string s) => "\"" + s.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
 
         private static string FindRepoRoot()
         {

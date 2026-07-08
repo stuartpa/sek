@@ -94,6 +94,12 @@ public sealed class Explorer
             // A state instance used to evaluate domains (domains may read state).
             var domainInstance = Deserialize(fromJson);
 
+            // Per-state negative-conformance bookkeeping: an action label enabled for ANY arg set is
+            // legal here; one that is guard-disabled for every arg set (and never enabled) is a
+            // model-derived negative edge (attempting it here is illegal and a SUT must reject it).
+            var enabledHere = new HashSet<string>(StringComparer.Ordinal);
+            var disabledReasons = new Dictionary<string, string>(StringComparer.Ordinal);
+
             foreach (var rule in _model.Rules)
             {
                 if (_options.AllowedActionLabels is { } allowed && !allowed.Contains(rule.ActionLabel)) continue;
@@ -102,11 +108,13 @@ public sealed class Explorer
                 {
                     var target = Deserialize(fromJson);
                     var invokeArgs = MaterializeArgs(rule, target, argSet);
-                    if (!TryInvoke(rule, target, invokeArgs, result.Diagnostics, out var retVal))
+                    if (!TryInvoke(rule, target, invokeArgs, result.Diagnostics, out var retVal, out var guardReason))
                     {
+                        if (guardReason is not null) disabledReasons[rule.ActionLabel] = guardReason;
                         continue; // guard disabled or error -> action not enabled
                     }
 
+                    enabledHere.Add(rule.ActionLabel);
                     foreach (var req in Requirement.Captured) capturedReqs.Add(req);
 
                     var toJson = Serialize(target);
@@ -138,6 +146,14 @@ public sealed class Explorer
                     var action = new ActionInvocation(rule.ActionLabel, invokeArgs.Select(Stringify).ToList(), ActionKindOf(rule.ActionLabel), ResultOf(rule, retVal));
                     graph.Transitions.Add(new Transition(fromId, action, toId));
                 }
+            }
+
+            // Record model-derived negative edges: actions guard-disabled here for every arg set
+            // (never enabled) — attempting them from this state is illegal and a SUT must reject them.
+            foreach (var (label, reason) in disabledReasons)
+            {
+                if (enabledHere.Contains(label)) continue;
+                graph.NegativeTransitions.Add(new NegativeTransition(fromId, ActionInvocation.Of(label), reason));
             }
         }
 
@@ -462,7 +478,13 @@ public sealed class Explorer
 
     private static bool TryInvoke(RuleInfo rule, ModelProgram target, object?[] args, List<string> diagnostics, out object? returnValue)
     {
+        return TryInvoke(rule, target, args, diagnostics, out returnValue, out _);
+    }
+
+    private static bool TryInvoke(RuleInfo rule, ModelProgram target, object?[] args, List<string> diagnostics, out object? returnValue, out string? guardReason)
+    {
         returnValue = null;
+        guardReason = null;
         try
         {
             Requirement.Reset(); // capture requirement ids raised by this invocation
@@ -471,9 +493,10 @@ public sealed class Explorer
                 : rule.Method.Invoke(target, args);
             return true;
         }
-        catch (TargetInvocationException tie) when (tie.InnerException is GuardDisabledException)
+        catch (TargetInvocationException tie) when (tie.InnerException is GuardDisabledException g)
         {
-            return false; // guard not satisfied: action disabled
+            guardReason = g.Message; // guard not satisfied: action disabled (model forbids it here)
+            return false;
         }
         catch (TargetInvocationException tie)
         {
