@@ -58,6 +58,19 @@ public class CordParserCoverageTests
     [InlineData("config C { action all S; } machine M() : C { let int x, int y where {. Condition.In(x, 1, 2); Condition.In(y, 3); .} in a; b }")]
     // using clauses + comments
     [InlineData("using Some.Namespace;\n// a line comment\nconfig C { action all S; } machine M() : C { a }")]
+    // declared-action parameter lists (out/ref/comma) + the three where-clause forms
+    [InlineData("config C { action void Svc.Do(out int x, ref string y, int z); }")]
+    [InlineData("config C { action void Svc.Do(int x) where (x in {1,2}); }")]
+    [InlineData("config C { action void Svc.Do(int x) where {. Condition.In(x, 1, 2); .}; }")]
+    [InlineData("config C { action void Svc.Do() where SomeBareToken; }")]
+    // argument-domain forms in bind: integer range, non-integer range, unions with the
+    // unbound marker (both sides), a structured value, and an `instances` domain
+    [InlineData("config C { action all S; } machine Mp() : C { construct model program from C } machine M() : C { ( bind Open(1..3) in Mp ) }")]
+    [InlineData("config C { action all S; } machine Mp() : C { construct model program from C } machine M() : C { ( bind Open(lo..hi) in Mp ) }")]
+    [InlineData("config C { action all S; } machine Mp() : C { construct model program from C } machine M() : C { ( bind Open(_ + {1,2}) in Mp ) }")]
+    [InlineData("config C { action all S; } machine Mp() : C { construct model program from C } machine M() : C { ( bind Open({1} + _) in Mp ) }")]
+    [InlineData("config C { action all S; } machine Mp() : C { construct model program from C } machine M() : C { ( bind Make(Foo(F={1,2}, G=3)) in Mp ) }")]
+    [InlineData("config C { action all S; } machine Mp() : C { construct model program from C } machine M() : C { ( bind Use(instances Foo) in Mp ) }")]
     public void Parses_Without_Error(string source)
     {
         var ex = Record.Exception(() => CordDocument.ParseText(source));
