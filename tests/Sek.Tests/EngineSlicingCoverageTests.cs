@@ -100,4 +100,17 @@ public class EngineSlicingCoverageTests
         Assert.False(bare.TryStepBinding(bare.Start, "Nope", System.Array.Empty<string>(), new Dictionary<string, string>(), out _, out _));
         Assert.Empty(bare.ArgPatterns(-1, "A"));                                 // invalid state
     }
+
+    [Fact]
+    public void MixedPinnedAndBare_ArgPatterns_SkipsNonMatchingKeys()
+    {
+        // A choice of a pinned A(1) and a bare B: ArgPatterns("A") must skip the "B" key (it does
+        // not start with "A("), exercising the skip branch; ArgPatterns("A") still yields A's pattern.
+        var sc = Explorer().Compile(new ChoiceBehavior { Items = { Inv("A", "1"), Inv("B") } });
+        var aPat = sc.ArgPatterns(sc.Start, "A").ToList();
+        Assert.NotEmpty(aPat);
+        Assert.Single(aPat[0]);                       // one pinned arg "1"
+        Assert.Empty(sc.ArgPatterns(sc.Start, "B"));  // B is bare → no pinned patterns
+        Assert.True(sc.Permits(sc.Start, "B"));       // but B is permitted (bare)
+    }
 }
