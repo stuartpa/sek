@@ -199,4 +199,41 @@ public class SolvingBranchCoverageExtraTests
         // "^" is not modelled by PredicateEval -> evaluates to null -> predicate is false for all.
         Assert.Empty(Enum(ps, Pred(Bin("^", Var("a"), Int(1)))));
     }
+
+    [Fact]
+    public void Enum_MixedTypeEquality_StringAndBoolOnRight()
+    {
+        var s = new List<SolverParam> { StrP("s", "1", "2") };
+        // literal int on the left, string parameter on the right -> AreEqual's "r is string" arm
+        Assert.Single(Enum(s, Pred(Bin("==", Int(1), Var("s")))));
+
+        var b = new List<SolverParam> { BoolP("b") };
+        // literal int on the left, bool parameter on the right -> AreEqual's "r is bool" arm
+        Assert.Single(Enum(b, Pred(Bin("==", Int(1), Var("b")))));
+    }
+
+    // ---- Z3 structural edges ----------------------------------------------------
+
+    [Fact]
+    public void Z3_UnsupportedOperator_FallsBackToPostFilter()
+    {
+        var ps = new List<SolverParam> { IntP("a", 1, 2, 3) };
+        // "^" cannot be translated to Z3 -> NotSupportedException -> C# post-filter (which also
+        // does not model "^") -> no rows survive.
+        Assert.Empty(Z3(ps, Pred(Bin("==", Bin("^", Var("a"), Int(1)), Int(1)))));
+    }
+
+    [Fact]
+    public void Z3_NoParameters_YieldsSingleEmptyRowForTruePredicate()
+    {
+        // With no parameters the solver produces one satisfying (empty) assignment and then
+        // breaks because there is nothing to block.
+        var res = new Z3Solver().Generate(
+            new List<SolverParam>(),
+            new List<SolverConstraint> { Pred(Bool(true)) },
+            new CombinationSpec(),
+            10);
+        Assert.Single(res);
+        Assert.Empty(res[0]);
+    }
 }
