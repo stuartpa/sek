@@ -215,6 +215,25 @@ public class CordConstraintBranchTests
     }
 
     [Fact]
+    public void ConditionIn_UnknownToken_IsDropped()
+    {
+        // Condition.In whose first arg is neither a parameter nor a struct field of one is dropped
+        // (IsFieldOfParam: no dot → not a field).
+        var r = CordConstraintExtractor.Extract(Act("Condition.In(notaparam, 1, 2); Condition.In(a, 3, 4);", ("int", "a")));
+        var ins = r.Constraints.OfType<InConstraint>().ToList();
+        Assert.Single(ins);
+        Assert.Equal("a", ins[0].Param);
+    }
+
+    [Fact]
+    public void WhereLocal_SingleTokenLhs_And_NonAssignment_AreIgnored()
+    {
+        // LHS is a single token (not "Type name") and a statement with no '=' — neither is a local.
+        var r = CordConstraintExtractor.Extract(Act("x = a; someCall(a); Condition.In(a, 1);", ("int", "a")));
+        Assert.Single(r.Constraints.OfType<InConstraint>());
+    }
+
+    [Fact]
     public void Comments_AreStripped()
     {
         var r = CordConstraintExtractor.Extract(Act(
