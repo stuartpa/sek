@@ -83,4 +83,21 @@ public class EngineSlicingCoverageTests
         // Invalid state.
         Assert.False(sc.TryStepBinding(-1, "A", System.Array.Empty<string>(), new Dictionary<string, string>(), out _, out _));
     }
+
+    [Fact]
+    public void Stepping_EdgeCases_BareArgPatterns_NoMatch_LooseSequence()
+    {
+        // A three-item loose sequence exercises the repeated `_*` insertion in Build.
+        var loose = new LooseSequenceBehavior { Items = { Inv("A"), Inv("B"), Inv("A") } };
+        var lsc = Explorer().Compile(loose);
+        Assert.True(lsc.Permits(lsc.Start, "A"));
+
+        // A bare-label scenario: ArgPatterns yields nothing (no pinned forms); TryStepArgs finds no
+        // pinned match; TryStepBinding of an unknown label falls through to false.
+        var bare = Explorer().Compile(new SequenceBehavior { Items = { Inv("A"), Inv("B") } });
+        Assert.Empty(bare.ArgPatterns(bare.Start, "A"));
+        Assert.False(bare.TryStepArgs(bare.Start, "A", new[] { "1" }, out _));   // no pinned form
+        Assert.False(bare.TryStepBinding(bare.Start, "Nope", System.Array.Empty<string>(), new Dictionary<string, string>(), out _, out _));
+        Assert.Empty(bare.ArgPatterns(-1, "A"));                                 // invalid state
+    }
 }

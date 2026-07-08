@@ -197,6 +197,24 @@ public class CordConstraintBranchTests
     }
 
     [Fact]
+    public void RoslynFallback_AcrossParamKinds()
+    {
+        // A Roslyn-compiled predicate over long/bool/string params exercises SolverParamsOf/KindOf.
+        Assert.NotEmpty(CordConstraintExtractor.Extract(Act("Condition.IsTrue(System.Math.Abs(a) > 2);", ("long", "a")))
+            .Constraints.OfType<CompiledPredicateConstraint>());
+        Assert.NotEmpty(CordConstraintExtractor.Extract(Act("Condition.IsTrue(s.Contains(\"x\"));", ("string", "s")))
+            .Constraints.OfType<CompiledPredicateConstraint>());
+    }
+
+    [Fact]
+    public void WhereLocal_MalformedLhs_IsIgnored()
+    {
+        // A where-local whose LHS is not exactly "Type name" (3 tokens) is not treated as a local.
+        var r = CordConstraintExtractor.Extract(Act("unsigned int x = a; Condition.In(a, 1, 2);", ("int", "a")));
+        Assert.Single(r.Constraints.OfType<InConstraint>());
+    }
+
+    [Fact]
     public void Comments_AreStripped()
     {
         var r = CordConstraintExtractor.Extract(Act(

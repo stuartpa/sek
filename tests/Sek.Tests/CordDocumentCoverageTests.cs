@@ -37,4 +37,16 @@ public class CordDocumentCoverageTests
         Assert.Empty(d.ResolveMachineImportedActionTypes("Nope"));
         Assert.Empty(d.ResolveMachineEventActions("Nope"));
     }
+
+    [Fact]
+    public void EventAction_WithoutDot_UsesWholeTarget()
+    {
+        // An event action declared without a Type. qualifier (bare method) has a dotless target,
+        // exercising the `LastIndexOf('.') < 0` arm of the short-label extraction.
+        var d = CordDocument.ParseText(
+            "config C { action all S; action event void Ev(); }\n" +
+            "machine M() : C { construct model program from C }\n");
+        var events = d.ResolveMachineEventActions("M");
+        Assert.Contains("Ev", events);
+    }
 }
