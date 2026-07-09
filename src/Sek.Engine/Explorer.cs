@@ -98,7 +98,7 @@ public sealed class Explorer
             // legal here; one that is guard-disabled for every arg set (and never enabled) is a
             // model-derived negative edge (attempting it here is illegal and a SUT must reject it).
             var enabledHere = new HashSet<string>(StringComparer.Ordinal);
-            var disabledReasons = new Dictionary<string, string>(StringComparer.Ordinal);
+            var disabledReasons = new Dictionary<string, (string Reason, IReadOnlyList<string> Args)>(StringComparer.Ordinal);
 
             foreach (var rule in _model.Rules)
             {
@@ -110,7 +110,10 @@ public sealed class Explorer
                     var invokeArgs = MaterializeArgs(rule, target, argSet);
                     if (!TryInvoke(rule, target, invokeArgs, result.Diagnostics, out var retVal, out var guardReason))
                     {
-                        if (guardReason is not null) disabledReasons[rule.ActionLabel] = guardReason;
+                        // Remember the forbidden action WITH its argument set, so a negative test
+                        // reproduces the actual illegal invocation (e.g. a duplicate Create(1)),
+                        // not an argless default.
+                        if (guardReason is not null) disabledReasons[rule.ActionLabel] = (guardReason, invokeArgs.Select(Stringify).ToList());
                         continue; // guard disabled or error -> action not enabled
                     }
 
@@ -150,10 +153,11 @@ public sealed class Explorer
 
             // Record model-derived negative edges: actions guard-disabled here for every arg set
             // (never enabled) — attempting them from this state is illegal and a SUT must reject them.
-            foreach (var (label, reason) in disabledReasons)
+            foreach (var (label, info) in disabledReasons)
             {
                 if (enabledHere.Contains(label)) continue;
-                graph.NegativeTransitions.Add(new NegativeTransition(fromId, ActionInvocation.Of(label), reason));
+                graph.NegativeTransitions.Add(new NegativeTransition(
+                    fromId, new ActionInvocation(label, info.Args, ActionKindOf(label)), info.Reason));
             }
         }
 
@@ -495,7 +499,10 @@ public sealed class Explorer
         }
         catch (TargetInvocationException tie) when (tie.InnerException is GuardDisabledException g)
         {
-            guardReason = g.Message; // guard not satisfied: action disabled (model forbids it here)
+            // A real precondition surfaces a reason (=> a model-derived negative edge). An
+            // exploration bound disables the action for finite exploration only and is NOT a
+            // negative edge, so it reports no reason.
+            guardReason = g.IsExplorationBound ? null : g.Message; // guard not satisfied: action disabled here
             return false;
         }
         catch (TargetInvocationException tie)

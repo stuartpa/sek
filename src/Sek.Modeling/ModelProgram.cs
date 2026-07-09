@@ -21,4 +21,19 @@ public abstract class ModelProgram
             throw new GuardDisabledException(reason);
         }
     }
+
+    /// <summary>
+    /// An exploration bound (not a real precondition): if <paramref name="condition"/> is false the
+    /// action is disabled here only to keep the explored state space finite. Unlike
+    /// <see cref="Require"/>, a bound is NOT recorded as a model-derived negative edge — a conforming
+    /// SUT is not expected to reject it, because the limit is an artifact of finite exploration
+    /// rather than illegal behavior.
+    /// </summary>
+    protected static void RequireBound(bool condition, string reason)
+    {
+        if (!condition)
+        {
+            throw new GuardDisabledException(reason, isExplorationBound: true);
+        }
+    }
 }

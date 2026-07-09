@@ -43,6 +43,12 @@ public static class Conformance
 
         var report = new ConformanceReport();
 
+        // Optional per-path reset: a stateful SUT (e.g. one backed by a database) can expose a
+        // `public static void ResetForConformance()` on any type in the binding assembly. It is
+        // called before each witness path and each negative test so every path starts from the
+        // model's initial state, matching the offline exploration's per-path semantics.
+        var reset = FindResetHook(asm);
+
         // Replay witness PATHS (init → accepting), not isolated transitions: a stateful SUT must be
         // driven to a transition's source state before that transition is exercised. Each path uses
         // ONE SUT instance (per type), reused across the path's steps — mirroring the generated
@@ -57,6 +63,7 @@ public static class Conformance
         {
             foreach (var path in paths)
             {
+                reset?.Invoke(null, null); // start each path from the model's initial state
                 var instances = new Dictionary<Type, object?>();
                 foreach (var t in path.Steps)
                 {
@@ -81,6 +88,7 @@ public static class Conformance
             // An illegal action the SUT accepts is a conformance failure.
             foreach (var neg in graph.NegativeTransitions)
             {
+                reset?.Invoke(null, null); // clean state before driving the negative's legal prefix
                 var instances = new Dictionary<Type, object?>();
                 var prefixOk = true;
                 foreach (var t in TestGen.LegalPrefixTo(graph, neg.FromStateId))
@@ -121,6 +129,32 @@ public static class Conformance
         }
 
         return report;
+    }
+
+    /// <summary>Finds an optional per-path reset hook in the binding: the first accessible
+    /// <c>public static void ResetForConformance()</c> declared on any type. Returns null when
+    /// the SUT is stateless (no reset needed).</summary>
+    private static MethodInfo? FindResetHook(Assembly asm)
+    {
+        foreach (var type in SafeGetTypes(asm))
+        {
+            var method = type.GetMethod(
+                "ResetForConformance",
+                BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy,
+                binder: null, types: Type.EmptyTypes, modifiers: null);
+            if (method is not null && method.ReturnType == typeof(void))
+            {
+                return method;
+            }
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<Type> SafeGetTypes(Assembly asm)
+    {
+        try { return asm.GetTypes(); }
+        catch (ReflectionTypeLoadException ex) { return ex.Types.Where(t => t is not null)!; }
     }
 
     private enum StepOutcome { Ok, Rejected, Malformed, NoMethod }

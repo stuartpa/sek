@@ -6,6 +6,8 @@ namespace Sek.Cli;
 public static class ModelLoader
 {
     private static readonly HashSet<string> ProbeDirs = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly List<AssemblyDependencyResolver> Resolvers = new();
+    private static readonly HashSet<string> ResolverKeys = new(StringComparer.OrdinalIgnoreCase);
     private static bool _resolverInstalled;
 
     public static Type LoadModelType(string assemblyPath, string typeName)
@@ -70,7 +72,26 @@ public static class ModelLoader
     /// </summary>
     public static void InstallProbingResolver(string directory)
     {
-        ProbeDirs.Add(Path.GetFullPath(directory));
+        var dir = Path.GetFullPath(directory);
+        ProbeDirs.Add(dir);
+
+        // Register a .deps.json-aware resolver for each main assembly in the directory. This
+        // resolves dependencies the way the runtime would: RID-specific assets (e.g. the real
+        // Microsoft.Data.SqlClient under runtimes/win/lib, not the platform-agnostic facade) and
+        // native libraries (its SNI). Naive sibling probing alone would load the facade and fail
+        // at runtime ("not supported on this platform").
+        if (Directory.Exists(dir))
+        {
+            foreach (var deps in Directory.EnumerateFiles(dir, "*.deps.json"))
+            {
+                var main = Path.Combine(dir, Path.GetFileNameWithoutExtension(Path.GetFileNameWithoutExtension(deps)) + ".dll");
+                if (File.Exists(main) && ResolverKeys.Add(main))
+                {
+                    try { Resolvers.Add(new AssemblyDependencyResolver(main)); }
+                    catch { /* no/invalid deps.json: fall back to sibling probing */ }
+                }
+            }
+        }
 
         if (_resolverInstalled)
         {
@@ -80,6 +101,16 @@ public static class ModelLoader
         _resolverInstalled = true;
         AssemblyLoadContext.Default.Resolving += (ctx, name) =>
         {
+            // Prefer deps.json resolution (RID-correct), then fall back to sibling probing.
+            foreach (var resolver in Resolvers)
+            {
+                var resolved = resolver.ResolveAssemblyToPath(name);
+                if (resolved is not null && File.Exists(resolved))
+                {
+                    return ctx.LoadFromAssemblyPath(resolved);
+                }
+            }
+
             foreach (var dir in ProbeDirs)
             {
                 var candidate = Path.Combine(dir, name.Name + ".dll");
@@ -90,6 +121,20 @@ public static class ModelLoader
             }
 
             return null;
+        };
+
+        AssemblyLoadContext.Default.ResolvingUnmanagedDll += (assembly, libraryName) =>
+        {
+            foreach (var resolver in Resolvers)
+            {
+                var resolved = resolver.ResolveUnmanagedDllToPath(libraryName);
+                if (resolved is not null && File.Exists(resolved))
+                {
+                    return System.Runtime.InteropServices.NativeLibrary.Load(resolved);
+                }
+            }
+
+            return IntPtr.Zero;
         };
     }
 }

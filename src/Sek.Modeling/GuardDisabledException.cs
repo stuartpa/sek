@@ -7,8 +7,14 @@ namespace Sek.Modeling;
 /// </summary>
 public sealed class GuardDisabledException : Exception
 {
-    public GuardDisabledException(string reason)
+    /// <summary>True when the guard is an exploration bound (a limiter to keep the state space
+    /// finite) rather than a real precondition. Bounds disable the action during exploration but
+    /// are NOT recorded as model-derived negative edges (a conforming SUT need not reject them).</summary>
+    public bool IsExplorationBound { get; }
+
+    public GuardDisabledException(string reason, bool isExplorationBound = false)
         : base(reason)
     {
+        IsExplorationBound = isExplorationBound;
     }
 }
