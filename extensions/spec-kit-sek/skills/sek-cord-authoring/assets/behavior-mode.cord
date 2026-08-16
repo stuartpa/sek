@@ -1,0 +1,46 @@
+config Protocol
+{
+    action abstract static void Actions.Open();
+    action abstract static void Actions.Send();
+    action abstract static void Actions.Close();
+}
+
+machine Left() : Protocol
+{
+    Open; Send; Close
+}
+
+machine Right() : Protocol
+{
+    Open; (Send | Close)?
+}
+
+machine Synchronized() : Protocol
+{
+    Left || Right
+}
+
+machine Interleaved() : Protocol
+{
+    Left ||| Right
+}
+
+machine SharedSyncOthersInterleave() : Protocol
+{
+    Left |?| Right
+}
+
+machine Loose() : Protocol
+{
+    Open -> Close
+}
+
+machine PermutedBlocks() : Protocol
+{
+    (Open; Send) & Close
+}
+
+machine UniversalAndNegation() : Protocol
+{
+    Open; ...; (! Close)*; Close
+}

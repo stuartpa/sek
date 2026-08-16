@@ -7,7 +7,9 @@ description: A conceptual overview of Cord — SpecExplorerKit's configuration a
 
 **Cord** (COndition and Reaction Descriptions) is SEK's language for *configuring*
 exploration and *composing* behavior. This page explains the concepts; the
-[Cord language reference](../reference/cord-language.md) has the full grammar.
+[Cord language reference](../reference/cord-language.md) describes implemented syntax and
+semantics, while the [support matrix](../reference/cord-support.md) distinguishes Supported,
+Conditional, Parsed-only, and Unsupported surfaces.
 
 ## Two jobs
 
@@ -85,6 +87,10 @@ machine Party() : PartyActivities
 
 The [Operators sample](../samples/operators.md) demonstrates every operator.
 
+Parallel operators have an implementation boundary: keep them at the current/root
+composition rather than nesting them beneath sequence, choice, or repetition. See the
+[support matrix](../reference/cord-support.md) for this and other conditional semantics.
+
 ## Embedded C#
 
 Cord can embed C# for constraints and preconstraints:
@@ -101,6 +107,7 @@ reference that doesn't resolve.
 ## Related
 
 - [Cord language reference (grammar)](../reference/cord-language.md)
+- [Cord support matrix](../reference/cord-support.md)
 - [Parameter generation](parameter-generation.md)
 - [Combination strategies](combination-strategies.md)
 - Guide: [Writing Cord scenarios](../guides/writing-cord.md)

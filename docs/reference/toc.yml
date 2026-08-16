@@ -4,6 +4,10 @@
   href: cli.md
 - name: Cord language
   href: cord-language.md
+- name: Cord operator semantics
+  href: cord-operators.md
+- name: Cord support matrix
+  href: cord-support.md
 - name: Project configuration
   href: project-config.md
 - name: .seexpl format

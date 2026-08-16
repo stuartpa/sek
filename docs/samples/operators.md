@@ -1,11 +1,11 @@
 ---
 title: Operators sample
-description: The full Cord behavior algebra, demonstrated over abstract actions in behavior mode.
+description: The implemented Cord operator set, demonstrated over abstract actions in behavior mode.
 ---
 
 # Operators
 
-**Demonstrates:** the complete Cord behavior operator algebra, explored in
+**Demonstrates:** every implemented Cord behavior operator in its supported root form, explored in
 *behavior mode* (no model program — pure Cord over abstract actions).
 
 - **Project:** `samples/Operators`
@@ -20,15 +20,15 @@ one operator:
 |---|---|---|
 | `Party` | `;` `\|` `?` | 6 / 6 / 3 |
 | `SyncParallel` | `\|\|` | 3 / 2 / 1 |
-| `InterleavedParallel` | `\|\|\|` | 30 / 58 / 9 |
-| `SyncInterleavedParallel` | `\|?\|` | — |
-| `TightSequence` | `;` | — |
-| `LooseSequence` | `->` | — |
+| `InterleavedParallel` | `\|\|\|` | 27 / 50 / 9 |
+| `SyncInterleavedParallel` | `\|?\|` | 16 / 23 / 7 |
+| `TightSequence` | `;` | 10 / 15 / 3 |
+| `LooseSequence` | `->` | 11 / 68 / 3 |
 | `Permutation` | `&` | 9 / 8 / 2 |
-| `ZeroOrMore` / `OneOrMore` / `Optional` | `*` `+` `?` | — |
-| `BoundedRepetitionExact` / `…Least` / `…Range` | `{n}` `{n,}` `{n,m}` | — |
-| `AnyAction` / `RepetitionOfAnyAction` | `_` / `...` | — |
-| `Negation` / `Truncation` | `!` / `construct accepting paths` | — |
+| `ZeroOrMore` / `OneOrMore` / `Optional` | `*` `+` `?` | 6/12/4 · 6/12/3 · 10/17/4 |
+| `BoundedRepetitionExact` / `…Least` / `…Range` | `{n}` `{n,}` `{n,m}` | 9/14/3 · 13/29/6 · 13/23/6 |
+| `AnyAction` / `RepetitionOfAnyAction` | `_` / `...` | 4/13/1 · 3/13/2 |
+| `Negation` / `Truncation` | `!` / `construct accepting paths` | 3/11/2 · 1/0/1 |
 
 All 18 machines explore successfully.
 
@@ -43,10 +43,13 @@ pwsh samples/run-operators.ps1     # runs them all
 ## Why it matters
 
 The Operators sample is the proof that SEK's [Cord behavior algebra](../reference/cord-language.md#behavior-operators)
-is implemented correctly and can be explored without any model state — the
+can be explored without any model state in these supported forms — the
 [behavior-mode](../concepts/state-exploration.md#behavior-mode) exploration path.
+See the [support matrix](../reference/cord-support.md) before composing parallel operators
+beneath other algebra.
 
 ## Related
 
 - [The Cord language](../concepts/cord-language.md)
 - [Cord language reference](../reference/cord-language.md)
+- [Cord operator semantics](../reference/cord-operators.md)

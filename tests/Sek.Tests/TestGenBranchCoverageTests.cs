@@ -53,6 +53,11 @@ public class TestGenBranchCoverageTests
             Assert.Contains("StepExpectingError(\"A.Blocked\"", src);
             Assert.Contains("\"y\"", src);                        // negative action argument
             Assert.Contains("\\\"no\\\"", src);                   // escaped quotes in the reason
+            Assert.Contains("AppContext.BaseDirectory", src);
+            Assert.Contains("BindingAssets", src);
+            Assert.DoesNotContain(ThisAssembly, src, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("SEK_BINDING", src, StringComparison.Ordinal);
+            Assert.True(File.Exists(Path.Combine(outDir, "BindingAssets", Path.GetFileName(ThisAssembly))));
         }
         finally
         {

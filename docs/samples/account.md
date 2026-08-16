@@ -18,20 +18,20 @@ and mixing object and value parameters.
 exist in the current state; the `balance` value comes from Cord
 `Condition.In(balance, 10, 100)`.
 
-Exploring `AccountExploration` yields exactly ten structurally-distinct states:
+Exploring `ModelProgram` yields exactly ten structurally-distinct states:
 
 ```text
 []  [{0}]  [{0,0}]  [{10}]  [{100}]  [{0,10}]  [{0,100}]  [{10,10}]  [{10,100}]  [{100,100}]
 ```
 
-**Result:** 10 states / 58 transitions / 10 accepting.
+**Result:** 10 states / 78 transitions / 10 accepting.
 
 ## Run it
 
 ```bash
 dotnet build samples/Account/Model/Account.Model.csproj
-sek explore AccountExploration --project samples/Account
-sek view samples/Account/.specexplorerkit/out/AccountExploration.seexpl --format html --out account.html
+sek explore ModelProgram --project samples/Account
+sek view samples/Account/.specexplorerkit/out/ModelProgram.seexpl --format html --out account.html
 ```
 
 ## Why it matters
@@ -43,13 +43,13 @@ distinct states rather than self-loops.
 
 ## Scenario slicing
 
-As in the classic sample's `SlicedModelProgram`, `SlicedAccount` composes a scenario
-with the model via `||`: `(CreateAccount; (SetBalance | GetBalance)* ; Clear) || construct
-model program from ParameterCombinationConfig`. It restricts the full model (10 states /
-58 transitions) to that lifecycle (8 states / 25 transitions).
+`SlicedModelProgram` composes a lifecycle scenario with `ModelProgram` via `||`:
+`(CreateAccount; (SetBalance | GetBalance | SearchAccounts)*; Clear) || ModelProgram`.
+It restricts the full model (10 states / 78 transitions) to 11 product states /
+55 transitions / 1 accepting state.
 
 ```bash
-sek explore SlicedAccount --project samples/Account
+sek explore SlicedModelProgram --project samples/Account
 ```
 
 ## Related

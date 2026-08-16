@@ -12,7 +12,7 @@ comparison.
 
 | Sample | What it demonstrates | Result |
 |---|---|---|
-| [Operators](operators.md) | the full Cord behavior algebra | 18 machines explore (e.g. Party 6/6/3) |
+| [Operators](operators.md) | every implemented Cord operator in supported root forms | 18 machines explore (e.g. Party 6/6/3) |
 | [ParameterGeneration](parameter-generation.md) | Z3 combination strategies + predicate pruning | Product 27, Pairwise 11, Constraint 21 |
 | [Account](account.md) | dynamic reachable-object domains | 10 states / 58 transitions |
 | [PubSub](pubsub.md) | pub/sub object model, message queues | 500 states (bound hit) |

@@ -1,0 +1,68 @@
+config Main
+{
+    action void Workflow.Start(int id);
+    action void Workflow.Advance(int id);
+    action void Workflow.Stop();
+    switch StateBound = 1000;
+    switch StepBound = 5000;
+    switch PathDepthBound = 100;
+}
+
+machine ModelProgram() : Main
+{
+    construct model program from Main
+}
+
+machine BoundInputs() : Main
+{
+    bind Start({1, 2}), Advance(1..3)
+    in
+    ModelProgram
+}
+
+machine DifferentIds() : Main
+{
+    let int requestId, int responseId
+        where {.
+            Condition.In(requestId, 1, 2, 3);
+            Condition.In(responseId, 1, 2, 3);
+            Condition.IsTrue(requestId != responseId);
+        .}
+    in
+    Start(requestId); Advance(responseId)
+}
+
+machine Bounded() : Main
+{
+    construct bounded exploration where PathDepth = 2 for ModelProgram
+}
+
+machine Completing() : Main
+{
+    construct accept completion where Completer = "ModelProgram" for Bounded
+}
+
+machine PointAndShoot() : Main
+{
+    construct point shoot
+        where Shoot = "Bounded", Completer = "ModelProgram"
+        with (. WorkflowModel.GoalReached .)
+        for ModelProgram
+}
+
+machine ForbiddenOrder() : Main
+{
+    ...; Stop; Advance : fail
+}
+
+machine CheckOrder() : Main
+{
+    ForbiddenOrder || ModelProgram
+}
+
+machine Requirements() : Main
+{
+    construct requirement coverage
+        where RequirementsToCover = "REQ-start,REQ-stop", MinimumRequirementCount = 2
+        for ModelProgram
+}

@@ -19,13 +19,13 @@ model state; the rules that act on them take a `Tree`/`SFile` parameter drawn fr
 the reachable objects. Guards enforce the lifecycle ordering. The model is
 *accepting* when the session is fully torn down.
 
-**Result:** 17 states / 32 transitions / 1 accepting — a clean, finite lifecycle.
+**AllSync result:** 15 states / 60 transitions / 5 accepting.
 
 ## Run it
 
 ```bash
 dotnet build samples/SMB2/Model/SMB2.Model.csproj
-sek explore Smb2Lifecycle --project samples/SMB2
+sek explore AllSync --project samples/SMB2
 ```
 
 ## Porting note
@@ -37,12 +37,12 @@ are out of scope for model exploration.
 
 ## Scenario slicing
 
-As in the classic sample's `AllSync`, `SyncSession` composes a synchronous session
-scenario with the model via `||`: setup → tree connect → create → read/write → teardown.
-It restricts the full lifecycle (17 states / 32 transitions) to 9 states / 9 transitions.
+`AllSync` composes a synchronous setup scenario with `StateMachine` via `||` and then
+allows the remaining context behavior. `AsyncCreateClose` is the bounded asynchronous
+create/close slice (24 states / 60 transitions / 5 accepting).
 
 ```bash
-sek explore SyncSession --project samples/SMB2
+sek explore AsyncCreateClose --project samples/SMB2
 ```
 
 ## Related

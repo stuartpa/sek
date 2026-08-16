@@ -1,10 +1,11 @@
 # Builds the SpecExplorerKit release assets into ./dist:
 #   - spec-kit-sek.zip   : the Spec Kit extension (extension.yml at archive root)
 #   - SpecExplorerKit.Tool.<version>.nupkg : the `sek` .NET global tool
+#   - SpecExplorerKit.Modeling.<version>.nupkg : the downstream model-program runtime
 # and prints the extension zip's SHA-256 (for the community catalog entry).
 
 param(
-    [string]$Version = '0.1.0',
+    [string]$Version = '0.1.2',
     [string]$Configuration = 'Release'
 )
 
@@ -29,7 +30,9 @@ Write-Host "SHA-256           : $sha"
 & (Join-Path $PSScriptRoot 'fetch-z3-linux.ps1')
 $cli = Join-Path $root 'src/Sek.Cli/Sek.Cli.csproj'
 dotnet pack $cli -c $Configuration -o $dist /p:Version=$Version | Out-Null
-Get-ChildItem $dist -Filter '*.nupkg' | ForEach-Object { Write-Host "Tool package      : $($_.FullName)" }
+$modeling = Join-Path $root 'src/Sek.Modeling/Sek.Modeling.csproj'
+dotnet pack $modeling -c $Configuration -o $dist /p:Version=$Version | Out-Null
+Get-ChildItem $dist -Filter '*.nupkg' | ForEach-Object { Write-Host "NuGet package     : $($_.FullName)" }
 
 # 3) Stamp the sha256 into the catalog entry for convenience.
 $catalog = Join-Path $root 'extensions/catalog.community.json'

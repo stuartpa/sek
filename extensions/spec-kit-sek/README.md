@@ -12,15 +12,17 @@ that your implementation conforms.
 - `/speckit.sek.model` — generate a SEK model program + Cord scenarios from `spec.md`.
 - `/speckit.sek.explore` — explore the model into a `.seexpl` transition system and summarize coverage.
 - `/speckit.sek.verify` — replay the exploration against the implementation and report conformance.
+- `skills/sek-cord-authoring` — progressively loaded, implementation-accurate Cord language guidance.
+- `skills/using-sek-to-generate-tests` — downstream project, binding, conformance, and generated-replay guidance.
 
 ## Installation
 
 ```bash
 # Install the SEK tool (dependency)
-dotnet tool install -g sek
+dotnet tool install -g SpecExplorerKit.Tool
 
 # Add the extension to your Spec Kit project
-specify extension add spec-kit-sek --from https://github.com/stuartpa/sek/releases/latest/download/spec-kit-sek.zip
+specify extension add sek --from https://github.com/stuartpa/sek/releases/latest/download/spec-kit-sek.zip
 ```
 
 Or, for local development against a checkout:
@@ -36,6 +38,7 @@ specify extension add --dev ./extensions/spec-kit-sek
 | Spec Kit | `>= 0.1.0` | host toolkit |
 | .NET SDK | `>= 8.0` | runs SEK |
 | `sek` tool | latest | model exploration & conformance |
+| `SpecExplorerKit.Modeling` | matching SEK version | model-program compile-time/runtime API |
 
 ## Usage
 
@@ -47,6 +50,10 @@ specify extension add --dev ./extensions/spec-kit-sek
 
 See each command's documentation under [`commands/`](commands/), and the full
 SEK documentation at <https://github.com/stuartpa/sek>.
+
+Installed agent resources live under
+`.specify/extensions/sek/skills/`; downstream products should consume them rather
+than vendoring SEK language documentation.
 
 ## Configuration
 
@@ -63,7 +70,7 @@ The commands operate on a `.specexplorerkit/config.json` in the feature folder:
 
 ## Troubleshooting
 
-- **`sek: command not found`** — run `dotnet tool install -g sek` and ensure the
+- **`sek: command not found`** — run `dotnet tool install -g SpecExplorerKit.Tool` and ensure the
   .NET global tools directory is on your `PATH`.
 - **`machine '<name>' not found`** — check the machine name matches a `machine`
   declared in your Cord script (`sek validate` lists them).

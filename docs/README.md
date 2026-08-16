@@ -28,7 +28,7 @@ docfx docs/docfx.json
 - `install/` — installation.
 - `guides/` — task-oriented walkthroughs (quickstart, authoring, Cord, conformance, migration).
 - `concepts/` — the ideas (MBT, model programs, exploration, Cord, Z3, object domains, conformance).
-- `reference/` — CLI, Cord grammar, project config, `.seexpl` format.
+- `reference/` — CLI, implemented Cord language/support status, project config, `.seexpl` format.
 - `samples/` — the ported Spec Explorer 2010 sample suite.
 - `community/` — using SEK as a Spec Kit extension.
 - `release-notes/` — per-version release notes.

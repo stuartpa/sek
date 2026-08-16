@@ -1,0 +1,38 @@
+config Main
+{
+    action void Workflow.Start(int id);
+    action void Workflow.Advance(int id);
+    action void Workflow.Stop();
+
+    switch StateBound = 1000;
+    switch StepBound = 5000;
+    switch PathDepthBound = 100;
+}
+
+config Domains : Main
+{
+    action void Workflow.Start(int id)
+        where {. Condition.In(id, 1, 2, 3); .};
+    action void Workflow.Advance(int id)
+        where {. Condition.In(id, 1, 2, 3); .};
+}
+
+machine ModelProgram() : Domains
+{
+    construct model program from Domains
+}
+
+machine Lifecycle() : Domains
+{
+    Start; Advance*; Stop
+}
+
+machine LifecycleSlice() : Domains
+{
+    Lifecycle || ModelProgram
+}
+
+machine TestSuite() : Domains where TestEnabled = true
+{
+    construct test cases where strategy = "shorttests" for LifecycleSlice
+}

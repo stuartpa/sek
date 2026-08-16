@@ -19,14 +19,13 @@ shore; `RunAground(atx, aty)` and `Rescue()` model the grounding lifecycle. The
 `RunAground`'s `atx`/`aty` use **state-dependent `[Domain]`** methods
 (`=> new[]{X}` / `=> new[]{Y}`) so the guard `atx == X` is always satisfiable.
 
-**Result:** 4,000 states / 4,000 transitions / 3 accepting **(bound hit)** — matching
-the classic sample's own 4,000 bound.
+**Point-shoot result:** 19 states / 46 transitions / 3 accepting.
 
 ## Run it
 
 ```bash
 dotnet build samples/Sailboat/Model/Sailboat.Model.csproj
-sek explore Voyage --project samples/Sailboat
+sek explore PointAndShoot --project samples/Sailboat
 ```
 
 ## Why it matters

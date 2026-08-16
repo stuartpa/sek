@@ -1,9 +1,9 @@
 schema_version: "1.0"
 
 extension:
-  id: "spec-kit-sek"
+  id: "sek"
   name: "SpecExplorerKit (SEK)"
-  version: "0.1.1"
+  version: "0.1.2"
   description: "Model-based testing for spec-driven development: model, explore, and verify with SpecExplorerKit."
   author: "stuartpa"
   repository: "https://github.com/stuartpa/sek"

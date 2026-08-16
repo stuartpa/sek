@@ -5,13 +5,15 @@ description: Install and use the SpecExplorerKit community extension to add mode
 
 # Using SEK as a Spec Kit extension
 
-SEK ships as a **Spec Kit community extension** (`spec-kit-sek`). It adds
+SEK ships as a **Spec Kit community extension** (`sek`; release asset
+`spec-kit-sek.zip`). It adds
 model-based testing to the spec-driven development (SDD) lifecycle: turn a feature's
 acceptance criteria into an executable **model**, **explore** it for edge cases, and
 **verify** that your implementation conforms.
 
 - **Category:** `code` &nbsp;•&nbsp; **Effect:** `read-write`
 - **Commands:** `/speckit.sek.model`, `/speckit.sek.explore`, `/speckit.sek.verify`
+- **Agent skills:** `sek-cord-authoring`, `using-sek-to-generate-tests`
 
 ## Prerequisites
 
@@ -22,7 +24,7 @@ acceptance criteria into an executable **model**, **explore** it for edge cases,
 ## Install the extension
 
 ```bash
-specify extension add spec-kit-sek \
+specify extension add sek \
   --from https://github.com/stuartpa/sek/releases/latest/download/spec-kit-sek.zip
 ```
 
@@ -31,6 +33,10 @@ For local development against a checkout of this repo:
 ```bash
 specify extension add --dev ./extensions/spec-kit-sek
 ```
+
+The installed extension is self-contained: its implementation-accurate Cord and downstream
+consumer skills live under `.specify/extensions/sek/skills/`. Consumers should load
+those resources rather than copying SEK language documentation into their own products.
 
 ## The commands
 

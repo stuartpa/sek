@@ -7,7 +7,15 @@ and reachable states before generating or running tests.
 ## Prerequisites
 
 - A SEK model + Cord exist for the feature (see `/speckit.sek.model`).
-- The `sek` tool is installed: `dotnet tool install -g sek`.
+- The `sek` tool is installed: `dotnet tool install -g SpecExplorerKit.Tool`.
+
+## Cord authority
+
+Before reviewing or changing `.cord`, load
+`.specify/extensions/sek/skills/sek-cord-authoring/SKILL.md` and its
+`references/support-and-safety.md`. In the SEK source repository, use
+`extensions/spec-kit-sek/skills/sek-cord-authoring/SKILL.md`. Stop if these resources are missing;
+do not infer semantics from parser acceptance or downstream documentation.
 
 ## Steps
 
@@ -33,6 +41,8 @@ and reachable states before generating or running tests.
    list the actions that were covered; and call out any `bound hit` (the graph was
    truncated by `StateBound`/`StepBound`, which usually means the modeled behavior
    is unbounded and needs a tighter scenario).
+   Also report arguments/domains, fail/goal/requirement counts when applicable, and
+   model-derived negative transitions. Keep direct-model and sliced-machine evidence separate.
 
 ## Output
 

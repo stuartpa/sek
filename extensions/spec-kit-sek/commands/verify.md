@@ -9,7 +9,15 @@ implementation behaves as the model says it should.
 - A SEK model + Cord exist and explore successfully (see `/speckit.sek.explore`).
 - A **binding** exists that maps model actions to implementation calls (an adapter
   assembly + namespace), declared in `.specexplorerkit/config.json`.
-- The `sek` tool is installed: `dotnet tool install -g sek`.
+- The `sek` tool is installed: `dotnet tool install -g SpecExplorerKit.Tool`.
+
+## SEK consumer authority
+
+Load `.specify/extensions/sek/skills/using-sek-to-generate-tests/SKILL.md`
+before configuring or debugging the binding. Load the sibling `sek-cord-authoring` skill
+when the proof machine or Cord changes. In the SEK source repository, use the same files
+under `extensions/spec-kit-sek/skills/`. Stop if they are unavailable; do not use a
+downstream product's copied SEK documentation.
 
 ## Steps
 

@@ -23,7 +23,11 @@ namespace Sek.Cli
 {
     public static class SekCli
     {
-        private const string Version = "0.1.0";
+        private static string Version =>
+            typeof(SekCli).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+                .InformationalVersion.Split('+')[0]
+            ?? typeof(SekCli).Assembly.GetName().Version?.ToString(3)
+            ?? "unknown";
 
         public static int Run(string[] args)
         {

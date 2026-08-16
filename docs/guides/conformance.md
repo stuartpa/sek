@@ -16,12 +16,17 @@ A binding is an adapter assembly that exposes one method per model action label.
 action, and calls it with the transition's arguments.
 
 ```csharp
-namespace Adapter;
+namespace Turnstile.Sut;
 
-public static class AccountImpl   // namespace/type reachable in the binding assembly
+public sealed class Turnstile
 {
-    public static void CreateAccount() { /* call the real system */ }
-    public static void SetBalance(object account, int balance) { /* ... */ }
+  public bool Locked { get; private set; } = true;
+  public void Coin() => Locked = false;
+  public void Push()
+  {
+    if (Locked) throw new InvalidOperationException("cannot push a locked turnstile");
+    Locked = true;
+  }
 }
 ```
 
@@ -31,9 +36,9 @@ Add a `binding` block to `.specexplorerkit/config.json`:
 
 ```json
 {
-  "model":   { "assembly": "Model/bin/Debug/Model.dll", "type": "MyApp.AccountModel" },
+  "model":   { "assembly": "Model/bin/Debug/Turnstile.Model.dll", "type": "Turnstile.Model.TurnstileModel" },
   "cord":    "Model",
-  "binding": { "assembly": "Adapter/bin/Debug/Adapter.dll", "namespace": "Adapter" },
+  "binding": { "assembly": "Sut/bin/Debug/Turnstile.Sut.dll", "namespace": "Turnstile.Sut" },
   "out":     ".specexplorerkit/out"
 }
 ```
@@ -41,18 +46,20 @@ Add a `binding` block to `.specexplorerkit/config.json`:
 ## 3. Build and run
 
 ```bash
-dotnet build Model/Model.csproj
-dotnet build Adapter/Adapter.csproj
-sek test AccountExploration --project path/to/project
+dotnet build samples/Turnstile/Model/Turnstile.Model.csproj
+dotnet build samples/Turnstile/Sut/Turnstile.Sut.csproj
+sek test ModelProgram --project samples/Turnstile
 ```
 
 ```text
-Explored 'AccountExploration': 10 states, 58 transitions.
-Conformance against SUT (Adapter):
-  transitions replayed : 58
-  succeeded            : 58
+Explored 'ModelProgram': 2 states, 3 transitions.
+Conformance against SUT (Turnstile.Sut):
+  transitions replayed : 3
+  succeeded            : 3
   failed               : 0
-  actions covered      : 4 (AccountImpl.CreateAccount, AccountImpl.SetBalance, ...)
+  negative replayed    : 1 (illegal actions attempted)
+  negative rejected    : 1 (SUT correctly refused)
+  actions covered      : 2 (Turnstile.Coin, Turnstile.Push)
 TEST PASSED
 ```
 

@@ -52,9 +52,9 @@ public void SetBalance(Account account, int balance) => account.Balance = balanc
 - `SetBalance`'s `account` parameter ranges over the accounts currently in state;
   `balance` comes from Cord `Condition.In(balance, 10, 100)`.
 
-Exploring `AccountExploration` yields exactly the ten structurally-distinct states
+Exploring `ModelProgram` yields exactly the ten structurally-distinct states
 `{ [], [{0}], [{0,0}], [{10}], [{100}], [{0,10}], [{0,100}], [{10,10}], [{10,100}],
-[{100,100}] }` with 58 transitions — the object domain and Z3 value domain combining
+[{100,100}] }` with 78 transitions — the object domain and Z3 value domain combining
 correctly.
 
 ## Mixing object and value parameters

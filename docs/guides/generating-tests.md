@@ -46,7 +46,8 @@ A self-contained test project:
 ```text
 <machine>Tests/
 ├── <machine>Tests.csproj   # references xunit + the test SDK
-└── <machine>Tests.cs       # one [Fact] per generated path
+├── <machine>Tests.cs       # one [Fact] per generated path/rejection
+└── BindingAssets/          # binding DLL + built DLL/deps.json dependencies
 ```
 
 Each `[Fact]` replays a path by calling the SUT binding for every action in the
@@ -63,9 +64,10 @@ public void TpccExploration_Path01()
 }
 ```
 
-An embedded harness resolves each action label to the corresponding binding method
-(the same mapping [conformance](conformance.md) uses) and invokes it with the recorded
-arguments; a failed call fails the test.
+An embedded harness resolves each action label to the corresponding binding method and
+invokes it with the recorded arguments. SEK snapshots the built binding and its sibling
+DLL/`.deps.json` dependencies into `BindingAssets`; the generated project copies those
+assets into its output and loads only that snapshot. A failed call fails the test.
 
 ## Run
 
@@ -73,12 +75,12 @@ arguments; a failed call fails the test.
 dotnet test path/to/<machine>Tests
 ```
 
-The harness loads the binding assembly from a baked-in path. Override it — e.g. in CI,
-or when the adapter lives elsewhere — with the `SEK_BINDING` environment variable:
+There is no ambient binding fallback or `SEK_BINDING` override. Build the intended binding
+before generation, regenerate after binding/dependency changes, and commit or transfer the
+complete generated project including `BindingAssets`.
 
-```bash
-SEK_BINDING=/path/to/Adapter.dll dotnet test path/to/<machine>Tests
-```
+Model-derived negative transitions are emitted as tests that drive a legal prefix and then
+assert that the SUT rejects the forbidden action.
 
 ## Coverage and path selection
 
@@ -90,6 +92,9 @@ tests; the command reports how many transitions the suite covers.
 For large models (like TPC-C's 12,706 transitions) a bounded suite won't cover every
 edge — tune `--max`, or generate per-scenario machines in Cord and generate tests for
 each. For typical models, a small suite covers the whole graph.
+
+Keep an unsliced model machine when rejection evidence is required; current scenario-sliced
+exploration does not emit model-derived negative transitions.
 
 ## Related
 

@@ -12,8 +12,13 @@ implementation to check *conformance*.
 SEK targets **.NET 8**, runs anywhere .NET runs, needs **no Visual Studio**, and
 uses the **Z3 theorem prover** to power parameter generation.
 
-- 📖 **Documentation:** [`docs/`](docs/) (browse locally with DocFX — see below)
+- 📖 **Documentation:** [`docs/`](docs/) — start with
+    [Writing Cord](docs/guides/writing-cord.md), the
+    [Cord reference](docs/reference/cord-language.md), and the
+    [support matrix](docs/reference/cord-support.md)
 - 🧩 **Spec Kit extension:** [`extensions/spec-kit-sek/`](extensions/spec-kit-sek/)
+- 🤖 **Agent skills:** [Cord authoring](.github/skills/sek-cord-authoring/SKILL.md) and
+    [downstream test generation](.github/skills/using-sek-to-generate-tests/SKILL.md)
 - 🧪 **Samples:** [`samples/`](samples/) — the classic Spec Explorer 2010 suite, ported
 
 ## The SEK loop
@@ -34,25 +39,26 @@ flowchart LR
 dotnet build src/Sek.Cli/Sek.Cli.csproj
 
 # Explore a sample and view it
-sek explore AccountExploration --project samples/Account
-sek view samples/Account/.specexplorerkit/out/AccountExploration.seexpl --format html --out account.html
+sek explore SlicedModelProgram --project samples/Account
+sek view samples/Account/.specexplorerkit/out/SlicedModelProgram.seexpl --format html --out account.html
 ```
 
 Install `sek` as a global tool from a release:
 
 ```bash
-dotnet tool install -g sek --add-source <feed-or-nupkg-folder>
+dotnet tool install -g SpecExplorerKit.Tool --add-source <feed-or-nupkg-folder>
 ```
 
 ## Repository layout
 
 | Path | Contents |
 |---|---|
-| `src/` | The engine: `Sek.Core`, `Sek.Modeling`, `Sek.Solver` (Z3), `Sek.Cord`, `Sek.Engine`, `Sek.Cli`. |
+| `src/` | The engine: `Sek.Core`, `Sek.Modeling`, `Sek.Cord`, `Sek.Engine`, `Sek.Cli`; generic solving lives in `components/SpecExplorerKit.Components.Solving`. |
 | `docs/` | DocFX documentation site (MS-Learn-style). |
 | `samples/` | The nine ported Spec Explorer 2010 samples. |
 | `extensions/spec-kit-sek/` | The Spec Kit community extension. |
-| `skills/` | VS Code agent skills (e.g. viewing `.seexpl`). |
+| `.github/skills/` | Discoverable agent skills for Cord authoring, consumption, and SEK development. |
+| `skills/` | Product skills packaged outside `.github` (e.g. viewing `.seexpl`). |
 | `scripts/` | Packaging / release helpers. |
 
 ## Building the docs
@@ -71,7 +77,7 @@ lives in the engine**:
 
 - **Sek.Core** — the transition-system IR (`.seexpl`) and Mermaid/DOT/HTML renderers.
 - **Sek.Modeling** — the modeling runtime (`ModelProgram`, `[Rule]`, `[Domain]`, `[AcceptingCondition]`, `Require`, `Condition`).
-- **Sek.Solver** — the parameter solver seam with a Z3 backend and a dependency-free enumerative fallback.
+- **SpecExplorerKit.Components.Solving** — the parameter solver seam with Z3 and dependency-free enumerative backends.
 - **Sek.Cord** — the Cord lexer, parser, AST, and constraint extraction.
 - **Sek.Engine** — the deterministic BFS explorer (state hashing, guards, parameter generation, reachable-object domains) and the Cord behavior automaton.
 - **Sek.Cli** — the `sek` command-line tool (`init`, `validate`, `explore`, `view`, `test`).

@@ -13,6 +13,12 @@
   <PropertyGroup>
     <RootNamespace>Sek.Modeling</RootNamespace>
     <AssemblyName>Sek.Modeling</AssemblyName>
+    <PackageId>SpecExplorerKit.Modeling</PackageId>
+    <Authors>SpecExplorerKit</Authors>
+    <Description>Model-program runtime for SpecExplorerKit: rules, guards, domains, accepting conditions, requirements, and structural containers.</Description>
+    <PackageTags>model-based-testing;spec-explorer;cord;testing</PackageTags>
+    <RepositoryUrl>https://github.com/stuartpa/sek</RepositoryUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
 </Project>

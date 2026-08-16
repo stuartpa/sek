@@ -16,7 +16,6 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>sek</ToolCommandName>
     <PackageId>SpecExplorerKit.Tool</PackageId>
-    <Version>0.1.0</Version>
     <Authors>SpecExplorerKit</Authors>
     <Description>SpecExplorerKit (SEK): a modern, CLI-first model-based testing toolkit inspired by Spec Explorer + Cord.</Description>
   </PropertyGroup>

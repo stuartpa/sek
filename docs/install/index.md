@@ -34,6 +34,10 @@ sek version
 sek z3        # self-test the Z3 backend (prints SATISFIABLE)
 ```
 
+Model projects reference the matching `SpecExplorerKit.Modeling` package, published in the
+same release. Add the release folder as a NuGet source when working from downloaded packages,
+or use a source-checkout `ProjectReference` to `src/Sek.Modeling/Sek.Modeling.csproj`.
+
 ### From source
 
 ```bash
@@ -49,7 +53,7 @@ dotnet src/Sek.Cli/bin/Debug/sek.dll version
 If you use [Spec Kit](https://github.github.io/spec-kit/), add the SEK extension:
 
 ```bash
-specify extension add spec-kit-sek \
+specify extension add sek \
   --from https://github.com/stuartpa/sek/releases/latest/download/spec-kit-sek.zip
 ```
 

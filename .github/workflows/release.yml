@@ -1,8 +1,7 @@
 name: release
 
-# On a version tag (v*), validate SEK end-to-end, build the release assets
-# (the Spec Kit extension archive + the `sek` .NET tool package), and publish a
-# GitHub Release with those assets attached.
+# On a version tag (v*), validate SEK end-to-end, build the Spec Kit extension,
+# `sek` global-tool package, and model-runtime package, then publish them together.
 
 on:
   push:
@@ -11,9 +10,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to build (without leading v), e.g. 0.1.0"
+        description: "Version to build (without leading v), e.g. 0.1.2"
         required: true
-        default: "0.1.0"
+        default: "0.1.2"
 
 permissions:
   contents: write
@@ -57,4 +56,5 @@ jobs:
             --title "SpecExplorerKit v${{ steps.ver.outputs.version }}" \
             --notes-file "docs/release-notes/v${{ steps.ver.outputs.version }}.md" \
             "dist/spec-kit-sek.zip" \
-            "dist/SpecExplorerKit.Tool.${{ steps.ver.outputs.version }}.nupkg"
+            "dist/SpecExplorerKit.Tool.${{ steps.ver.outputs.version }}.nupkg" \
+            "dist/SpecExplorerKit.Modeling.${{ steps.ver.outputs.version }}.nupkg"

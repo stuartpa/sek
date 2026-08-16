@@ -20,13 +20,14 @@ A model is a plain net8 class library that references the `Sek.Modeling` runtime
     <AssemblyName>Model</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="SpecExplorerKit.Modeling" Version="0.1.0" />
+    <PackageReference Include="SpecExplorerKit.Modeling" Version="0.1.2" />
   </ItemGroup>
 </Project>
 ```
 
 > [!NOTE]
-> In the SEK source tree, samples use a `ProjectReference` to
+> Releases publish `SpecExplorerKit.Modeling` beside the `sek` tool package. In the SEK
+> source tree, samples use a `ProjectReference` to
 > `src/Sek.Modeling/Sek.Modeling.csproj` instead of a package reference.
 
 ## 2. Hold state in public properties

@@ -20,12 +20,14 @@ dotnet build (Join-Path $root 'src/Sek.Cli/Sek.Cli.csproj') -v q
 $samples = [ordered]@{
     'Operators'          = @('Party', 'SyncParallel', 'InterleavedParallel', 'Permutation', 'RepetitionOfAnyAction', 'Negation')
     'ParameterGeneration'= @('Product', 'Pairwise', 'Constraint')
-    'Account'            = @('AccountExploration')
-    'PubSub'             = @('PubSubExploration')
-    'atsvc'              = @('JobScheduler')
-    'chat'               = @('ChatProtocol')
-    'SMB2'               = @('Smb2Lifecycle')
-    'Sailboat'           = @('Voyage')
+    'Account'            = @('SlicedModelProgram')
+    'PubSub'             = @('TwoSubscribersWithParametersSlice')
+    'atsvc'              = @('ModelProgramWithTwoJobsPattern')
+    'chat'               = @('CombinedSlices')
+    'SMB2'               = @('AllSync', 'CheckAsyncCreateCloseForNoAsync')
+    'Sailboat'           = @('PointAndShoot')
+    'Turnstile'          = @('ModelProgram')
+    'SelfHost'           = @('ModelProgram')
 }
 
 $failures = @()

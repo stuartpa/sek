@@ -1,8 +1,8 @@
 # HANDOFF: EngLoopKit is now available — install & practise the fix→release→upgrade loop
 
 **Audience:** the chat/fork developing **SEK**.
-**Date:** 2026-07-06.
-**TL;DR:** A new Spec Kit bundle, **EngLoopKit**, now exists and is released at **v1.2.0**.
+**Date:** 2026-07-13.
+**TL;DR:** A new Spec Kit bundle, **EngLoopKit**, now exists and is released at **v1.6.0**.
 SEK should consume it as a proper downstream user. This document says what it is, how it is
 installed (and the role of `uv`), and — most importantly — **how to get SEK through the
 EngLoopKit stages without it turning into a slog: pilot on one small component first, use
@@ -19,7 +19,7 @@ It provides nine `/speckit.engloopkit.*` commands and composes two companion ext
 (architecture-guard, tinyspec).
 
 - **Repo:** https://github.com/stuartpa/engloopkit
-- **Current release:** `v1.2.0`
+- **Current release:** `v1.6.0`
 - **Commands:** `seed`, `architect`, `model`, `explore`, `coverage`, `incident`,
   `postmortem`, `repair`, `refactor-scan`.
 
@@ -63,14 +63,14 @@ initialized (`.specify/` exists), so no `specify init` is needed.
 
 ```powershell
 specify extension add engloopkit --force `
-  --from https://github.com/stuartpa/engloopkit/releases/download/v1.2.0/engloopkit-extension-1.2.0.zip
+  --from https://github.com/stuartpa/engloopkit/releases/download/v1.6.0/engloopkit-extension-1.6.0.zip
 ```
 
 Answer **`y`** to the "Untrusted Source" prompt (it is an external URL). This installs the
 nine `/speckit.engloopkit.*` commands into SEK's agent command directories
 (`.github/prompts/`, `.github/agents/`) and the source under `.specify/extensions/engloopkit/`.
 
-### Option B — the full bundle (adds the companion extensions)
+### Option B — the full workflow (adds the companion extensions)
 
 The `architect` stage uses **architecture-guard** and the `repair` stage uses **tinyspec**.
 For the whole loop, install all three:
@@ -81,7 +81,7 @@ specify extension add architecture-guard --force `
 specify extension add tinyspec --force `
   --from https://github.com/Quratulain-bilal/spec-kit-tinyspec/archive/refs/tags/v1.0.0.zip
 specify extension add engloopkit --force `
-  --from https://github.com/stuartpa/engloopkit/releases/download/v1.2.0/engloopkit-extension-1.2.0.zip
+  --from https://github.com/stuartpa/engloopkit/releases/download/v1.6.0/engloopkit-extension-1.6.0.zip
 ```
 
 ### Verify
@@ -147,7 +147,11 @@ models hang. On a **small component** each of these is a five-minute incident, n
 3. **Model it (Stage 4)** — `/speckit.engloopkit.model`: a small SEK model of that component.
 4. **Explore + cover (Stage 5)** — `/speckit.engloopkit.explore` then
    `/speckit.engloopkit.coverage`: get the generated (or, where `generate` can't bind,
-   hand-written) tests green and that component's coverage up.
+  hand-written) tests green and that component's coverage up. **Do not advance to
+  operations merely because a percentage looks good:** v1.6.0's Readiness Gate requires
+  model-derived negative conformance (the model must generate illegal sequences that the
+  SUT rejects), no hand-coded error assertions substituted for that evidence, and a
+  behavioral-richness floor. Record that evidence in the COV/readiness inventory.
 5. **Every time a command or the tool misbehaves, that is an EngLoopKit incident** — go to 4.3.
 
 The pilot is *done* when that one component is filed, modelled, tested, and green — **and** the
@@ -177,12 +181,13 @@ with its own release cycle.
  ┌────────────────────────────────────────────────────────────────────────┐
  │ 3. FIX in the EngLoopKit repo (its own operations loop)                │
  │    /speckit.engloopkit.incident → mitigate; then postmortem → repair.  │
- │    Land the fix; 42-test suite + `specify bundle validate` stay green. │
+ │    Land the fix; ELK's release-validation suite + `specify bundle       │
+ │    validate` stay green.                                                │
  └───────────────────────────────┬────────────────────────────────────────┘
                                  │
                                  ▼
  ┌────────────────────────────────────────────────────────────────────────┐
- │ 4. RELEASE a new EngLoopKit version (e.g. v1.2.0)                       │
+│ 4. RELEASE a new EngLoopKit version (e.g. v1.6.1)                       │
  │    Bump extension.yml + bundle.yml + CHANGELOG; rebuild the extension   │
  │    asset; update catalog.json (download_url + sha256); tag; gh release  │
  │    with engloopkit-<v>.zip + engloopkit-extension-<v>.zip.             │

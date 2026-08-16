@@ -24,16 +24,15 @@ combinations — mirroring the classic sample's parameter slicing.
 
 ```bash
 dotnet build samples/atsvc/Model/atsvc.Model.csproj
-sek explore JobScheduler --project samples/atsvc
-sek explore ManagedJobs  --project samples/atsvc   # scenario-sliced
+sek explore ModelProgramWithConfigParameters --project samples/atsvc
+sek explore ModelProgramWithTwoJobsPattern --project samples/atsvc
 ```
 
 ## Scenario slicing
 
-`ManagedJobs` slices the model with a scenario — `AddJob; (GetJobInfo | DeleteJob)*`
-composed with the model program via `||`. The full `JobScheduler` explores to 10
-states / 42 transitions; the slice restricts it to 8 states / 15 transitions (runs
-that add one job and then only query or delete it — never a second `AddJob`). See
+`ModelProgramWithTwoJobsPattern` slices the model with `AddTwoJobsPattern` via `||`.
+The direct model explores to 10 states / 42 transitions / 10 accepting states; the
+sliced product explores to 35 states / 72 transitions / 10 accepting states. See
 [Writing Cord → Scenario slicing](../guides/writing-cord.md#scenario-slicing).
 
 ## Porting note

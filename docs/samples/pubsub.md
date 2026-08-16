@@ -18,28 +18,20 @@ fans a message out to all of a publisher's subscribers; `BroadcastAck(Subscriber
 consumes the head of a subscriber's queue. Object-typed parameters (`Publisher`,
 `Subscriber`) range over reachable objects; message payloads come from Cord.
 
-**Result:** 500 states / 1,610 transitions / 4 accepting **(bound hit)**.
+**Parameterized-slice result:** 90 states / 137 transitions / 8 accepting.
 
 ## Run it
 
 ```bash
 dotnet build samples/PubSub/Model/PubSub.Model.csproj
-sek explore PubSubExploration --project samples/PubSub
+sek explore TwoSubscribersWithParametersSlice --project samples/PubSub
 ```
-
-## Note on bounds
-
-The message queues are unbounded (you can always publish again), so the state space
-is infinite; exploration reports `(bound hit)` when `StateBound` truncates it — the
-classic PubSub sample notes the same "infinite, pruned" behavior. Tighten the Cord
-scenario to explore a specific finite slice.
 
 ## Scenario slicing
 
-The unbounded full model becomes finite when sliced by a scenario, as in the classic
-sample's `TwoSubscribersSlice`: `TwoSubscribersScenario || construct model program from
-Params`. Full exploration hits the bound (500 states); the slice is a finite 20 states /
-30 transitions.
+`TwoSubscribersSlice` constrains object creation and two publishes, exploring to
+11 states / 13 transitions / 1 accepting state. `TwoSubscribersWithParametersSlice`
+uses bounded `let` values for three publishes and explores to 90 / 137 / 8.
 
 ```bash
 sek explore TwoSubscribersSlice --project samples/PubSub

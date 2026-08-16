@@ -142,8 +142,9 @@ sek generate TpccExploration --project ./MyProject
 # Run with: dotnet test ".../TpccExplorationTests"
 ```
 
-The generated tests load the binding assembly from a baked-in path; override it at run
-time with the `SEK_BINDING` environment variable (useful in CI).
+The generated project snapshots the built binding and its sibling DLL/`.deps.json`
+dependencies under `BindingAssets`, copies them to test output, and loads that snapshot.
+There is no `SEK_BINDING` fallback. Rebuild and regenerate after binding changes.
 
 ---
 

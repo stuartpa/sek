@@ -20,28 +20,23 @@ inbox. Object-typed parameters range over reachable users; user ids and payloads
 come from Cord. The model is *accepting* when the protocol is quiescent (everyone
 logged on, no pending broadcasts).
 
-**Result:** 1,000 states / 4,512 transitions / 4 accepting **(bound hit)**.
+**Combined-slice result:** 57 states / 83 transitions / 17 accepting.
 
 ## Run it
 
 ```bash
 dotnet build samples/chat/Model/chat.Model.csproj
-sek explore ChatProtocol --project samples/chat
+sek explore CombinedSlices --project samples/chat
 ```
-
-## Note on bounds
-
-Like PubSub, broadcast queues are unbounded, so exploration reports `(bound hit)`.
-Tighten the Cord scenario to focus on a finite conversation.
 
 ## Scenario slicing
 
-Like the classic sample's `LogOnOffListSlice`, `ChatSlice` composes a logon/broadcast/
-logoff scenario with the model via `||`. The full model is unbounded (hits the bound at
-1000 states); the slice is a finite 14 states / 16 transitions.
+`CombinedSlices` composes the logon/list, ordered-broadcast, and unordered-broadcast
+scenarios after server startup. Each constituent slice uses `||` with `ModelProgram`.
 
 ```bash
-sek explore ChatSlice --project samples/chat
+sek explore LogOnOffListSlice --project samples/chat
+sek explore BroadcastOrderedSlice --project samples/chat
 ```
 
 ## Related

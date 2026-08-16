@@ -36,10 +36,11 @@ SEK is a clean-room, modern revival of those ideas:
 - The modeling runtime is a small, purpose-built library (`Sek.Modeling`) rather
   than `Microsoft.Modeling`. State lives in public properties and is snapshotted as
   JSON; set-equality is handled by canonical hashing.
-- Some advanced Spec Explorer scenario-control constructs (`bind`,
-  `construct point shoot`, `construct bounded exploration`) are on the roadmap. The
-  common `construct model program from <Config>` and the full behavior operator
-  algebra are supported today.
+- SEK implements the Cord surface exercised by its modern and byte-faithful sample suite,
+  including `bind`, bounded exploration, point-shoot, parameterized machines, and the
+  behavior algebra. Some forms have narrower semantics than classic Spec Explorer and some
+  legacy productions remain unsupported; the
+  [Cord support matrix](../reference/cord-support.md) is authoritative.
 - SEK ships as a [Spec Kit community extension](../community/spec-kit-extension.md),
   bringing model-based testing into modern spec-driven development.
 

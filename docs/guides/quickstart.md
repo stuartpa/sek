@@ -61,7 +61,7 @@ config ParameterCombinationConfig : Main
       where {. Condition.In(balance, 10, 100); .};
 }
 
-machine AccountExploration() : ParameterCombinationConfig
+machine ModelProgram() : Main
 {
     construct model program from ParameterCombinationConfig
 }
@@ -79,12 +79,12 @@ This checks that every Cord action maps to a model rule and that machine
 ## 4. Explore
 
 ```bash
-sek explore AccountExploration --project samples/Account
+sek explore ModelProgram --project samples/Account
 ```
 
 ```text
-Explored 'AccountExploration': 10 states, 58 transitions, 10 accepting.
-Wrote samples/Account/.specexplorerkit/out/AccountExploration.seexpl
+Explored 'ModelProgram': 10 states, 78 transitions, 10 accepting.
+Wrote samples/Account/.specexplorerkit/out/ModelProgram.seexpl
 ```
 
 SEK performed a deterministic breadth-first search, used Z3 to generate the
@@ -93,7 +93,7 @@ SEK performed a deterministic breadth-first search, used Z3 to generate the
 ## 5. View the graph
 
 ```bash
-sek view samples/Account/.specexplorerkit/out/AccountExploration.seexpl \
+sek view samples/Account/.specexplorerkit/out/ModelProgram.seexpl \
   --format html --out account.html
 ```
 
@@ -106,7 +106,7 @@ If you have a system-under-test binding configured (see
 [Running conformance](conformance.md)), replay the exploration against it:
 
 ```bash
-sek test AccountExploration --project samples/Account
+sek test ModelProgram --project path/to/a/project-with-a-binding
 ```
 
 ## What next?

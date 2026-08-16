@@ -28,7 +28,7 @@ Studio**, and uses the **Z3 theorem prover** to power parameter generation.
 | **CLI-first** | One tool, `sek`. Scriptable, CI-friendly, editor-agnostic. Works great in VS Code with no proprietary extension required. |
 | **Cross-platform .NET 8** | No Windows-only runtime, no Visual Studio, no legacy `Microsoft.Modeling`. |
 | **Z3-powered** | Parameter domains and combination strategies are solved by the [Z3 theorem prover](concepts/parameter-generation.md). |
-| **Cord preserved** | The [Cord](reference/cord-language.md) scenario/configuration language is a first-class citizen. |
+| **Cord preserved** | The [Cord](reference/cord-language.md) scenario/configuration language is first-class, with an explicit [support matrix](reference/cord-support.md). |
 | **Reviewable artifacts** | Explorations are emitted as `.seexpl` JSON and rendered to Mermaid, DOT, or HTML. |
 | **Conformance built in** | Replay an exploration against your system under test and get a pass/fail report. |
 
@@ -63,7 +63,7 @@ flowchart LR
 SEK is validated against the original Spec Explorer 2010 sample suite, ported to
 the modern toolchain. See [Samples](samples/index.md):
 
-- **Operators** — the full Cord behavior algebra.
+- **Operators** — every implemented Cord operator in its supported root composition.
 - **ParameterGeneration** — Z3 combination strategies (interaction, pairwise, predicates).
 - **Account**, **PubSub** — dynamic object domains.
 - **atsvc**, **chat**, **SMB2** — protocol state machines.
@@ -85,3 +85,4 @@ verify your implementation conforms.
 - [Concepts](concepts/index.md)
 - [CLI reference](reference/cli.md)
 - [Cord language reference](reference/cord-language.md)
+- [Cord support matrix](reference/cord-support.md)

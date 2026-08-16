@@ -28,13 +28,14 @@ classic Spec Explorer projects, this guide maps the old concepts to the new ones
 | `Condition.IsTrue(...)` as guards | `Require(cond, "reason")` (or `Condition.IsTrue(cond, "reason")`) |
 | `Microsoft.Modeling` containers (`SetContainer`, `MapContainer`, `Sequence`) | plain `List<T>` / records; structural state hashing handles set-equality |
 | `.seexpl` proprietary output + VS viewer | `.seexpl` JSON + `sek view` (Mermaid/DOT/HTML) |
-| Parameter generation engine | Z3-backed solver (`Sek.Solver`) |
+| Parameter generation engine | Z3-backed `SpecExplorerKit.Components.Solving` |
 | Post-processing via `Microsoft.SpecExplorer.ObjectModel` | read `.seexpl` JSON directly, or `sek view` |
 
 ## Step-by-step
 
 1. **Retarget the model project** to `net8.0` and replace the `Microsoft.Modeling`
-   reference with `SpecExplorerKit.Modeling`.
+   reference with the `SpecExplorerKit.Modeling` package (or a source-checkout
+   `ProjectReference` to `src/Sek.Modeling/Sek.Modeling.csproj`).
 2. **Convert the model class** to derive from `ModelProgram`. Move static state into
    public instance properties. Give it a parameterless constructor.
 3. **Port rules.** Change static `[Rule]` methods to instance methods; keep the
@@ -44,10 +45,12 @@ classic Spec Explorer projects, this guide maps the old concepts to the new ones
 5. **Replace modeling containers** with `List<T>`/records. Objects created during
    exploration become the domain for reference-typed parameters automatically
    (see [Object domains](../concepts/object-domains.md)).
-6. **Keep your Cord** mostly as-is. Advanced scenario-control constructs (`bind`,
-   `construct point shoot`, `construct bounded exploration`) are on the roadmap; the
-   common `construct model program from <Config>` and the full behavior algebra work
-   today.
+6. **Port your Cord against SEK's implemented contract.** `bind`, bounded exploration,
+   point-shoot, parameterized machines, and the behavior algebra are available, but some
+   forms have narrower semantics than classic Spec Explorer. Review the
+   [Cord language reference](../reference/cord-language.md) and
+   [support matrix](../reference/cord-support.md); do not treat successful parsing as
+   semantic parity.
 7. **Add `.specexplorerkit/config.json`** pointing at the built model assembly, the
    Cord directory, and (optionally) the adapter binding.
 8. **Validate and explore:** `sek validate` then `sek explore`.

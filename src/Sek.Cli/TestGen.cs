@@ -250,9 +250,10 @@ public static class TestGen
         var className = safe + "Tests";
         var csproj = Path.Combine(outDir, className + ".csproj");
         var csfile = Path.Combine(outDir, className + ".cs");
+        var bindingFileName = SnapshotBindingAssets(bindingAssemblyPath, outDir);
 
         File.WriteAllText(csproj, Csproj());
-        File.WriteAllText(csfile, TestSource(graph, paths, safe, className, testNamespace, bindingAssemblyPath, bindingNamespace));
+        File.WriteAllText(csfile, TestSource(graph, paths, safe, className, testNamespace, bindingFileName, bindingNamespace));
 
         var covered = new HashSet<Transition>();
         foreach (var p in paths) foreach (var t in p.Steps) covered.Add(t);
@@ -277,6 +278,10 @@ public static class TestGen
             <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
           </ItemGroup>
 
+                    <ItemGroup>
+                        <None Include="BindingAssets/**/*" CopyToOutputDirectory="PreserveNewest" />
+                    </ItemGroup>
+
         </Project>
 
         """;
@@ -294,8 +299,8 @@ public static class TestGen
         sb.AppendLine($"//   {paths.Count} positive test(s) covering {covered.Count}/{graph.Transitions.Count} transitions.");
         sb.AppendLine($"//   {graph.NegativeTransitions.Count} negative test(s): drive to a state, then assert the SUT rejects a model-forbidden action.");
         sb.AppendLine("//   Each test replays an explored action sequence against the SUT binding.");
-        sb.AppendLine("//   The binding assembly path is baked in below; override with the SEK_BINDING");
-        sb.AppendLine("//   environment variable. Regenerate with: sek generate " + graph.Machine);
+        sb.AppendLine("//   The binding and its built dependencies are snapshotted under BindingAssets");
+        sb.AppendLine("//   and loaded only from the generated test output. Regenerate with: sek generate " + graph.Machine);
         sb.AppendLine("// </auto-generated>");
         sb.AppendLine("#nullable disable");
         sb.AppendLine("using System;");
@@ -309,11 +314,11 @@ public static class TestGen
         sb.AppendLine("{");
         sb.AppendLine($"    public sealed class {className}");
         sb.AppendLine("    {");
-        sb.AppendLine($"        private const string DefaultBinding = {Literal(bindingPath)};");
+        sb.AppendLine($"        private const string BindingFileName = {Literal(bindingPath)};");
         sb.AppendLine($"        private const string BindingNamespace = {Literal(bindingNs)};");
         sb.AppendLine();
         sb.AppendLine("        private readonly Sut _sut = new Sut(");
-        sb.AppendLine("            Environment.GetEnvironmentVariable(\"SEK_BINDING\") ?? DefaultBinding, BindingNamespace);");
+        sb.AppendLine("            Path.Combine(AppContext.BaseDirectory, \"BindingAssets\", BindingFileName), BindingNamespace);");
         sb.AppendLine();
 
         for (var i = 0; i < paths.Count; i++)
@@ -396,8 +401,8 @@ public static class TestGen
                         var full = Path.GetFullPath(path);
                         if (!File.Exists(full))
                             throw new FileNotFoundException(
-                                "SUT binding assembly not found: " + full +
-                                ". Build the adapter or set the SEK_BINDING environment variable.");
+                                "Snapshotted SUT binding assembly not found: " + full +
+                                ". Regenerate the standalone test project from a built binding.");
                         var dir = Path.GetDirectoryName(full);
                         AssemblyLoadContext.Default.Resolving += (ctx, name) =>
                         {
@@ -464,6 +469,31 @@ public static class TestGen
                 }
 
         """;
+
+    private static string SnapshotBindingAssets(string bindingAssemblyPath, string outDir)
+    {
+        var binding = Path.GetFullPath(bindingAssemblyPath);
+        if (!File.Exists(binding))
+        {
+            throw new FileNotFoundException($"Binding assembly not found: {binding}. Build the binding before generation.", binding);
+        }
+
+        var sourceDir = Path.GetDirectoryName(binding)
+                        ?? throw new InvalidDataException($"Binding assembly has no parent directory: {binding}");
+        var assetsDir = Path.Combine(outDir, "BindingAssets");
+        if (Directory.Exists(assetsDir)) Directory.Delete(assetsDir, recursive: true);
+        Directory.CreateDirectory(assetsDir);
+
+        foreach (var pattern in new[] { "*.dll", "*.deps.json" })
+        {
+            foreach (var source in Directory.GetFiles(sourceDir, pattern, SearchOption.TopDirectoryOnly))
+            {
+                File.Copy(source, Path.Combine(assetsDir, Path.GetFileName(source)), overwrite: true);
+            }
+        }
+
+        return Path.GetFileName(binding);
+    }
 
     private static string Sanitize(string s)
     {

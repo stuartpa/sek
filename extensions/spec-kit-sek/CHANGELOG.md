@@ -4,6 +4,26 @@ All notable changes to the SpecExplorerKit Spec Kit extension are documented her
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2026-08-16
+
+### Added
+
+- SEK-owned `sek-cord-authoring` and `using-sek-to-generate-tests` Agent Skills,
+  including parse-validated Cord assets and an explicit support matrix.
+- Public implementation-accurate Cord reference, support matrix, and advanced authoring patterns.
+- `SpecExplorerKit.Modeling` is packed beside `SpecExplorerKit.Tool`, so downstream model
+  projects no longer require a sibling SEK source checkout.
+- Generated xUnit projects snapshot their binding and built dependencies under
+  `BindingAssets`, removing absolute paths and the ambient `SEK_BINDING` fallback.
+
+### Fixed
+
+- Changed the extension ID to `sek` so it matches the existing `/speckit.sek.*`
+  command namespace and installs successfully with current Spec Kit. The release asset remains
+  `spec-kit-sek.zip`.
+- Updated generated-test documentation for portable `BindingAssets` snapshots and removed the
+  obsolete `SEK_BINDING` fallback guidance.
+
 ## [0.1.1] - 2026-07-04
 
 ### Changed
