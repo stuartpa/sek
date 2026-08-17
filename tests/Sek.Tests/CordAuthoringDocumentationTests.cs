@@ -92,7 +92,7 @@ public sealed class CordAuthoringDocumentationTests
     public void ReleaseSurface_packagesTheToolAndModelingRuntimeAtOneVersion()
     {
         var props = File.ReadAllText(Path.Combine(Root, "Directory.Build.props"));
-        Assert.Contains("<VersionPrefix>0.1.2</VersionPrefix>", props, StringComparison.Ordinal);
+        Assert.Contains("<VersionPrefix>0.1.3</VersionPrefix>", props, StringComparison.Ordinal);
 
         var cliProject = File.ReadAllText(Path.Combine(Root, "src", "Sek.Cli", "Sek.Cli.csproj"));
         Assert.Contains("<PackageId>SpecExplorerKit.Tool</PackageId>", cliProject, StringComparison.Ordinal);

@@ -9,7 +9,7 @@ SEK is a .NET global tool named `sek`. It runs on Windows, macOS, and Linux.
 
 ## Prerequisites
 
-- **.NET SDK 8.0 or later** — check with `dotnet --version`.
+- **.NET SDK 10.0.303** — the repository and release workflows are pinned to this SDK. Check with `dotnet --version`.
   Download from <https://dotnet.microsoft.com/download>.
 - No Visual Studio, no Windows-only runtime, no legacy `Microsoft.Modeling`.
 - The Z3 native library ships with the `Microsoft.Z3` NuGet package that SEK
@@ -45,7 +45,7 @@ git clone https://github.com/stuartpa/sek
 cd sek
 dotnet build src/Sek.Cli/Sek.Cli.csproj
 # invoke the freshly built tool:
-dotnet src/Sek.Cli/bin/Debug/sek.dll version
+dotnet src/Sek.Cli/bin/Debug/net10.0/sek.dll version
 ```
 
 ## Install the Spec Kit extension

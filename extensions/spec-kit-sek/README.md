@@ -36,7 +36,7 @@ specify extension add --dev ./extensions/spec-kit-sek
 | Dependency | Version | Purpose |
 |---|---|---|
 | Spec Kit | `>= 0.1.0` | host toolkit |
-| .NET SDK | `>= 8.0` | runs SEK |
+| .NET SDK | `10.0.303` | builds and runs SEK |
 | `sek` tool | latest | model exploration & conformance |
 | `SpecExplorerKit.Modeling` | matching SEK version | model-program compile-time/runtime API |
 
@@ -61,9 +61,9 @@ The commands operate on a `.specexplorerkit/config.json` in the feature folder:
 
 ```json
 {
-  "model":   { "assembly": "Model/bin/Debug/Model.dll", "type": "Ns.Model" },
+  "model":   { "assembly": "Model/bin/Debug/net10.0/Model.dll", "type": "Ns.Model" },
   "cord":    "Model",
-  "binding": { "assembly": "Adapter/bin/Debug/Adapter.dll", "namespace": "Adapter" },
+  "binding": { "assembly": "Adapter/bin/Debug/net10.0/Adapter.dll", "namespace": "Adapter" },
   "out":     ".specexplorerkit/out"
 }
 ```

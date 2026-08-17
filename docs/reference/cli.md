@@ -174,5 +174,5 @@ sek version
 If you haven't installed the global tool, invoke the freshly built assembly:
 
 ```bash
-dotnet src/Sek.Cli/bin/Debug/sek.dll <command> [options]
+dotnet src/Sek.Cli/bin/Debug/net10.0/sek.dll <command> [options]
 ```

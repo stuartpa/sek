@@ -11,16 +11,16 @@ parts; see also the [Model programs](../concepts/model-programs.md) concept.
 
 ## 1. Create a project
 
-A model is a plain net8 class library that references the `Sek.Modeling` runtime.
+A model is a plain `net10.0` class library that references the `Sek.Modeling` runtime.
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <AssemblyName>Model</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="SpecExplorerKit.Modeling" Version="0.1.2" />
+    <PackageReference Include="SpecExplorerKit.Modeling" Version="0.1.3" />
   </ItemGroup>
 </Project>
 ```

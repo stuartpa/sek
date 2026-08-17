@@ -140,9 +140,9 @@ namespace Sek.Cli
             File.WriteAllText(configPath,
                 """
                 {
-                  "model":   { "assembly": "Model/bin/Debug/Model.dll", "type": "MyProject.Model" },
+                  "model":   { "assembly": "Model/bin/Debug/net10.0/Model.dll", "type": "MyProject.Model" },
                   "cord":    "Model",
-                  "binding": { "assembly": "Adapter/bin/Debug/Adapter.dll", "namespace": "Adapter" },
+                  "binding": { "assembly": "Adapter/bin/Debug/net10.0/Adapter.dll", "namespace": "Adapter" },
                   "out":     ".specexplorerkit/out"
                 }
                 """);

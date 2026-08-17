@@ -9,7 +9,7 @@ intended behavior of a system, describe the scenarios you care about in the
 system** that you can view, generate tests from, and replay against a real
 implementation to check *conformance*.
 
-SEK targets **.NET 8**, runs anywhere .NET runs, needs **no Visual Studio**, and
+SEK targets **.NET 10**, runs anywhere .NET 10 runs, needs **no Visual Studio**, and
 uses the **Z3 theorem prover** to power parameter generation.
 
 - 📖 **Documentation:** [`docs/`](docs/) — start with

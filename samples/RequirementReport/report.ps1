@@ -6,7 +6,7 @@
 # post-processor, which turns any explored `.seexpl` graph into an HTML / DOT / Mermaid
 # report. This script regenerates HTML reports for the explored sample graphs.
 
-$sek = 'C:\boards\brd009\SEK\src\Sek.Cli\bin\Debug\sek.dll'
+$sek = 'C:\boards\brd009\SEK\src\Sek.Cli\bin\Debug\net10.0\sek.dll'
 $outDir = 'C:\boards\brd009\SEK\samples\RequirementReport\reports'
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 

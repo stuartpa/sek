@@ -21,7 +21,7 @@ classic Spec Explorer projects, this guide maps the old concepts to the new ones
 | Classic Spec Explorer | SpecExplorerKit |
 |---|---|
 | Visual Studio extension + designer | CLI-first `sek` tool; no Visual Studio |
-| `.NET Framework` + `Microsoft.Modeling` / `Microsoft.Xrt.Runtime` | .NET 8 + `Sek.Modeling` |
+| `.NET Framework` + `Microsoft.Modeling` / `Microsoft.Xrt.Runtime` | .NET 10 + `Sek.Modeling` |
 | `static` model classes with static state | a class deriving from `ModelProgram`, state in public properties |
 | `[Rule]` on static methods | `[Rule("Label")]` on instance methods |
 | `[AcceptingStateCondition]` | `[AcceptingCondition]` |
@@ -33,7 +33,7 @@ classic Spec Explorer projects, this guide maps the old concepts to the new ones
 
 ## Step-by-step
 
-1. **Retarget the model project** to `net8.0` and replace the `Microsoft.Modeling`
+1. **Retarget the model project** to `net10.0` and replace the `Microsoft.Modeling`
    reference with the `SpecExplorerKit.Modeling` package (or a source-checkout
    `ProjectReference` to `src/Sek.Modeling/Sek.Modeling.csproj`).
 2. **Convert the model class** to derive from `ModelProgram`. Move static state into
@@ -58,8 +58,8 @@ classic Spec Explorer projects, this guide maps the old concepts to the new ones
 ## Worked examples
 
 Every one of the nine classic Spec Explorer 2010 samples has been ported and lives
-under `samples/`. Compare `samples-source/<name>` (the original) with
-`samples/<name>` (the SEK port) to see the migration applied in practice. See
+under `samples/`. Compare `samples-source/<name>` (original source and Cord fixtures) with
+`samples/<name>` (the .NET 10 SEK port) to see the migration applied in practice. See
 [Samples](../samples/index.md).
 
 ## Notes on parameter generation

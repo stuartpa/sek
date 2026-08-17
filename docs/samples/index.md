@@ -7,8 +7,8 @@ description: The classic Spec Explorer 2010 sample suite, ported to SpecExplorer
 
 To demonstrate fidelity to Spec Explorer, the original Spec Explorer 2010 sample
 suite has been ported to SEK and validated. Each sample lives under `samples/<name>`
-in the repository; the originals are preserved under `samples-source/<name>` for
-comparison.
+in the repository; their original source and byte-identical Cord fixtures are preserved under
+`samples-source/<name>` for comparison; legacy project and build artifacts are intentionally omitted.
 
 | Sample | What it demonstrates | Result |
 |---|---|---|
@@ -28,7 +28,7 @@ comparison.
 From the repository root:
 
 ```bash
-dotnet build src/Sek.Cli/Sek.Cli.csproj
+dotnet build Sek.slnx
 pwsh scripts/validate.ps1     # builds each sample model and explores it
 ```
 

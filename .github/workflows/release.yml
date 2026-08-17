@@ -10,9 +10,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to build (without leading v), e.g. 0.1.2"
+        description: "Version to build (without leading v), e.g. 0.1.3"
         required: true
-        default: "0.1.2"
+        default: "0.1.3"
 
 permissions:
   contents: write
@@ -26,7 +26,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: "10.0.303"
 
       - name: Determine version
         id: ver

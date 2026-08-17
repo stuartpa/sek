@@ -18,7 +18,7 @@ acceptance criteria into an executable **model**, **explore** it for edge cases,
 ## Prerequisites
 
 - [Spec Kit](https://github.github.io/spec-kit/) (`specify`) installed.
-- .NET SDK 8.0+.
+- .NET SDK 10.0.303.
 - The `sek` tool: `dotnet tool install -g SpecExplorerKit.Tool`.
 
 ## Install the extension

@@ -15,6 +15,14 @@ docs/api/
 # Release staging
 dist/
 
+# Legacy Spec Explorer fixtures preserve source/Cord only, never old project/build artifacts
+samples-source/**/*.sln
+samples-source/**/*.csproj
+samples-source/**/*.vcxproj*
+samples-source/**/*.testrunconfig
+samples-source/**/Debug/
+samples-source/**/Release/
+
 # Vendored native (fetched on demand by scripts/fetch-z3-linux.ps1)
 native/
 

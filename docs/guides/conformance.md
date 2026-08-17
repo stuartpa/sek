@@ -36,9 +36,9 @@ Add a `binding` block to `.specexplorerkit/config.json`:
 
 ```json
 {
-  "model":   { "assembly": "Model/bin/Debug/Turnstile.Model.dll", "type": "Turnstile.Model.TurnstileModel" },
+  "model":   { "assembly": "Model/bin/Debug/net10.0/Turnstile.Model.dll", "type": "Turnstile.Model.TurnstileModel" },
   "cord":    "Model",
-  "binding": { "assembly": "Sut/bin/Debug/Turnstile.Sut.dll", "namespace": "Turnstile.Sut" },
+  "binding": { "assembly": "Sut/bin/Debug/net10.0/Turnstile.Sut.dll", "namespace": "Turnstile.Sut" },
   "out":     ".specexplorerkit/out"
 }
 ```

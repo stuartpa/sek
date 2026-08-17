@@ -58,7 +58,7 @@ Spec Explorer binds actions to an adapter/model project via the Visual Studio pr
 `.specexplorerkit/config.json`:
 
 ```json
-{ "model": { "assembly": "Model/bin/Debug/Model.dll", "type": "<default model type>" },
+{ "model": { "assembly": "Model/bin/Debug/net10.0/Model.dll", "type": "<default model type>" },
   "cord": "Model", "out": ".specexplorerkit/out" }
 ```
 

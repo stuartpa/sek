@@ -15,7 +15,7 @@
     Path to the JSON manifest (default: samples/regression.manifest.json).
 
 .PARAMETER Dll
-    Path to the built sek.dll (default: src/Sek.Cli/bin/Debug/sek.dll).
+    Path to the built sek.dll (default: src/Sek.Cli/bin/Debug/net10.0/sek.dll).
 
 .PARAMETER Update
     Record mode: run each entry and write the observed counts back to the manifest
@@ -31,7 +31,7 @@
 [CmdletBinding()]
 param(
     [string]$Manifest = "$PSScriptRoot/../samples/regression.manifest.json",
-    [string]$Dll = "$PSScriptRoot/../src/Sek.Cli/bin/Debug/sek.dll",
+    [string]$Dll = "$PSScriptRoot/../src/Sek.Cli/bin/Debug/net10.0/sek.dll",
     [switch]$Update,
     [int]$TimeoutSec = 180
 )

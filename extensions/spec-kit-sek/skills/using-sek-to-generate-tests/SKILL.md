@@ -27,9 +27,9 @@ MyProject/
 
 ```json
 {
-  "model": { "assembly": "Model/bin/Debug/Model.dll", "type": "MyNs.MyModel" },
+  "model": { "assembly": "Model/bin/Debug/net10.0/Model.dll", "type": "MyNs.MyModel" },
   "cord": "Model",
-  "binding": { "assembly": "Sut/bin/Debug/MySut.dll", "namespace": "MyNs.Sut" },
+  "binding": { "assembly": "Sut/bin/Debug/net10.0/MySut.dll", "namespace": "MyNs.Sut" },
   "out": ".specexplorerkit/out"
 }
 ```
@@ -44,7 +44,7 @@ different assembly or stale artifact.
 
 ## Model project
 
-Target `net8.0`, derive from `Sek.Modeling.ModelProgram`, and reference the
+Target `net10.0`, derive from `Sek.Modeling.ModelProgram`, and reference the
 `SpecExplorerKit.Modeling` package matching the installed SEK release. In a source checkout, a
 model can instead use a `ProjectReference` to `src/Sek.Modeling/Sek.Modeling.csproj`.
 
@@ -83,7 +83,7 @@ DLL, `.seexpl`, or generated suite after source changes.
 
 ## Generated replay contract
 
-The generated project is standalone net8.0/xUnit and includes a reflection harness. For each path:
+The generated project is standalone `net10.0`/xUnit and includes a reflection harness. For each path:
 
 - one SUT instance per reflected type is reused across all steps in that test path;
 - labels resolve to `<binding namespace>.<Class>` and `Method`;

@@ -13,9 +13,9 @@ output directory are.
 
 ```json
 {
-  "model":   { "assembly": "Model/bin/Debug/Model.dll", "type": "MyApp.MyModel" },
+  "model":   { "assembly": "Model/bin/Debug/net10.0/Model.dll", "type": "MyApp.MyModel" },
   "cord":    "Model",
-  "binding": { "assembly": "Adapter/bin/Debug/Adapter.dll", "namespace": "Adapter" },
+  "binding": { "assembly": "Adapter/bin/Debug/net10.0/Adapter.dll", "namespace": "Adapter" },
   "out":     ".specexplorerkit/out"
 }
 ```
@@ -54,7 +54,7 @@ directories are present after build.
 
 ```json
 {
-  "model": { "assembly": "Model/bin/Debug/Model.dll", "type": "AccountSample.AccountModel" },
+  "model": { "assembly": "Model/bin/Debug/net10.0/Model.dll", "type": "AccountSample.AccountModel" },
   "cord":  "Model",
   "out":   ".specexplorerkit/out"
 }
@@ -64,9 +64,9 @@ directories are present after build.
 
 ```json
 {
-  "model":   { "assembly": "Model/bin/Debug/Model.dll", "type": "MyApp.MyModel" },
+  "model":   { "assembly": "Model/bin/Debug/net10.0/Model.dll", "type": "MyApp.MyModel" },
   "cord":    "Model",
-  "binding": { "assembly": "Adapter/bin/Debug/Adapter.dll", "namespace": "Adapter" },
+  "binding": { "assembly": "Adapter/bin/Debug/net10.0/Adapter.dll", "namespace": "Adapter" },
   "out":     ".specexplorerkit/out"
 }
 ```

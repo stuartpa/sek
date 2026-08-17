@@ -24,9 +24,9 @@ downstream product's copied SEK documentation.
 1. **Ensure a binding is configured.** In `.specexplorerkit/config.json`:
    ```json
    {
-     "model":   { "assembly": "Model/bin/Debug/Model.dll", "type": "Ns.Model" },
+     "model":   { "assembly": "Model/bin/Debug/net10.0/Model.dll", "type": "Ns.Model" },
      "cord":    "Model",
-     "binding": { "assembly": "Adapter/bin/Debug/Adapter.dll", "namespace": "Adapter" },
+     "binding": { "assembly": "Adapter/bin/Debug/net10.0/Adapter.dll", "namespace": "Adapter" },
      "out":     ".specexplorerkit/out"
    }
    ```

@@ -469,10 +469,10 @@ public class SekCliCoverageTests : IClassFixture<SampleModelsFixture>
         Directory.CreateDirectory(Path.Combine(dir, ".specexplorerkit", "out"));
         Directory.CreateDirectory(Path.Combine(dir, "Model"));
         var binding = withBinding
-            ? ",\n  \"binding\": { \"assembly\": \"Sut/bin/Debug/X.dll\", \"namespace\": \"X\" }"
+            ? ",\n  \"binding\": { \"assembly\": \"Sut/bin/Debug/net10.0/X.dll\", \"namespace\": \"X\" }"
             : string.Empty;
         File.WriteAllText(Path.Combine(dir, ".specexplorerkit", "config.json"),
-            "{\n  \"model\": { \"assembly\": \"Model/bin/Debug/X.dll\", \"type\": \"X.Model\" },\n" +
+            "{\n  \"model\": { \"assembly\": \"Model/bin/Debug/net10.0/X.dll\", \"type\": \"X.Model\" },\n" +
             "  \"cord\": \"Model\"" + binding + ",\n  \"out\": \".specexplorerkit/out\"\n}");
         File.WriteAllText(Path.Combine(dir, "Model", "Config.cord"),
             "config C { }\nmachine ModelProgram() : C { construct model program from C }\n");

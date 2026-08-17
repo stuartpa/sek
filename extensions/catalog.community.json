@@ -6,9 +6,9 @@
       "id": "sek",
       "description": "Model-based testing for spec-driven development: turn acceptance criteria into an explorable model, explore edge cases with Z3, and verify implementation conformance.",
       "author": "stuartpa",
-      "version": "0.1.2",
-      "download_url": "https://github.com/stuartpa/sek/releases/download/v0.1.2/spec-kit-sek.zip",
-      "sha256": "f4c35996c384b60999324a190b5560f783e8eb49ba1d7098340b9175025213f0",
+      "version": "0.1.3",
+      "download_url": "https://github.com/stuartpa/sek/releases/download/v0.1.3/spec-kit-sek.zip",
+      "sha256": "458c2b2bb48d6f7df4863956e19e5a09cda60671dc9ce7061378ae76a8a83e6c",
       "repository": "https://github.com/stuartpa/sek",
       "homepage": "https://github.com/stuartpa/sek",
       "documentation": "https://github.com/stuartpa/sek/tree/main/extensions/spec-kit-sek/README.md",
@@ -21,7 +21,7 @@
         "tools": [
           {
             "name": "dotnet",
-            "version": ">=8.0",
+            "version": ">=10.0",
             "required": true
           },
           {

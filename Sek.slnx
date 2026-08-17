@@ -12,6 +12,35 @@
     <Project Path="src/Sek.Engine/Sek.Engine.csproj" />
     <Project Path="src/Sek.Modeling/Sek.Modeling.csproj" />
   </Folder>
+  <Folder Name="/samples/Account/">
+    <Project Path="samples/Account/Model/Account.Model.csproj" />
+  </Folder>
+  <Folder Name="/samples/ParameterGeneration/">
+    <Project Path="samples/ParameterGeneration/Model/ParameterGeneration.Model.csproj" />
+  </Folder>
+  <Folder Name="/samples/PubSub/">
+    <Project Path="samples/PubSub/Model/PubSub.Model.csproj" />
+  </Folder>
+  <Folder Name="/samples/SMB2/">
+    <Project Path="samples/SMB2/Model/SMB2.Model.csproj" />
+  </Folder>
+  <Folder Name="/samples/Sailboat/">
+    <Project Path="samples/Sailboat/Model/Sailboat.Model.csproj" />
+  </Folder>
+  <Folder Name="/samples/SelfHost/">
+    <Project Path="samples/SelfHost/Model/SelfHost.Model.csproj" />
+    <Project Path="samples/SelfHost/Sut/SelfHost.Sut.csproj" />
+  </Folder>
+  <Folder Name="/samples/Turnstile/">
+    <Project Path="samples/Turnstile/Model/Turnstile.Model.csproj" />
+    <Project Path="samples/Turnstile/Sut/Turnstile.Sut.csproj" />
+  </Folder>
+  <Folder Name="/samples/atsvc/">
+    <Project Path="samples/atsvc/Model/atsvc.Model.csproj" />
+  </Folder>
+  <Folder Name="/samples/chat/">
+    <Project Path="samples/chat/Model/chat.Model.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Sek.Tests/Sek.Tests.csproj" />
   </Folder>

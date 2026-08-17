@@ -15,7 +15,7 @@ public class ModelLoaderTests : IClassFixture<SampleModelsFixture>
 
     public ModelLoaderTests(SampleModelsFixture fx)
     {
-        _asm = Path.Combine(fx.RepoRoot, "samples", "SelfHost", "Model", "bin", "Debug", "SelfHost.Model.dll");
+        _asm = Path.Combine(fx.RepoRoot, "samples", "SelfHost", "Model", "bin", "Debug", "net10.0", "SelfHost.Model.dll");
     }
 
     [Fact]

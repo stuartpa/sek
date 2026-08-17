@@ -4,6 +4,17 @@ All notable changes to the SpecExplorerKit Spec Kit extension are documented her
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2026-08-17
+
+### Changed
+
+- Migrated every active product, component, sample, test, generated-test template, workflow,
+  package, document, and Agent Skill to .NET 10 (`net10.0`) with SDK `10.0.303` pinned by
+  `global.json`.
+- Added every active project to the modern `Sek.slnx`; legacy Spec Explorer project/build
+  artifacts are no longer part of the repository, while their source and byte-identical Cord
+  fixtures remain under `samples-source/`.
+
 ## [0.1.2] - 2026-08-16
 
 ### Added

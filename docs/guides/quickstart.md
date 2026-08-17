@@ -20,7 +20,7 @@ dotnet build src/Sek.Cli/Sek.Cli.csproj
 
 For brevity, the rest of this page assumes `sek` is on your `PATH`. If you're
 running the in-repo build, replace `sek` with
-`dotnet src/Sek.Cli/bin/Debug/sek.dll`.
+`dotnet src/Sek.Cli/bin/Debug/net10.0/sek.dll`.
 
 ## 2. Look at the model
 

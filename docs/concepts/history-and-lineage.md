@@ -25,7 +25,7 @@ SEK is a clean-room, modern revival of those ideas:
 
 - **Cord is preserved** as a first-class scenario and configuration language.
 - The **model / explore / view / verify** workflow is intact.
-- The tooling is **CLI-first** (`sek`), cross-platform, and **.NET 8**-native —
+- The tooling is **CLI-first** (`sek`), cross-platform, and **.NET 10**-native —
   no Visual Studio and no Windows-only runtime.
 - Parameter generation is powered by the **Z3** theorem prover.
 - Explorations are emitted as open **`.seexpl` JSON** and rendered to Mermaid, DOT,
@@ -48,5 +48,5 @@ SEK is a clean-room, modern revival of those ideas:
 
 To demonstrate fidelity, the original Spec Explorer 2010 sample suite has been
 ported to SEK and validated (see [Samples](../samples/index.md)). Comparing
-`samples-source/` (originals) with `samples/` (SEK ports) shows the lineage
-concretely.
+`samples-source/` (original source and Cord fixtures) with `samples/` (SEK ports) shows the
+lineage concretely without retaining legacy project or build systems.

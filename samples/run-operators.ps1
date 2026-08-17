@@ -1,4 +1,4 @@
-$sek = 'C:\boards\brd009\SEK\src\Sek.Cli\bin\Debug\sek.dll'
+$sek = 'C:\boards\brd009\SEK\src\Sek.Cli\bin\Debug\net10.0\sek.dll'
 $proj = 'C:\boards\brd009\SEK\samples\Operators'
 $machines = @(
   'Party','NoParty','SyncParallel','InterleavedParallel','SyncInterleavedParallel',

@@ -14,7 +14,7 @@ scenarios you care about in the **Cord** language, and SEK explores the model
 into a finite-state **transition system** that you can view, generate tests
 from, and replay against a real implementation to check *conformance*.
 
-SEK targets **.NET 8**, runs anywhere the .NET runtime runs, needs **no Visual
+SEK targets **.NET 10**, runs anywhere the .NET 10 runtime runs, needs **no Visual
 Studio**, and uses the **Z3 theorem prover** to power parameter generation.
 
 > [!TIP]
@@ -26,7 +26,7 @@ Studio**, and uses the **Z3 theorem prover** to power parameter generation.
 | | |
 |---|---|
 | **CLI-first** | One tool, `sek`. Scriptable, CI-friendly, editor-agnostic. Works great in VS Code with no proprietary extension required. |
-| **Cross-platform .NET 8** | No Windows-only runtime, no Visual Studio, no legacy `Microsoft.Modeling`. |
+| **Cross-platform .NET 10** | No Windows-only runtime, no Visual Studio, no legacy `Microsoft.Modeling`. |
 | **Z3-powered** | Parameter domains and combination strategies are solved by the [Z3 theorem prover](concepts/parameter-generation.md). |
 | **Cord preserved** | The [Cord](reference/cord-language.md) scenario/configuration language is first-class, with an explicit [support matrix](reference/cord-support.md). |
 | **Reviewable artifacts** | Explorations are emitted as `.seexpl` JSON and rendered to Mermaid, DOT, or HTML. |

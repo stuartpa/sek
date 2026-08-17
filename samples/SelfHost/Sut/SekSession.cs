@@ -24,7 +24,7 @@ namespace SelfHost.Sut
         public SekSession()
         {
             _repoRoot = FindRepoRoot();
-            _sekDll = Path.Combine(_repoRoot, "src", "Sek.Cli", "bin", "Debug", "sek.dll");
+            _sekDll = Path.Combine(_repoRoot, "src", "Sek.Cli", "bin", "Debug", "net10.0", "sek.dll");
 
             var turnstile = Path.Combine(_repoRoot, "samples", "Turnstile");
 
@@ -40,8 +40,8 @@ namespace SelfHost.Sut
                 File.Copy(cord, Path.Combine(modelDir, Path.GetFileName(cord)), overwrite: true);
             }
 
-            var modelDll = Path.Combine(turnstile, "Sut", "..", "Model", "bin", "Debug", "Turnstile.Model.dll");
-            var sutDll = Path.Combine(turnstile, "Sut", "bin", "Debug", "Turnstile.Sut.dll");
+            var modelDll = Path.Combine(turnstile, "Sut", "..", "Model", "bin", "Debug", "net10.0", "Turnstile.Model.dll");
+            var sutDll = Path.Combine(turnstile, "Sut", "bin", "Debug", "net10.0", "Turnstile.Sut.dll");
             _configJson =
                 "{\n" +
                 $"  \"model\":   {{ \"assembly\": {Json(Path.GetFullPath(modelDll))}, \"type\": \"Turnstile.Model.TurnstileModel\" }},\n" +

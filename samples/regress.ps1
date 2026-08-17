@@ -1,4 +1,4 @@
-$sek = 'C:\boards\brd009\SEK\src\Sek.Cli\bin\Debug\sek.dll'
+$sek = 'C:\boards\brd009\SEK\src\Sek.Cli\bin\Debug\net10.0\sek.dll'
 function E($label, $machine, $proj) {
     $line = dotnet $sek explore $machine --project $proj 2>&1 | Select-Object -First 1
     '{0,-24}: {1}' -f $label, $line

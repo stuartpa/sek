@@ -24,7 +24,7 @@ action, finds a method whose name matches the action (the part after the last `.
 and invokes it with the transition's arguments.
 
 ```json
-"binding": { "assembly": "Adapter/bin/Debug/Adapter.dll", "namespace": "Adapter" }
+"binding": { "assembly": "Adapter/bin/Debug/net10.0/Adapter.dll", "namespace": "Adapter" }
 ```
 
 Keep bindings **thin**: translate an action + arguments into a single call on the

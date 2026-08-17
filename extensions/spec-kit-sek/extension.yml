@@ -3,7 +3,7 @@ schema_version: "1.0"
 extension:
   id: "sek"
   name: "SpecExplorerKit (SEK)"
-  version: "0.1.2"
+  version: "0.1.3"
   description: "Model-based testing for spec-driven development: model, explore, and verify with SpecExplorerKit."
   author: "stuartpa"
   repository: "https://github.com/stuartpa/sek"
@@ -16,7 +16,7 @@ requires:
   speckit_version: ">=0.1.0"
   tools:
     - name: "dotnet"
-      version: ">=8.0"
+      version: ">=10.0"
       required: true
     - name: "sek"
       required: true

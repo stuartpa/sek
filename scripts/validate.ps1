@@ -1,10 +1,10 @@
-# Validates SEK by building the toolkit, building each sample model, and exploring
+# Validates SEK by building the complete modern solution and exploring
 # a representative machine from each sample. Exits non-zero on any failure. Used by
 # CI (release workflow) and locally. Self-contained: only touches this repo.
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
-$sek  = Join-Path $root 'src/Sek.Cli/bin/Debug/sek.dll'
+$sek  = Join-Path $root 'src/Sek.Cli/bin/Debug/net10.0/sek.dll'
 
 # Microsoft.Z3 has no linux-x64 native. Cache the matching libz3.so so the build copies
 # it next to sek.dll (the .NET loader then uses this app-local native on Linux instead
@@ -13,8 +13,8 @@ if ($IsLinux) {
     & (Join-Path $PSScriptRoot 'fetch-z3-linux.ps1')
 }
 
-Write-Host '== Building SEK toolkit =='
-dotnet build (Join-Path $root 'src/Sek.Cli/Sek.Cli.csproj') -v q
+Write-Host '== Building SEK solution =='
+dotnet build (Join-Path $root 'Sek.slnx') -v q
 
 # sample dir -> @(machines...). Operators is behavior-mode (no model project).
 $samples = [ordered]@{
@@ -33,12 +33,6 @@ $samples = [ordered]@{
 $failures = @()
 foreach ($name in $samples.Keys) {
     $proj = Join-Path $root "samples/$name"
-    # Build the model project if the sample has one.
-    $csproj = Get-ChildItem -Path (Join-Path $proj 'Model') -Filter '*.csproj' -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($csproj) {
-        Write-Host "== Building model: $name =="
-        dotnet build $csproj.FullName -v q
-    }
     foreach ($machine in $samples[$name]) {
         Write-Host "== Explore: $name / $machine =="
         & dotnet $sek explore $machine --project $proj

@@ -24,25 +24,17 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: "10.0.303"
 
       - name: Fetch Linux Z3 native (Microsoft.Z3 ships no linux-x64 libz3)
         shell: pwsh
         run: pwsh scripts/fetch-z3-linux.ps1
 
-      - name: Build CLI
-        run: dotnet build src/Sek.Cli/Sek.Cli.csproj -c Debug
+      - name: Build solution
+        run: dotnet build Sek.slnx -c Debug
 
       - name: Unit tests
-        run: dotnet test tests/Sek.Tests/Sek.Tests.csproj -c Debug --nologo
-
-      - name: Build sample models
-        shell: bash
-        run: |
-          for proj in samples/*/Model/*.csproj; do
-            echo "== building $proj =="
-            dotnet build "$proj" -c Debug
-          done
+        run: dotnet test tests/Sek.Tests/Sek.Tests.csproj -c Debug --no-build --nologo
 
       - name: Sample-exploration regression gate
         shell: pwsh
@@ -52,7 +44,7 @@ jobs:
         shell: bash
         run: |
           set -e
-          SEK=src/Sek.Cli/bin/Debug/sek.dll
+          SEK=src/Sek.Cli/bin/Debug/net10.0/sek.dll
           dotnet build samples/Turnstile/Sut/Turnstile.Sut.csproj -c Debug
           dotnet build samples/Turnstile/Model/Turnstile.Model.csproj -c Debug
           dotnet "$SEK" generate ModelProgram --project samples/Turnstile
@@ -62,7 +54,7 @@ jobs:
         shell: bash
         run: |
           set -e
-          SEK=src/Sek.Cli/bin/Debug/sek.dll
+          SEK=src/Sek.Cli/bin/Debug/net10.0/sek.dll
           # The SelfHost SUT drives the real sek CLI against the Turnstile sample.
           dotnet build samples/Turnstile/Model/Turnstile.Model.csproj -c Debug
           dotnet build samples/SelfHost/Sut/SelfHost.Sut.csproj -c Debug

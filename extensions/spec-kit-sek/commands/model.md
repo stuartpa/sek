@@ -6,7 +6,7 @@ explored and verified as a finite-state model.
 
 ## Prerequisites
 
-- The `.NET 8` SDK is installed (`dotnet --version` ≥ 8).
+- The .NET SDK `10.0.303` is installed (`dotnet --version`).
 - The `sek` tool is installed: `dotnet tool install -g SpecExplorerKit.Tool`.
 - A Spec Kit feature exists with a `spec.md` (and ideally acceptance criteria).
 

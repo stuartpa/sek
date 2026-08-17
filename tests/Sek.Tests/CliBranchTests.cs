@@ -20,7 +20,7 @@ public class CliBranchTests : IClassFixture<SampleModelsFixture>
 
     public CliBranchTests(SampleModelsFixture fx)
     {
-        _turnstileSut = Path.Combine(fx.RepoRoot, "samples", "Turnstile", "Sut", "bin", "Debug", "Turnstile.Sut.dll");
+        _turnstileSut = Path.Combine(fx.RepoRoot, "samples", "Turnstile", "Sut", "bin", "Debug", "net10.0", "Turnstile.Sut.dll");
     }
 
     private static ExplorationGraph LinearGraph(params (string from, string action, string to, bool accepting)[] edges)
