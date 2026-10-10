@@ -79,6 +79,11 @@ public class CliSamplesTests : IClassFixture<SampleModelsFixture>
     public void Explore_SampleMachine_InProcess_Succeeds(string project, string machine)
     {
         var dir = Path.Combine(_fx.RepoRoot, project.Replace('/', Path.DirectorySeparatorChar));
+        if (project == "samples/Sailboat" && machine is "BoundedShoot" or "BoundedShoot1" or "BoundedShoot2" or "PointAndShoot" or "PointAndShoot2")
+        {
+            AssertIncompleteDiagnostic(dir, machine);
+            return;
+        }
         var (code, _, err) = CliHost.Run("explore", machine, "--project", dir);
         Assert.True(code == 0, $"explore {project}/{machine} failed: {err}");
 
@@ -299,8 +304,24 @@ public class CliSamplesTests : IClassFixture<SampleModelsFixture>
     public void Explore_Sailboat_PointAndShoot_SteeringConstruct()
     {
         var dir = Path.Combine(_fx.RepoRoot, "samples", "Sailboat");
-        var (code, _, err) = CliHost.Run("explore", "PointAndShoot", "--project", dir);
-        Assert.True(code == 0, err);
+        AssertIncompleteDiagnostic(dir, "PointAndShoot");
+    }
+
+    private static void AssertIncompleteDiagnostic(string directory, string machine)
+    {
+        var output = Path.Combine(Path.GetTempPath(), "sek_partial_" + Guid.NewGuid().ToString("N") + ".seexpl");
+        try
+        {
+            var (code, stdout, error) = CliHost.Run("explore", machine, "--project", directory, "--partial-out", output);
+            Assert.Equal(1, code);
+            Assert.Contains("depth-limit", error);
+            Assert.DoesNotContain("TEST PASSED", stdout);
+            using var document = JsonDocument.Parse(File.ReadAllText(output));
+            Assert.Equal("INCOMPLETE", document.RootElement.GetProperty("metadata").GetProperty("completeness").GetString());
+            Assert.True(document.RootElement.GetProperty("states").GetArrayLength() > 0);
+            Assert.True(document.RootElement.GetProperty("transitions").GetArrayLength() > 0);
+        }
+        finally { File.Delete(output); }
     }
 
     [Fact]

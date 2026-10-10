@@ -21,6 +21,48 @@ public class EngineSlicingCoverageTests
         new() { Target = target, Args = args.Length == 0 ? null : args.ToList() };
 
     [Fact]
+    public void InvalidState_RejectsAllScenarioQueries()
+    {
+        var scenario = Explorer().Compile(Inv("A", "1"));
+        Assert.False(scenario.IsAccepting(-1));
+        Assert.False(scenario.IsFail(-1));
+        Assert.False(scenario.Permits(-1, "A"));
+        Assert.False(scenario.TryStepArgs(-1, "A", new[] { "1" }, out _));
+    }
+
+    [Fact]
+    public void PinnedProducerAndMixedConsumer_EnforceBindingsArityAndLiterals()
+    {
+        var producer = Inv("A", "1");
+        producer.ReturnBinding = "value";
+        var consumer = Inv("B", "value", "_", "3");
+        var scenario = Explorer().Compile(new SequenceBehavior { Items = { producer, consumer } });
+        var empty = new Dictionary<string, string>();
+        Assert.False(scenario.TryStepBinding(scenario.Start, "A", new[] { "2" }, empty, out _, out _));
+        Assert.False(scenario.TryStepBinding(scenario.Start, "A", System.Array.Empty<string>(), empty, out _, out _));
+        Assert.True(scenario.TryStepBinding(scenario.Start, "A", new[] { "1" }, empty, out var next, out var bound));
+        Assert.Equal("value", bound);
+        var environment = new Dictionary<string, string> { ["value"] = "5" };
+        Assert.False(scenario.TryStepBinding(next, "B", new[] { "6", "99", "3" }, environment, out _, out _));
+        Assert.False(scenario.TryStepBinding(next, "B", new[] { "5", "99", "4" }, environment, out _, out _));
+        Assert.False(scenario.TryStepBinding(next, "B", new[] { "5", "99" }, environment, out _, out _));
+        Assert.True(scenario.TryStepBinding(next, "B", new[] { "5", "99", "3" }, environment, out var end, out var returned));
+        Assert.Null(returned);
+        Assert.True(scenario.IsAccepting(end));
+        Assert.True(scenario.TryStepBinding(next, "B", new[] { "unbound", "99", "3" }, empty, out _, out _));
+        Assert.False(scenario.TryStepArgs(scenario.Start, "A", new[] { "2" }, out _));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SymbolOf_EmptyArgumentsRemainBare(bool explicitEmpty)
+    {
+        var invocation = new InvocationBehavior { Target = "A", Args = explicitEmpty ? new List<string>() : null };
+        Assert.Equal("A", BehaviorExplorer.SymbolOf(invocation));
+    }
+
+    [Fact]
     public void PinnedArgs_Match_Mismatch_LengthMismatch_Wildcard()
     {
         // Scenario: A(1) | A(_)  → the DFA has pinned transitions "A(1)" and "A(_)".

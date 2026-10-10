@@ -22,6 +22,12 @@ public abstract class ModelProgram
         }
     }
 
+    protected static void Require(bool condition, string reason, string obligationId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(obligationId);
+        if (!condition) throw new GuardDisabledException(reason, obligationId: obligationId);
+    }
+
     /// <summary>
     /// An exploration bound (not a real precondition): if <paramref name="condition"/> is false the
     /// action is disabled here only to keep the explored state space finite. Unlike

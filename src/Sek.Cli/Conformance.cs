@@ -30,7 +30,9 @@ public sealed class ConformanceReport
 /// </summary>
 public static class Conformance
 {
-    public static ConformanceReport Replay(ExplorationGraph graph, string bindingAssemblyPath, string ns)
+    public static ConformanceReport Replay(ExplorationGraph graph, string bindingAssemblyPath, string ns,
+        IReadOnlyList<TestGen.TestPath>? selectedPaths = null, IReadOnlyList<NegativeTransition>? selectedNegatives = null,
+        CancellationToken cancellationToken = default)
     {
         var full = Path.GetFullPath(bindingAssemblyPath);
         if (!File.Exists(full))
@@ -54,7 +56,7 @@ public static class Conformance
         // ONE SUT instance (per type), reused across the path's steps — mirroring the generated
         // harness (see IN001). Replaying transitions in isolation on a fresh instance would spuriously
         // fail any guarded action (e.g. a `View` that requires a prior `Explore`).
-        var paths = TestGen.SelectPaths(graph, Math.Max(1, graph.Transitions.Count), TestGen.TestStrategy.Long);
+        var paths = selectedPaths ?? TestGen.SelectPaths(graph, Math.Max(1, graph.Transitions.Count), TestGen.TestStrategy.Long);
 
         // Silence the SUT's console chatter (FakeImpl writes a line per call).
         var savedOut = Console.Out;
@@ -63,10 +65,12 @@ public static class Conformance
         {
             foreach (var path in paths)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 reset?.Invoke(null, null); // start each path from the model's initial state
                 var instances = new Dictionary<Type, object?>();
                 foreach (var t in path.Steps)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     report.TransitionsReplayed++;
                     var outcome = InvokeStep(asm, ns, t.Action, instances, out var msg);
                     if (outcome == StepOutcome.Ok)
@@ -86,8 +90,9 @@ public static class Conformance
             // NEGATIVE conformance (model-derived): for each illegal (state, action) pair, drive the
             // legal prefix to that state then attempt the action — a conforming SUT must REJECT it.
             // An illegal action the SUT accepts is a conformance failure.
-            foreach (var neg in graph.NegativeTransitions)
+            foreach (var neg in selectedNegatives ?? graph.NegativeTransitions)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 reset?.Invoke(null, null); // clean state before driving the negative's legal prefix
                 var instances = new Dictionary<Type, object?>();
                 var prefixOk = true;
@@ -105,8 +110,8 @@ public static class Conformance
                 if (!prefixOk) continue;
 
                 report.NegativeReplayed++;
-                var negOutcome = InvokeStep(asm, ns, neg.Action, instances, out var nmsg);
-                if (negOutcome == StepOutcome.Rejected)
+                var negOutcome = InvokeStep(asm, ns, neg.Action, instances, out var nmsg, out var rejection);
+                if (negOutcome == StepOutcome.Rejected && MatchesRejection(rejection!, RejectionField(neg, "ExpectedExceptionType"), RejectionField(neg, "ExpectedMessageContains")))
                 {
                     report.NegativeRejected++;
                     report.ActionsCovered.Add(neg.Action.Name);
@@ -159,12 +164,24 @@ public static class Conformance
 
     private enum StepOutcome { Ok, Rejected, Malformed, NoMethod }
 
+    internal static string? RejectionField(NegativeTransition negative, string name) =>
+        typeof(NegativeTransition).GetProperty(name)?.GetValue(negative) as string;
+
+    public static bool MatchesRejection(Exception exception, string? expectedExceptionType, string? expectedMessageContains) =>
+        (expectedExceptionType is null || exception.GetType().FullName == expectedExceptionType)
+        && (expectedMessageContains is null || exception.Message.Contains(expectedMessageContains, StringComparison.Ordinal));
+
     /// <summary>Invokes one action against the SUT (reusing per-type instances). <see
     /// cref="StepOutcome.Ok"/> = accepted (ran); <see cref="StepOutcome.Rejected"/> = the SUT threw
     /// (a rejection — the expected outcome for a negative edge); the others are setup problems.</summary>
     private static StepOutcome InvokeStep(Assembly asm, string ns, ActionInvocation action, Dictionary<Type, object?> instances, out string message)
+        => InvokeStep(asm, ns, action, instances, out message, out _);
+
+    private static StepOutcome InvokeStep(Assembly asm, string ns, ActionInvocation action, Dictionary<Type, object?> instances,
+        out string message, out Exception? rejection)
     {
         message = string.Empty;
+        rejection = null;
         var label = action.Name;
         var dot = label.LastIndexOf('.');
         if (dot <= 0)
@@ -189,20 +206,28 @@ public static class Conformance
         try
         {
             var ps = method.GetParameters();
+            if (ps.Length != action.Arguments.Count)
+                throw new ArgumentException($"arity mismatch for '{label}': expected {ps.Length}, got {action.Arguments.Count}");
             var args = new object?[ps.Length];
-            for (var k = 0; k < ps.Length && k < action.Arguments.Count; k++)
+            for (var k = 0; k < ps.Length; k++)
             {
                 args[k] = Coerce(action.Arguments[k], ps[k].ParameterType);
             }
 
             var target = method.IsStatic ? null : Instance(instances, type!);
-            method.Invoke(target, args);
+            try { method.Invoke(target, args); }
+            catch (TargetInvocationException ex) when (ex.InnerException is not null)
+            {
+                rejection = ex.InnerException;
+                message = $"{rejection.GetType().FullName}: {rejection.Message}";
+                return StepOutcome.Rejected;
+            }
             return StepOutcome.Ok;
         }
         catch (Exception ex)
         {
             message = ex.InnerException?.Message ?? ex.Message;
-            return StepOutcome.Rejected;
+            return StepOutcome.Malformed;
         }
     }
 
@@ -225,13 +250,7 @@ public static class Conformance
             return value;
         }
 
-        try
-        {
-            return Convert.ChangeType(value, target);
-        }
-        catch
-        {
-            return value;
-        }
+        if (target.IsEnum) return Enum.Parse(target, value, true);
+        return Convert.ChangeType(value, target, System.Globalization.CultureInfo.InvariantCulture);
     }
 }

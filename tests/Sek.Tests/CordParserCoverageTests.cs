@@ -12,6 +12,57 @@ namespace Sek.Tests;
 public class CordParserCoverageTests
 {
     [Theory]
+    [InlineData("\"fast\"", "fast")]
+    [InlineData("42", "42")]
+    [InlineData("CollapseLabelView", "CollapseLabelView")]
+    public void SwitchValues_AreRetainedInConfigAndMachine(string token, string expected)
+    {
+        var script = Sek.Cord.Parsing.Parser.ParseText(
+            $"config C {{ switch Mode = {token}; }} machine M() : C where Mode = {token} {{ }}");
+        Assert.Equal(expected, Assert.Single(script.Configurations).Switches["Mode"]);
+        Assert.Equal(expected, Assert.Single(script.Machines).Switches["Mode"]);
+    }
+
+    [Theory]
+    [InlineData("config C { switch Mode = ; }")]
+    [InlineData("config C { switch Mode = +; }")]
+    [InlineData("config C { switch Mode = ")]
+    [InlineData("config C {} machine M() : C where Mode = + { }")]
+    [InlineData("config C {} machine M() : C where Mode = ")]
+    [InlineData("config C { action void Service.Call(int")]
+    [InlineData("config C { action void Service.Call(int value")]
+    [InlineData("config C { action void Service.Call() where value")]
+    [InlineData("config C { switch Mode = 42;")]
+    [InlineData("config C {} machine M(int value")]
+    [InlineData("config C {} machine M(System.Collections.Generic.List<int")]
+    [InlineData("config C {} machine M(int[")]
+    [InlineData("config C { action void Service.Call(int value) where (value")]
+    [InlineData("config C {} machine M() : C { Call((1)")]
+    [InlineData("config C {} machine M() : C { bind Call({1")]
+    [InlineData("config C {} machine M() : C { bind Call(Value(Field={1})")]
+    [InlineData("config C {} machine M() : C { let int value where (value")]
+    [InlineData("config C {} machine M() : C { bind Call(")]
+    [InlineData("config C {} machine M() : C { bind Call({")]
+    [InlineData("config C {} machine M() : C { bind Call(Value(")]
+    [InlineData("config C {} machine M() : C { Call(1,")]
+    [InlineData("config C { unknown value")]
+    public void TruncatedDeclarationsAndInvalidSwitchValues_RejectSyntax(string source)
+    {
+        var exception = Assert.ThrowsAny<System.Exception>(() => Sek.Cord.Parsing.Parser.ParseText(source));
+        Assert.Equal("CordSyntaxException", exception.GetType().Name);
+    }
+
+    [Fact]
+    public void DeclaredActionWithoutParameterName_PreservesEmptyName()
+    {
+        var script = Sek.Cord.Parsing.Parser.ParseText("config C { action void Service.Call(int); }");
+        var action = Assert.Single(Assert.Single(script.Configurations).DeclaredActions);
+        var parameter = Assert.Single(action.Parameters);
+        Assert.Equal("int", parameter.Type);
+        Assert.Equal(string.Empty, parameter.Name);
+    }
+
+    [Theory]
     // action kinds + modifiers
     [InlineData("config C { action event void Sub.Received(string d); }")]
     [InlineData("config C { action return int Svc.Compute(); }")]
@@ -71,6 +122,23 @@ public class CordParserCoverageTests
     [InlineData("config C { action all S; } machine Mp() : C { construct model program from C } machine M() : C { ( bind Open({1} + _) in Mp ) }")]
     [InlineData("config C { action all S; } machine Mp() : C { construct model program from C } machine M() : C { ( bind Make(Foo(F={1,2}, G=3)) in Mp ) }")]
     [InlineData("config C { action all S; } machine Mp() : C { construct model program from C } machine M() : C { ( bind Use(instances Foo) in Mp ) }")]
+    [InlineData("config C {} machine M() : C { bind Call in Step }")]
+    [InlineData("config C {} machine M() : C { bind Call(out {1}, ref {2}) in Step }")]
+    [InlineData("config C {} machine M() : C { bind Call(_ + _, {1} + {2}, Value()) in Step }")]
+    [InlineData("config C {} machine M() : C { bind Call(Value(Field=_)) in Step }")]
+    [InlineData("config C {} machine M() : C { bind Call(hi..3, 3..lo, 4..2, 1..5000) in Step }")]
+    [InlineData("config C {} machine M() : C { bind Call({+}) in Step }")]
+    [InlineData("config C {} machine M() : C { let int value in Step }")]
+    [InlineData("config C {} machine M() : C { let int value where (Check((value))) in Step }")]
+    [InlineData("config C {} machine M() : C { let int value where (. Check(value) .) in Step }")]
+    [InlineData("config C {} machine M() : C { (Open() / _) }")]
+    [InlineData("config C {} machine M() : C { construct accepting paths where Flag, Mode = Fast with (Check((1))) for Step }")]
+    [InlineData("config C {} machine M() : C { construct requirement coverage for Step }")]
+    [InlineData("config C {} machine M() : C { construct requirement coverage where Flag=true for Step }")]
+    [InlineData("config C {} machine M() : C { construct test cases for Step }")]
+    [InlineData("config C {} machine M() : C { construct bounded exploration for Step }")]
+    [InlineData("config C {} machine M() : C { construct point shoot for Step }")]
+    [InlineData("config C {} machine M() : C { construct accept completion for Step }")]
     public void Parses_Without_Error(string source)
     {
         var ex = Record.Exception(() => CordDocument.ParseText(source));

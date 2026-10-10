@@ -71,6 +71,19 @@ public class SolvingPredicateCoverageTests
     }
 
     [Fact]
+    public void MixedTypes_Preserve_Null_Boolean_And_Numeric_Conversions()
+    {
+        Assert.Equal(true, Ev(Bin("==", Lit(1L), Lit(true))));
+        Assert.Equal(true, Ev(Bin("==", Lit(0L), Lit(false))));
+        Assert.Equal(false, Ev(Bin("==", Lit(1L), Lit(false))));
+        Assert.Equal(true, Ev(Un("!", Lit(null))));
+        Assert.Equal(false, Ev(Un("!", Lit(1L))));
+        Assert.Equal(0L, Ev(Bin("+", Lit(null), Lit(false))));
+        Assert.Equal(1L, Ev(Bin("+", Lit(true), Lit(false))));
+        Assert.Equal(2L, Ev(Bin("+", Lit(2.5m), Lit(0L))));
+    }
+
+    [Fact]
     public void Vars_And_Eval_ReturnsBool()
     {
         var a = new Dictionary<string, object?> { ["x"] = 5L };

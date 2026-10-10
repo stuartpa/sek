@@ -340,6 +340,8 @@
     {
       "project": "samples/Sailboat",
       "machine": "BoundedShoot",
+      "expectedOutcome": "INCOMPLETE",
+      "terminationReason": "depth-limit",
       "states": 9,
       "transitions": 24,
       "accepting": 3
@@ -347,6 +349,8 @@
     {
       "project": "samples/Sailboat",
       "machine": "BoundedShoot1",
+      "expectedOutcome": "INCOMPLETE",
+      "terminationReason": "depth-limit",
       "states": 74,
       "transitions": 117,
       "accepting": 3
@@ -354,6 +358,8 @@
     {
       "project": "samples/Sailboat",
       "machine": "BoundedShoot2",
+      "expectedOutcome": "INCOMPLETE",
+      "terminationReason": "depth-limit",
       "states": 74,
       "transitions": 117,
       "accepting": 3
@@ -361,6 +367,8 @@
     {
       "project": "samples/Sailboat",
       "machine": "PointAndShoot",
+      "expectedOutcome": "INCOMPLETE",
+      "terminationReason": "depth-limit",
       "states": 19,
       "transitions": 46,
       "accepting": 3
@@ -368,6 +376,8 @@
     {
       "project": "samples/Sailboat",
       "machine": "PointAndShoot2",
+      "expectedOutcome": "INCOMPLETE",
+      "terminationReason": "depth-limit",
       "states": 329,
       "transitions": 1018,
       "accepting": 3

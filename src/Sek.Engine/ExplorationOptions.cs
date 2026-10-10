@@ -12,6 +12,14 @@ public sealed class ExplorationOptions
     /// <summary>Maximum BFS depth from the initial state.</summary>
     public int MaxDepth { get; set; } = 12800;
 
+    public long MaxCandidateEvaluations { get; set; } = 250000;
+    public int MaxNegativeTransitions { get; set; } = 5000;
+    public TimeSpan MaxElapsedTime { get; set; } = TimeSpan.FromSeconds(120);
+    public CancellationToken CancellationToken { get; set; }
+    public TimeProvider TimeProvider { get; set; } = TimeProvider.System;
+    public ExplorationBudget? Budget { get; set; }
+    public Func<string, string, Sek.Core.Model.ActionInvocation, bool>? RejectionFilter { get; set; }
+
     /// <summary>When true (Cord <c>switch StopAtError</c>), a model-checking exploration stops
     /// as soon as the first failure (<c>: fail</c>) state is reached.</summary>
     public bool StopAtError { get; set; }

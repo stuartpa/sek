@@ -14,6 +14,24 @@ namespace Sek.Tests;
 /// </summary>
 public class ModelingContainerCoverageTests
 {
+    private static Container ReadNull<Container>()
+    {
+        var options = new JsonSerializerOptions();
+        var converter = (System.Text.Json.Serialization.JsonConverter<Container>)
+            new ContainerJsonConverterFactory().CreateConverter(typeof(Container), options);
+        var reader = new Utf8JsonReader(System.Text.Encoding.UTF8.GetBytes("null"));
+        Assert.True(reader.Read());
+        return converter.Read(ref reader, typeof(Container), options)!;
+    }
+
+    [Fact]
+    public void ContainerConverters_NullReadsProduceEmptyImmutableCollections()
+    {
+        Assert.Empty(ReadNull<Set<int>>());
+        Assert.Empty(ReadNull<Sequence<int>>());
+        Assert.Empty(ReadNull<Map<string, int>>());
+    }
+
     [Fact]
     public void Set_Operations_And_Equality()
     {

@@ -85,6 +85,9 @@ public sealed class SeexplDocument
                 Action = n.Action.Name,
                 Arguments = n.Action.Arguments.Count == 0 ? null : n.Action.Arguments.ToList(),
                 Reason = n.Reason,
+                ObligationId = n.ObligationId,
+                ExpectedExceptionType = n.ExpectedExceptionType,
+                ExpectedMessageContains = n.ExpectedMessageContains,
             });
         }
 
@@ -117,7 +120,12 @@ public sealed class SeexplDocument
             graph.NegativeTransitions.Add(new NegativeTransition(
                 n.From,
                 new ActionInvocation(n.Action, n.Arguments ?? new List<string>()),
-                n.Reason ?? string.Empty));
+                n.Reason ?? string.Empty)
+            {
+                ObligationId = n.ObligationId,
+                ExpectedExceptionType = n.ExpectedExceptionType,
+                ExpectedMessageContains = n.ExpectedMessageContains,
+            });
         }
 
         return graph;
@@ -125,13 +133,154 @@ public sealed class SeexplDocument
 
     public string ToJson() => JsonSerializer.Serialize(this, JsonOptions);
 
-    public void Save(string path) => File.WriteAllText(path, ToJson());
+    public void Save(string path) => Save(path, DefaultMaxBytes);
+
+    public void Save(string path, long maxBytes, CancellationToken cancellationToken = default) =>
+        Publish(path, maxBytes, cancellationToken, stream => JsonSerializer.Serialize(stream, this, JsonOptions));
+
+    private const long DefaultMaxBytes = 25 * 1024 * 1024;
+
+    public static void SaveGraph(ExplorationGraph graph, string path, long maxBytes = DefaultMaxBytes,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(graph);
+        Publish(path, maxBytes, cancellationToken, stream =>
+        {
+            using var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true });
+            writer.WriteStartObject();
+            writer.WriteString("seexplVersion", "0.1");
+            writer.WriteString("machine", graph.Machine);
+            writer.WriteString("generatedUtc", DateTime.UtcNow);
+            if (graph.InitialStateId is not null) writer.WriteString("initialState", graph.InitialStateId);
+            writer.WriteStartArray("states");
+            foreach (var state in graph.States)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                writer.WriteStartObject();
+                writer.WriteString("id", state.Id);
+                if (state.Hash is not null) writer.WriteString("hash", state.Hash);
+                if (state.Label is not null) writer.WriteString("label", state.Label);
+                writer.WriteBoolean("accepting", state.Accepting);
+                writer.WriteBoolean("initial", state.Initial);
+                writer.WriteEndObject();
+                writer.Flush();
+            }
+            writer.WriteEndArray();
+            writer.WriteStartArray("transitions");
+            foreach (var transition in graph.Transitions)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                writer.WriteStartObject();
+                writer.WriteString("from", transition.FromStateId);
+                writer.WriteString("to", transition.ToStateId);
+                writer.WriteString("action", transition.Action.Name);
+                writer.WritePropertyName("arguments");
+                JsonSerializer.Serialize(writer, transition.Action.Arguments, JsonOptions);
+                if (transition.Action.Kind != "call" && transition.Action.Kind is not null)
+                    writer.WriteString("kind", transition.Action.Kind);
+                if (transition.Action.Result is not null) writer.WriteString("result", transition.Action.Result);
+                writer.WriteEndObject();
+                writer.Flush();
+            }
+            writer.WriteEndArray();
+            writer.WriteStartArray("negativeTransitions");
+            foreach (var transition in graph.NegativeTransitions)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                writer.WriteStartObject();
+                writer.WriteString("from", transition.FromStateId);
+                writer.WriteString("action", transition.Action.Name);
+                if (transition.Action.Arguments.Count != 0)
+                {
+                    writer.WritePropertyName("arguments");
+                    JsonSerializer.Serialize(writer, transition.Action.Arguments, JsonOptions);
+                }
+                if (transition.Reason is not null) writer.WriteString("reason", transition.Reason);
+                if (transition.ObligationId is not null) writer.WriteString("obligationId", transition.ObligationId);
+                if (transition.ExpectedExceptionType is not null) writer.WriteString("expectedExceptionType", transition.ExpectedExceptionType);
+                if (transition.ExpectedMessageContains is not null) writer.WriteString("expectedMessageContains", transition.ExpectedMessageContains);
+                writer.WriteEndObject();
+                writer.Flush();
+            }
+            writer.WriteEndArray();
+            writer.WriteStartObject("metadata");
+            foreach (var entry in graph.Metadata)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                writer.WritePropertyName(entry.Key);
+                JsonSerializer.Serialize(writer, entry.Value, JsonOptions);
+                writer.Flush();
+            }
+            writer.WriteEndObject();
+            writer.WriteEndObject();
+            writer.Flush();
+        });
+    }
+
+    private static void Publish(string path, long maxBytes, CancellationToken cancellationToken, Action<Stream> write)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxBytes);
+        cancellationToken.ThrowIfCancellationRequested();
+        var fullPath = Path.GetFullPath(path);
+        var tempPath = fullPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        var ownsTemp = false;
+        try
+        {
+            using (var file = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            {
+                ownsTemp = true;
+                using var stream = new BoundedWriteStream(file, maxBytes, cancellationToken);
+                write(stream);
+                stream.Flush();
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            File.Move(tempPath, fullPath, overwrite: true);
+        }
+        finally
+        {
+            if (ownsTemp && File.Exists(tempPath)) File.Delete(tempPath);
+        }
+    }
 
     public static SeexplDocument Load(string path)
     {
-        var json = File.ReadAllText(path);
-        return JsonSerializer.Deserialize<SeexplDocument>(json, JsonOptions)
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        if (stream.Length > DefaultMaxBytes)
+            throw new InvalidDataException($"'{path}' exceeds the .seexpl size limit of {DefaultMaxBytes} bytes.");
+        return JsonSerializer.Deserialize<SeexplDocument>(stream, JsonOptions)
                ?? throw new InvalidDataException($"'{path}' is not a valid .seexpl document.");
+    }
+
+    private sealed class BoundedWriteStream(Stream inner, long maxBytes, CancellationToken cancellationToken) : Stream
+    {
+        private long written;
+
+        public override bool CanRead => false;
+        public override bool CanSeek => false;
+        public override bool CanWrite => true;
+        public override long Length => written;
+        public override long Position { get => written; set => throw new NotSupportedException(); }
+
+        public override void Flush()
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            inner.Flush();
+        }
+
+        public override void Write(byte[] buffer, int offset, int count) => Write(buffer.AsSpan(offset, count));
+
+        public override void Write(ReadOnlySpan<byte> buffer)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (buffer.Length > maxBytes - written)
+                throw new InvalidDataException($".seexpl serialization exceeds the size limit of {maxBytes} bytes.");
+            inner.Write(buffer);
+            written += buffer.Length;
+        }
+
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
     }
 }
 
@@ -162,4 +311,7 @@ public sealed class SeexplNegativeTransition
     [JsonPropertyName("action")] public string Action { get; set; } = string.Empty;
     [JsonPropertyName("arguments")] public List<string>? Arguments { get; set; }
     [JsonPropertyName("reason")] public string? Reason { get; set; }
+    [JsonPropertyName("obligationId")] public string? ObligationId { get; set; }
+    [JsonPropertyName("expectedExceptionType")] public string? ExpectedExceptionType { get; set; }
+    [JsonPropertyName("expectedMessageContains")] public string? ExpectedMessageContains { get; set; }
 }

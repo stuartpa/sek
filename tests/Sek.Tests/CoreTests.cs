@@ -127,6 +127,154 @@ public class CoreTests
         Assert.Contains("\"transitions\"", json);
     }
 
+    [Fact]
+    public void Seexpl_SaveGraph_RoundTripsCompatibleSchema()
+    {
+        var graph = Sample();
+        graph.States.Add(new ModelState("S4", "h4", "label"));
+        graph.Transitions.Add(new Transition("S4", new ActionInvocation("UnspecifiedKind", new string[0], null!), "S0"));
+        graph.Transitions.Add(new Transition("S2", new ActionInvocation("Return", new[] { "quoted\"", "unicode\u00e9" }, "return", "result"), "S4"));
+        graph.NegativeTransitions.Add(new NegativeTransition("S0", ActionInvocation.Of("Denied"), "guard")
+        {
+            ObligationId = "permission.denied",
+            ExpectedExceptionType = "System.InvalidOperationException",
+            ExpectedMessageContains = "guard",
+        });
+        graph.NegativeTransitions.Add(new NegativeTransition("S1", new ActionInvocation("Denied", new[] { "1" }), "reason"));
+        graph.Metadata["key"] = "value";
+        var path = Path.Combine(Path.GetTempPath(), $"sek_{System.Guid.NewGuid():N}.seexpl");
+        try
+        {
+            SeexplDocument.SaveGraph(graph, path);
+            var loaded = SeexplDocument.Load(path);
+            var expected = SeexplDocument.FromGraph(graph);
+            expected.GeneratedUtc = loaded.GeneratedUtc;
+            Assert.Equal(expected.ToJson(), loaded.ToJson());
+            Assert.Equal(expected.ToJson(), File.ReadAllText(path));
+            var back = loaded.ToGraph();
+            Assert.Equal(graph.States, back.States);
+            Assert.Equal(graph.Transitions.Select(transition => transition.Action.Display), back.Transitions.Select(transition => transition.Action.Display));
+            Assert.Equal("return", back.Transitions.Last().Action.Kind);
+            Assert.Equal("result", back.Transitions.Last().Action.Result);
+            Assert.Equal(2, back.NegativeTransitions.Count);
+            Assert.Equal("permission.denied", back.NegativeTransitions[0].ObligationId);
+            Assert.Equal("System.InvalidOperationException", back.NegativeTransitions[0].ExpectedExceptionType);
+            Assert.Equal("guard", back.NegativeTransitions[0].ExpectedMessageContains);
+            Assert.Equal("value", back.Metadata["key"]);
+        }
+        finally
+        {
+            if (File.Exists(path)) File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Seexpl_NullDocumentAndLegacyNegativeFieldsRemainDistinct()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"sek_{System.Guid.NewGuid():N}.seexpl");
+        try
+        {
+            File.WriteAllText(path, """
+                {"machine":"M","negativeTransitions":[{"from":"S0","action":"Denied","arguments":null,"reason":null}]}
+                """);
+            var negative = Assert.Single(SeexplDocument.Load(path).ToGraph().NegativeTransitions);
+            Assert.Empty(negative.Action.Arguments);
+            Assert.Equal("", negative.Reason);
+            File.WriteAllText(path, "null");
+            Assert.Contains("not a valid .seexpl", Assert.Throws<InvalidDataException>(() => SeexplDocument.Load(path)).Message);
+            Assert.Throws<System.ArgumentNullException>(() => SeexplDocument.SaveGraph(null!, path));
+        }
+        finally { File.Delete(path); }
+    }
+
+    [Fact]
+    public void Seexpl_MissingParentDoesNotLeaveAnOwnedTemporaryArtifact()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"sek_{System.Guid.NewGuid():N}");
+        Assert.Throws<DirectoryNotFoundException>(() => SeexplDocument.SaveGraph(Sample(), Path.Combine(directory, "graph.seexpl")));
+        Assert.False(Directory.Exists(directory));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Seexpl_BoundedSave_PreservesArtifactAndCleansOnlyOwnedTemp(bool directlyFromGraph)
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"sek_{System.Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, "graph.seexpl");
+        var unrelated = Path.Combine(directory, "other.tmp");
+        try
+        {
+            Assert.Throws<InvalidDataException>(() =>
+            {
+                if (directlyFromGraph) SeexplDocument.SaveGraph(Sample(), path, 64);
+                else SeexplDocument.FromGraph(Sample()).Save(path, 64);
+            });
+            Assert.Empty(Directory.GetFiles(directory));
+            File.WriteAllText(path, "old artifact");
+            File.WriteAllText(unrelated, "unrelated");
+            var error = Assert.Throws<InvalidDataException>(() =>
+            {
+                if (directlyFromGraph) SeexplDocument.SaveGraph(Sample(), path, 64);
+                else SeexplDocument.FromGraph(Sample()).Save(path, 64);
+            });
+            Assert.Contains("64 bytes", error.Message);
+            Assert.Equal("old artifact", File.ReadAllText(path));
+            Assert.Equal("unrelated", File.ReadAllText(unrelated));
+            Assert.Equal(2, Directory.GetFiles(directory).Length);
+            if (directlyFromGraph) SeexplDocument.SaveGraph(Sample(), path);
+            else SeexplDocument.FromGraph(Sample()).Save(path);
+            Assert.Equal("M", SeexplDocument.Load(path).Machine);
+            Assert.Equal(2, Directory.GetFiles(directory).Length);
+            var document = SeexplDocument.Load(path);
+            var length = new FileInfo(path).Length;
+            document.Save(path, length);
+            Assert.Equal(length, new FileInfo(path).Length);
+            Assert.Throws<InvalidDataException>(() => document.Save(path, length - 1));
+            Assert.Equal(length, new FileInfo(path).Length);
+            Assert.Equal(2, Directory.GetFiles(directory).Length);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Seexpl_Load_RejectsOversizedArtifactBeforeParsing()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"sek_{System.Guid.NewGuid():N}.seexpl");
+        try
+        {
+            using (var stream = File.Create(path)) stream.SetLength(25 * 1024 * 1024 + 1);
+            var error = Assert.Throws<InvalidDataException>(() => SeexplDocument.Load(path));
+            Assert.Contains("26214400 bytes", error.Message);
+        }
+        finally
+        {
+            if (File.Exists(path)) File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void Seexpl_SaveGraph_CancellationPreservesArtifact()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"sek_{System.Guid.NewGuid():N}.seexpl");
+        try
+        {
+            File.WriteAllText(path, "old artifact");
+            using var cancellation = new System.Threading.CancellationTokenSource();
+            cancellation.Cancel();
+            Assert.Throws<System.OperationCanceledException>(() => SeexplDocument.SaveGraph(Sample(), path, cancellationToken: cancellation.Token));
+            Assert.Equal("old artifact", File.ReadAllText(path));
+        }
+        finally
+        {
+            if (File.Exists(path)) File.Delete(path);
+        }
+    }
+
     // ---- GraphAnalysis (domain adapter over Components.Graphs) --------------------------
 
     [Fact]

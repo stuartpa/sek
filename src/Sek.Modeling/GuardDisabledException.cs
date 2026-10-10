@@ -11,10 +11,12 @@ public sealed class GuardDisabledException : Exception
     /// finite) rather than a real precondition. Bounds disable the action during exploration but
     /// are NOT recorded as model-derived negative edges (a conforming SUT need not reject them).</summary>
     public bool IsExplorationBound { get; }
+    public string? ObligationId { get; }
 
-    public GuardDisabledException(string reason, bool isExplorationBound = false)
+    public GuardDisabledException(string reason, bool isExplorationBound = false, string? obligationId = null)
         : base(reason)
     {
         IsExplorationBound = isExplorationBound;
+        ObligationId = obligationId;
     }
 }

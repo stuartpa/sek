@@ -17,6 +17,20 @@ namespace Sek.Tests;
 /// </summary>
 public class SekCliTests
 {
+    [Fact]
+    public void BehaviorPreprocessing_ConsumesSharedCandidateBudgetAndHonorsCancellation()
+    {
+        var body = new SequenceBehavior { Items = { new InvocationBehavior { Target = "A" }, new InvocationBehavior { Target = "B" } } };
+        var options = new ExplorationOptions { MaxCandidateEvaluations = 1 };
+        var budget = new ExplorationBudget(options);
+        Assert.Contains("candidate-limit", Assert.Throws<InvalidOperationException>(() => SekCli.DesugarLet(body, budget)).Message);
+        Assert.Equal(1, budget.CandidateEvaluations);
+        var expansionBudget = new ExplorationBudget(options);
+        Assert.Contains("candidate-limit", Assert.Throws<InvalidOperationException>(() => SekCli.ExpandParamMachines(CordDocument.ParseText("config C { }"), body, expansionBudget)).Message);
+        options.CancellationToken = new System.Threading.CancellationToken(canceled: true);
+        Assert.Contains("cancelled", Assert.Throws<InvalidOperationException>(() => SekCli.DesugarLet(body, new ExplorationBudget(options))).Message);
+    }
+
     // ---- option parsing / small helpers ------------------------------------------------
 
     [Fact]

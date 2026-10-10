@@ -15,17 +15,24 @@
 
 .PARAMETER Branch
   Instead of fully-uncovered lines, list lines whose branch condition-coverage is below 100%.
+
+.PARAMETER Report
+  Read this exact report instead of the newest report, which may be a focused test run.
 #>
 param(
     [Parameter(Mandatory)][string]$Package,
-    [switch]$Branch
+    [switch]$Branch,
+    [string]$Report
 )
 
 $ErrorActionPreference = 'Stop'
 Set-Location (Split-Path $PSScriptRoot -Parent)
 
-$f = Get-ChildItem tests/Sek.Tests/TestResults -Recurse -Filter coverage.cobertura.xml -ErrorAction SilentlyContinue |
+$f = $Report
+if (-not $f) {
+  $f = Get-ChildItem tests/Sek.Tests/TestResults -Recurse -Filter coverage.cobertura.xml -ErrorAction SilentlyContinue |
     Sort-Object LastWriteTime | Select-Object -Last 1 -ExpandProperty FullName
+}
 if (-not $f) { throw "no coverage report on disk — run scripts/coverage.ps1 first" }
 
 [xml]$cov = Get-Content $f

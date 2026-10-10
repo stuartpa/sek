@@ -41,4 +41,9 @@ public sealed class ExplorationGraph
 /// <see cref="FromStateId"/> is forbidden by the model (the action's guard is false there), and a
 /// conforming SUT must reject it. <see cref="Reason"/> is the guard's message.
 /// </summary>
-public sealed record NegativeTransition(string FromStateId, ActionInvocation Action, string Reason);
+public sealed record NegativeTransition(string FromStateId, ActionInvocation Action, string Reason)
+{
+    public string? ObligationId { get; init; }
+    public string? ExpectedExceptionType { get; init; }
+    public string? ExpectedMessageContains { get; init; }
+}

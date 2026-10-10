@@ -46,6 +46,8 @@ namespace Sek.Cli
                     "view" => CmdView(args.Skip(1).ToArray()),
                     "init" => CmdInit(args.Skip(1).ToArray()),
                     "validate" => CmdValidate(args.Skip(1).ToArray()),
+                    "build" => CmdBuild(args.Skip(1).ToArray()),
+                    "__proof-replay" => ExecuteProofCommand("__proof-replay", args.Skip(1).ToArray()),
                     "explore" => CmdExplore(args.Skip(1).ToArray()),
                     "test" => CmdTest(args.Skip(1).ToArray()),
                     "run" => CmdTest(args.Skip(1).ToArray()),
@@ -192,7 +194,7 @@ namespace Sek.Cli
             return options;
         }
 
-        public static ExplorationGraph ExploreBehavior(CordDocument cord, string machine)
+        public static ExplorationGraph ExploreBehavior(CordDocument cord, string machine, ExplorationOptions? options = null)
         {
             var m = cord.GetMachine(machine);
             if (m?.Body is null)
@@ -204,11 +206,19 @@ namespace Sek.Cli
                 .Select(t => { var i = t.LastIndexOf('.'); return i >= 0 ? t[(i + 1)..] : t; })
                 .ToHashSet(StringComparer.Ordinal);
 
-            var explorer = new BehaviorExplorer(name => cord.GetMachine(name)?.Body, alphabet);
-            return explorer.Explore(machine, ExpandParamMachines(cord, DesugarLet(m.Body)));
+            options ??= BoundsFor(cord, machine);
+            options.Budget ??= new ExplorationBudget(options);
+            var explorer = CreateBehaviorExplorer(cord, alphabet, options);
+            return explorer.Explore(machine, ExpandParamMachines(cord, DesugarLet(m.Body, options.Budget), options.Budget));
         }
 
-        public static ExplorationResult ExploreMachine(ProjectConfig config, string dir, CordDocument cord, string machine, string solverName)
+        private static BehaviorExplorer CreateBehaviorExplorer(CordDocument cord, IEnumerable<string> alphabet, ExplorationOptions options)
+        {
+            return new BehaviorExplorer(name => cord.GetMachine(name)?.Body, alphabet, options);
+        }
+
+        public static ExplorationResult ExploreMachine(ProjectConfig config, string dir, CordDocument cord, string machine, string solverName,
+            ExplorationOptions? options = null)
         {
             // Phase 3 (semantic analysis): resolve names, catch cross-reference errors, get the checked
             // SemanticModel — the single source of truth the rest of this method resolves names through.
@@ -218,7 +228,8 @@ namespace Sek.Cli
             var scope = ResolveModelScope(cord, cord.GetMachine(machine)?.Body);
             var modelType = ModelLoader.LoadModelTypeInScope(config.ResolveModelAssembly(dir), scope, config.Model.Type);
             var introspector = new ModelIntrospector(modelType);
-            var options = BoundsFor(cord, machine);
+            options ??= BoundsFor(cord, machine);
+            options.Budget ??= new ExplorationBudget(options);
             // Consume `action all <Adapter>` / explicit `action` declarations: restrict the model's
             // action universe to the imported actions (resolves to all rules for single-adapter models).
             options.AllowedActionLabels = ActionImportResolver.Resolve(
@@ -229,7 +240,9 @@ namespace Sek.Cli
             // from controllable calls.
             options.EventActionLabels = semantics.EventActions(machine);
             var binds = new Dictionary<string, List<List<string>>>(StringComparer.Ordinal);
-            return Interpret(introspector, cord, machine, cord.GetMachine(machine)?.Body, options, solverName, binds);
+            var result = Interpret(introspector, cord, machine, cord.GetMachine(machine)?.Body, options, solverName, binds);
+            result.Graph.Metadata["completeness"] = result.IsComplete ? "COMPLETE" : "INCOMPLETE";
+            return result;
         }
 
         // Finds the model `scope` a machine explores under (the first `construct model program … where
@@ -331,7 +344,7 @@ namespace Sek.Cli
                 var pg = BuildParamGen(cord, cfg, machine, solverName, binds, introspector);
                 var explorer = new Explorer(introspector, options, pg);
                 var shortNames = introspector.Rules.Select(r => ShortLabel(r.ActionLabel)).ToHashSet(StringComparer.Ordinal);
-                var compiled = new BehaviorExplorer(name => cord.GetMachine(name)?.Body, shortNames).Compile(ExpandParamMachines(cord, DesugarLet(extracted.Scenario)));
+                var compiled = CreateBehaviorExplorer(cord, shortNames, options).Compile(ExpandParamMachines(cord, DesugarLet(extracted.Scenario, options.Budget), options.Budget));
                 return explorer.ExploreSliced(machine, compiled, ShortLabel);
             }
 
@@ -342,8 +355,8 @@ namespace Sek.Cli
 
             // A pure behavior (a scenario / parametrized `let`) with no model program is explored
             // directly as a behavior automaton over its declared action alphabet.
-            var behaviorGraph = ExploreBehavior(cord, machine);
-            return new ExplorationResult { Graph = behaviorGraph };
+            var behaviorGraph = ExploreBehavior(cord, machine, options);
+            return new ExplorationResult { Graph = behaviorGraph, TerminationReason = options.Budget?.TerminationReason };
         }
 
         public static ExplorationResult InterpretConstruct(
@@ -450,8 +463,10 @@ namespace Sek.Cli
                         if (pathDepth is int d) shootOpts.MaxDepth = d;
                         shootOpts.AllowedActionLabels = options.AllowedActionLabels;
                         shootOpts.EventActionLabels = options.EventActionLabels;
+                        ShareBudget(options, shootOpts);
                         foreach (var json in point.StateJson.Values.ToList())
                         {
+                            if (options.Budget?.Check() == false) break;
                             var g2 = Interpret(introspector, cord, shootName, shootM.Body, shootOpts, solverName, new Dictionary<string, List<List<string>>>(StringComparer.Ordinal), json);
                             phases.Add(g2);
                             goalHashes.UnionWith(GoalHashes(g2));
@@ -464,9 +479,11 @@ namespace Sek.Cli
                         var compOpts = BoundsFor(cord, completerName);
                         compOpts.AllowedActionLabels = options.AllowedActionLabels;
                         compOpts.EventActionLabels = options.EventActionLabels;
+                        ShareBudget(options, compOpts);
                         var goalJsons = phases.SelectMany(p => p.StateJson.Where(kv => goalHashes.Contains(p.Graph.FindState(kv.Key)?.Hash ?? "")).Select(kv => kv.Value)).Distinct().ToList();
                         foreach (var json in goalJsons)
                         {
+                            if (options.Budget?.Check() == false) break;
                             var g3 = Interpret(introspector, cord, completerName, compM.Body, compOpts, solverName, new Dictionary<string, List<List<string>>>(StringComparer.Ordinal), json);
                             phases.Add(g3);
                         }
@@ -476,7 +493,27 @@ namespace Sek.Cli
                     FilterToGoalThenAccepting(merged, goalHashes);
                     merged.Metadata["goalCount"] = merged.States.Count(s => goalHashes.Contains(s.Hash)).ToString();
                     merged.Metadata["phases"] = phases.Count.ToString();
-                    return new ExplorationResult { Graph = merged };
+                    var combined = new ExplorationResult
+                    {
+                        Graph = merged, HitBound = phases.Any(phase => phase.HitBound),
+                        TerminationReason = options.Budget?.TerminationReason ?? phases.Select(phase => phase.TerminationReason).FirstOrDefault(reason => reason is not null),
+                    };
+                    foreach (var phase in phases)
+                    {
+                        combined.Diagnostics.AddRange(phase.Diagnostics);
+                        combined.CapturedRequirements.UnionWith(phase.CapturedRequirements);
+                        foreach (var state in phase.StateJson)
+                        {
+                            var hash = phase.Graph.FindState(state.Key)?.Hash;
+                            var target = merged.States.FirstOrDefault(candidate => candidate.Hash == hash);
+                            if (target is not null) combined.StateJson[target.Id] = state.Value;
+                        }
+                    }
+                    merged.Metadata["completeness"] = combined.IsComplete ? "COMPLETE" : "INCOMPLETE";
+                    merged.Metadata["terminationReason"] = combined.TerminationReason ?? "exhausted";
+                    merged.Metadata["candidateEvaluations"] = (options.Budget?.CandidateEvaluations ?? 0).ToString();
+                    merged.Metadata["elapsedMilliseconds"] = (options.Budget?.Elapsed.TotalMilliseconds ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    return combined;
                 }
                 case ConstructKind.AcceptCompletion:
                 {
@@ -504,6 +541,17 @@ namespace Sek.Cli
             }
 
             return Interpret(introspector, cord, machine, target, options, solverName, binds, startJson);
+        }
+
+        private static void ShareBudget(ExplorationOptions source, ExplorationOptions target)
+        {
+            source.Budget ??= new ExplorationBudget(source);
+            target.Budget = source.Budget;
+            target.CancellationToken = source.CancellationToken;
+            target.TimeProvider = source.TimeProvider;
+            target.MaxCandidateEvaluations = source.MaxCandidateEvaluations;
+            target.MaxNegativeTransitions = source.MaxNegativeTransitions;
+            target.MaxElapsedTime = source.MaxElapsedTime;
         }
 
         public static Sek.Cord.Ast.Behavior? Unwrap(Sek.Cord.Ast.Behavior? b) =>
@@ -690,7 +738,7 @@ namespace Sek.Cli
         // Returns the model-program config name if `item` (resolving machine references and groups) is
         // a bare `construct model program from Cfg`; otherwise null. A slice machine
         // (`scenario || model`) is NOT a pure model program — it is a scenario for further composition.
-        public static string? IsPureModelProgram(CordDocument cord, Sek.Cord.Ast.Behavior item)
+        public static string? IsPureModelProgram(CordDocument cord, Sek.Cord.Ast.Behavior? item)
         {
             item = Unwrap(item);
             if (item is Sek.Cord.Ast.InvocationBehavior inv && (inv.Args is null || inv.Args.Count == 0) && cord.GetMachine(inv.Target) is { } m)
@@ -718,34 +766,35 @@ namespace Sek.Cli
         // Expands parameterized-machine invocations: `machine AnyRequest(int id) { …(id)… }` used as
         // `AnyRequest(5)` is replaced by the machine's body with its parameters substituted by the
         // call arguments. Runs after DesugarLet so let-bound values are already in the arguments.
-        public static Sek.Cord.Ast.Behavior ExpandParamMachines(CordDocument cord, Sek.Cord.Ast.Behavior b)
+        public static Sek.Cord.Ast.Behavior ExpandParamMachines(CordDocument cord, Sek.Cord.Ast.Behavior b, ExplorationBudget? budget = null)
         {
+            if (budget?.TryCandidate() == false) throw new InvalidOperationException($"INCOMPLETE behavior expansion: {budget.TerminationReason}");
             switch (b)
             {
                 case Sek.Cord.Ast.InvocationBehavior inv when inv.Args is { Count: > 0 } && cord.GetMachine(inv.Target) is { } m && m.Parameters.Count > 0:
                 {
                     var subst = new Dictionary<string, string>(StringComparer.Ordinal);
                     for (var i = 0; i < m.Parameters.Count && i < inv.Args.Count; i++) subst[m.Parameters[i].Name] = inv.Args[i];
-                    return ExpandParamMachines(cord, CloneWithSubst(m.Body, subst));
+                    return ExpandParamMachines(cord, CloneWithSubst(m.Body!, subst), budget);
                 }
                 case Sek.Cord.Ast.SequenceBehavior s:
-                { var n = new Sek.Cord.Ast.SequenceBehavior(); n.Items.AddRange(s.Items.Select(i => ExpandParamMachines(cord, i))); return n; }
+                { var n = new Sek.Cord.Ast.SequenceBehavior(); n.Items.AddRange(s.Items.Select(i => ExpandParamMachines(cord, i, budget))); return n; }
                 case Sek.Cord.Ast.ChoiceBehavior c:
-                { var n = new Sek.Cord.Ast.ChoiceBehavior(); n.Items.AddRange(c.Items.Select(i => ExpandParamMachines(cord, i))); return n; }
+                { var n = new Sek.Cord.Ast.ChoiceBehavior(); n.Items.AddRange(c.Items.Select(i => ExpandParamMachines(cord, i, budget))); return n; }
                 case Sek.Cord.Ast.ParallelBehavior p:
-                { var n = new Sek.Cord.Ast.ParallelBehavior { Op = p.Op }; n.Items.AddRange(p.Items.Select(i => ExpandParamMachines(cord, i))); return n; }
+                { var n = new Sek.Cord.Ast.ParallelBehavior { Op = p.Op }; n.Items.AddRange(p.Items.Select(i => ExpandParamMachines(cord, i, budget))); return n; }
                 case Sek.Cord.Ast.PermutationBehavior pm:
-                { var n = new Sek.Cord.Ast.PermutationBehavior(); n.Items.AddRange(pm.Items.Select(i => ExpandParamMachines(cord, i))); return n; }
+                { var n = new Sek.Cord.Ast.PermutationBehavior(); n.Items.AddRange(pm.Items.Select(i => ExpandParamMachines(cord, i, budget))); return n; }
                 case Sek.Cord.Ast.LooseSequenceBehavior ls:
-                { var n = new Sek.Cord.Ast.LooseSequenceBehavior(); n.Items.AddRange(ls.Items.Select(i => ExpandParamMachines(cord, i))); return n; }
+                { var n = new Sek.Cord.Ast.LooseSequenceBehavior(); n.Items.AddRange(ls.Items.Select(i => ExpandParamMachines(cord, i, budget))); return n; }
                 case Sek.Cord.Ast.RepetitionBehavior r:
-                    return new Sek.Cord.Ast.RepetitionBehavior { Inner = ExpandParamMachines(cord, r.Inner), Op = r.Op, Min = r.Min, Max = r.Max };
+                    return new Sek.Cord.Ast.RepetitionBehavior { Inner = ExpandParamMachines(cord, r.Inner, budget), Op = r.Op, Min = r.Min, Max = r.Max };
                 case Sek.Cord.Ast.GroupBehavior g:
-                    return new Sek.Cord.Ast.GroupBehavior { Inner = ExpandParamMachines(cord, g.Inner) };
+                    return new Sek.Cord.Ast.GroupBehavior { Inner = ExpandParamMachines(cord, g.Inner, budget) };
                 case Sek.Cord.Ast.PreconstraintBehavior pc:
-                    return new Sek.Cord.Ast.PreconstraintBehavior { Code = pc.Code, Inner = ExpandParamMachines(cord, pc.Inner) };
+                    return new Sek.Cord.Ast.PreconstraintBehavior { Code = pc.Code, Inner = ExpandParamMachines(cord, pc.Inner, budget) };
                 case Sek.Cord.Ast.FailBehavior fb:
-                    return new Sek.Cord.Ast.FailBehavior { Inner = ExpandParamMachines(cord, fb.Inner) };
+                    return new Sek.Cord.Ast.FailBehavior { Inner = ExpandParamMachines(cord, fb.Inner, budget) };
                 default:
                     return b;
             }
@@ -773,8 +822,9 @@ namespace Sek.Cli
 
         // Expands `let vars where {Condition.In...} in Behavior` into a choice over each variable
         // assignment, substituting the bound values into the inner behavior's invocation arguments.
-        public static Sek.Cord.Ast.Behavior DesugarLet(Sek.Cord.Ast.Behavior b)
+        public static Sek.Cord.Ast.Behavior DesugarLet(Sek.Cord.Ast.Behavior b, ExplorationBudget? budget = null)
         {
+            if (budget?.TryCandidate() == false) throw new InvalidOperationException($"INCOMPLETE let expansion: {budget.TerminationReason}");
             switch (b)
             {
                 case Sek.Cord.Ast.LetBehavior let:
@@ -794,10 +844,16 @@ namespace Sek.Cli
                         assignments = new EnumerativeSolver().Generate(solverParams, ac.Constraints, ac.Combination, 100000);
                     }
 
-                    var inner = DesugarLet(let.Inner);
+                    if (budget is not null && assignments.Count >= 100000)
+                    {
+                        budget.Stop("let-assignment-limit");
+                        throw new InvalidOperationException("INCOMPLETE let expansion: assignment enumeration reached its limit");
+                    }
+                    var inner = DesugarLet(let.Inner, budget);
                     var choices = new List<Sek.Cord.Ast.Behavior>();
                     foreach (var a in assignments)
                     {
+                        if (budget?.TryCandidate() == false) throw new InvalidOperationException($"INCOMPLETE let expansion: {budget.TerminationReason}");
                         var subst = new Dictionary<string, string>(StringComparer.Ordinal);
                         foreach (var kv in a) subst[kv.Key] = kv.Value?.ToString() ?? string.Empty;
                         choices.Add(CloneWithSubst(inner, subst));
@@ -827,6 +883,7 @@ namespace Sek.Cli
                             var tailChoice = new Sek.Cord.Ast.ChoiceBehavior();
                             foreach (var a in assignments)
                             {
+                                if (budget?.Check() == false) throw new InvalidOperationException($"INCOMPLETE let expansion: {budget.TerminationReason}");
                                 var subst = new Dictionary<string, string>(StringComparer.Ordinal);
                                 foreach (var kv in a) subst[kv.Key] = kv.Value?.ToString() ?? string.Empty;
                                 tailChoice.Items.Add(Tail(subst));
@@ -844,25 +901,25 @@ namespace Sek.Cli
                     return ch;
                 }
                 case Sek.Cord.Ast.SequenceBehavior s:
-                { var n = new Sek.Cord.Ast.SequenceBehavior(); n.Items.AddRange(s.Items.Select(DesugarLet)); return n; }
+                { var n = new Sek.Cord.Ast.SequenceBehavior(); n.Items.AddRange(s.Items.Select(item => DesugarLet(item, budget))); return n; }
                 case Sek.Cord.Ast.ChoiceBehavior c:
-                { var n = new Sek.Cord.Ast.ChoiceBehavior(); n.Items.AddRange(c.Items.Select(DesugarLet)); return n; }
+                { var n = new Sek.Cord.Ast.ChoiceBehavior(); n.Items.AddRange(c.Items.Select(item => DesugarLet(item, budget))); return n; }
                 case Sek.Cord.Ast.ParallelBehavior p:
-                { var n = new Sek.Cord.Ast.ParallelBehavior { Op = p.Op }; n.Items.AddRange(p.Items.Select(DesugarLet)); return n; }
+                { var n = new Sek.Cord.Ast.ParallelBehavior { Op = p.Op }; n.Items.AddRange(p.Items.Select(item => DesugarLet(item, budget))); return n; }
                 case Sek.Cord.Ast.PermutationBehavior pm:
-                { var n = new Sek.Cord.Ast.PermutationBehavior(); n.Items.AddRange(pm.Items.Select(DesugarLet)); return n; }
+                { var n = new Sek.Cord.Ast.PermutationBehavior(); n.Items.AddRange(pm.Items.Select(item => DesugarLet(item, budget))); return n; }
                 case Sek.Cord.Ast.LooseSequenceBehavior ls:
-                { var n = new Sek.Cord.Ast.LooseSequenceBehavior(); n.Items.AddRange(ls.Items.Select(DesugarLet)); return n; }
+                { var n = new Sek.Cord.Ast.LooseSequenceBehavior(); n.Items.AddRange(ls.Items.Select(item => DesugarLet(item, budget))); return n; }
                 case Sek.Cord.Ast.RepetitionBehavior r:
-                    return new Sek.Cord.Ast.RepetitionBehavior { Inner = DesugarLet(r.Inner), Op = r.Op, Min = r.Min, Max = r.Max };
+                    return new Sek.Cord.Ast.RepetitionBehavior { Inner = DesugarLet(r.Inner, budget), Op = r.Op, Min = r.Min, Max = r.Max };
                 case Sek.Cord.Ast.GroupBehavior gg:
-                    return new Sek.Cord.Ast.GroupBehavior { Inner = DesugarLet(gg.Inner) };
+                    return new Sek.Cord.Ast.GroupBehavior { Inner = DesugarLet(gg.Inner, budget) };
                 case Sek.Cord.Ast.PreconstraintBehavior pc:
-                    return new Sek.Cord.Ast.PreconstraintBehavior { Code = pc.Code, Inner = DesugarLet(pc.Inner) };
+                    return new Sek.Cord.Ast.PreconstraintBehavior { Code = pc.Code, Inner = DesugarLet(pc.Inner, budget) };
                 case Sek.Cord.Ast.FailBehavior fb:
-                    return new Sek.Cord.Ast.FailBehavior { Inner = DesugarLet(fb.Inner) };
+                    return new Sek.Cord.Ast.FailBehavior { Inner = DesugarLet(fb.Inner, budget) };
                 case Sek.Cord.Ast.BindBehavior bd:
-                { var n = new Sek.Cord.Ast.BindBehavior { Inner = DesugarLet(bd.Inner) }; n.Binds.AddRange(bd.Binds); return n; }
+                { var n = new Sek.Cord.Ast.BindBehavior { Inner = DesugarLet(bd.Inner, budget) }; n.Binds.AddRange(bd.Binds); return n; }
                 default:
                     return b;
             }
@@ -1028,6 +1085,173 @@ namespace Sek.Cli
 
         // --- explore -------------------------------------------------------------------
 
+        public static int CmdBuild(string[] rest)
+        {
+            var (config, dir) = ProjectConfig.Load(GetOption(rest, "--project"));
+            var evidence = new ProofEvidence(config, dir);
+            evidence.Build();
+            Console.WriteLine($"Build attested: {evidence.Fingerprint}");
+            return 0;
+        }
+
+        private static ExplorationResult AcquireGraph(ProjectConfig config, string dir, CordDocument cord, string machine,
+            string[] rest, ProofEvidence? proof, CancellationToken token, out ExplorationOptions options)
+        {
+            options = BoundsFor(cord, machine);
+            proof?.Contract.Budgets.Apply(options);
+            options.CancellationToken = token;
+            options.Budget = new ExplorationBudget(options);
+            var reuse = GetOption(rest, "--reuse") ?? config.Reuse;
+            if (reuse is not null)
+            {
+                if (proof is null) throw new InvalidDataException("graph reuse requires config.proof and an attested build");
+                return proof.LoadCheckpoint(Path.GetFullPath(Path.Combine(dir, reuse)), machine);
+            }
+            if (string.IsNullOrWhiteSpace(config.Model.Type))
+            {
+                var graph = ExploreBehavior(cord, machine, options);
+                return new ExplorationResult { Graph = graph, TerminationReason = options.Budget.TerminationReason };
+            }
+            return ExploreMachine(config, dir, cord, machine, GetOption(rest, "--solver") ?? "z3", options);
+        }
+
+        private static ProofEvidence? OpenProof(ProjectConfig config, string dir, string machine, string[] rest, CordDocument cord)
+        {
+            if (config.Proof is null) return null;
+            var outputs = new[] { GetOption(rest, "--report"), GetOption(rest, "--out"), GetOption(rest, "--partial-out") }.Where(path => path is not null).Cast<string>().ToArray();
+            var proof = new ProofEvidence(config, dir, outputs);
+            return proof;
+        }
+
+        private static void VerifyProof(ProofEvidence proof, ProjectConfig config, string dir, string machine, CordDocument cord)
+        {
+            proof.Machine(machine);
+            proof.VerifyBuild();
+            var semantics = AnalyzeCord(cord, machine);
+            if (string.IsNullOrWhiteSpace(config.Model.Type))
+                proof.VerifyActions(machine, semantics.DeclaredActions(machine).Keys);
+            else
+            {
+                var model = new ModelIntrospector(ModelLoader.LoadModelTypeInScope(config.ResolveModelAssembly(dir), ResolveModelScope(cord, cord.GetMachine(machine)?.Body), config.Model.Type));
+                var actions = ActionImportResolver.Resolve(semantics.ImportedActionTypes(machine), semantics.DeclaredActions(machine).Keys, model.Rules.Select(rule => rule.ActionLabel));
+                proof.VerifyActions(machine, actions ?? model.Rules.Select(rule => rule.ActionLabel).ToHashSet(StringComparer.Ordinal));
+            }
+        }
+
+        private static int ExecuteProofCommand(string mode, string[] rest)
+        {
+            var machine = rest[0];
+            var (config, dir, cord) = LoadProject(rest);
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            ProofEvidence? proof = null;
+            ExplorationResult? result = null;
+            ConformanceReport? replay = null;
+            var reportPath = GetOption(rest, "--report") ?? Path.Combine(config.ResolveOutDir(dir), machine + ".proof-report.json");
+            try
+            {
+                if (cord.GetMachine(machine) is null) throw new InvalidDataException($"machine '{machine}' not found. Available: {string.Join(", ", cord.Script.Machines.Select(item => item.Name))}");
+                if (mode != "explore" && config.Binding is null) throw new InvalidDataException("no 'binding' configured; replay and generation require a binding");
+                proof = OpenProof(config, dir, machine, rest, cord);
+                if (proof is not null) VerifyProof(proof, config, dir, machine, cord);
+                using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(proof?.Contract.Budgets.ExplorationSeconds ?? 120));
+                result = AcquireGraph(config, dir, cord, machine, rest, proof, deadline.Token, out var options);
+                RequireComplete(result, GetOption(rest, "--partial-out"), proof?.Contract.Budgets.GraphBytes ?? 26214400, deadline.Token);
+                var graph = result.Graph;
+                graph.Metadata["completeness"] = "COMPLETE";
+                if (proof is not null && !proof.Reused)
+                {
+                    graph.Metadata["proofStateJson"] = System.Text.Json.JsonSerializer.Serialize(result.StateJson);
+                    graph.Metadata["proofRequirements"] = System.Text.Json.JsonSerializer.Serialize(result.CapturedRequirements);
+                }
+                var selection = proof?.Select(graph, machine);
+                if (selection is { Complete: false }) throw new InvalidDataException($"missing proof obligations: {string.Join(", ", selection.MissingPositiveIds.Concat(selection.MissingRejectionIds))}");
+                var checkpointPath = GetOption(rest, "--reuse") ?? config.Reuse;
+                checkpointPath = checkpointPath is null ? Path.Combine(config.ResolveOutDir(dir), machine + ".seexpl") : Path.GetFullPath(Path.Combine(dir, checkpointPath));
+                if (mode == "explore") checkpointPath = GetOption(rest, "--out") ?? checkpointPath;
+                if (mode == "explore" || (proof is not null && !proof.Reused))
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(checkpointPath))!);
+                    if (proof is not null) proof.SaveCheckpoint(graph, checkpointPath, deadline.Token);
+                    else SeexplDocument.SaveGraph(graph, checkpointPath, cancellationToken: deadline.Token);
+                    Console.WriteLine($"Wrote {checkpointPath}");
+                }
+                if (mode == "test" || proof is not null)
+                {
+                    if (config.Binding is null) throw new InvalidDataException("strict proof requires a binding for concrete replay");
+                    using var phase = new CancellationTokenSource(TimeSpan.FromSeconds(proof?.Contract.Budgets.PhaseSeconds ?? 300));
+                    replay = proof is not null && mode != "__proof-replay"
+                        ? proof.ReplayCheckpoint(checkpointPath, machine)
+                        : Conformance.Replay(graph, Path.GetFullPath(Path.Combine(dir, config.Binding.Assembly)), config.Binding.Namespace,
+                            selection?.Paths, selection?.Negatives, phase.Token);
+                    phase.Token.ThrowIfCancellationRequested();
+                    if (!replay.Passed) throw new InvalidDataException($"TEST FAILED: {string.Join("; ", replay.Failures.Take(20))}");
+                }
+                if (mode == "generate")
+                {
+                    var maximum = int.TryParse(GetOption(rest, "--max"), out var count) && count > 0 ? count : 50;
+                    var strategy = TestGen.ParseStrategy(GetOption(rest, "--strategy") ?? FindTestStrategy(cord, machine));
+                    var paths = selection?.Paths ?? TestGen.SelectPaths(graph, maximum, strategy);
+                    if (paths.Count == 0) throw new InvalidDataException("no test paths could be derived from the exploration");
+                    var output = GetOption(rest, "--out") ?? Path.Combine(config.ResolveOutDir(dir), machine + "Tests");
+                    var ns = GetOption(rest, "--namespace") ?? (string.IsNullOrWhiteSpace(config.Binding!.Namespace) ? "SpecExplorerKit.GeneratedTests" : config.Binding.Namespace + ".Tests");
+                    using var phase = new CancellationTokenSource(TimeSpan.FromSeconds(proof?.Contract.Budgets.PhaseSeconds ?? 300));
+                    var generated = TestGen.EmitXunit(graph, paths, output, ns, Path.GetFullPath(Path.Combine(dir, config.Binding!.Assembly)), config.Binding.Namespace, selection?.Negatives);
+                    phase.Token.ThrowIfCancellationRequested();
+                    if (proof is not null)
+                        foreach (var file in Directory.EnumerateFiles(output, "*", SearchOption.AllDirectories)) proof.Artifacts[Path.GetFullPath(file)] = ProofEvidence.Hash(file);
+                    Console.WriteLine($"Generated {generated.TestCount} positive xUnit test(s), plus {generated.NegativeTestCount} negative test(s). Wrote {generated.TestFile}");
+                }
+                proof?.VerifyBuild();
+                proof?.Report(reportPath, "PASS", machine, result, watch.Elapsed, replay);
+                if (proof is null && GetOption(rest, "--report") is not null) WriteBasicReport(reportPath, "PASS", machine, result, watch.Elapsed, null);
+                Console.WriteLine($"Explored '{machine}': {graph.States.Count} states, {graph.Transitions.Count} transitions, {graph.States.Count(state => state.Accepting)} accepting, COMPLETE.");
+                if (mode == "test") Console.WriteLine("TEST PASSED");
+                return 0;
+            }
+            catch (Exception error)
+            {
+                var incomplete = result?.IsComplete == false || error is OperationCanceledException or TimeoutException
+                    || error.Message.Contains("INCOMPLETE", StringComparison.Ordinal) || error.Message.Contains(".seexpl serialization exceeds", StringComparison.Ordinal);
+                if (incomplete && result is not null)
+                {
+                    result.Graph.Metadata["completeness"] = "INCOMPLETE";
+                    result = new ExplorationResult { Graph = result.Graph, HitBound = result.HitBound, TerminationReason = result.TerminationReason ?? error.Message };
+                }
+                var verdict = incomplete ? "INCOMPLETE" : "FAIL";
+                if (proof is not null) proof.Report(reportPath, verdict, machine, result, watch.Elapsed, replay, error.Message);
+                else if (config.Proof is not null || GetOption(rest, "--report") is not null) WriteBasicReport(reportPath, verdict, machine, result, watch.Elapsed, error.Message);
+                Console.Error.WriteLine($"sek: error: {error.Message}");
+                return 1;
+            }
+        }
+
+        private static void WriteBasicReport(string path, string verdict, string machine, ExplorationResult? result, TimeSpan duration, string? error)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
+            using var stream = File.Create(path);
+            System.Text.Json.JsonSerializer.Serialize(stream, new { schemaVersion = "1.0", artifactType = "sek-proof-report", verdict,
+                completeness = result?.IsComplete == true ? "COMPLETE" : "INCOMPLETE", machine, inputFingerprint = (string?)null,
+                artifactDigests = new Dictionary<string, string>(),
+                budgetCounters = new { states = result?.Graph.States.Count ?? 0, transitions = result?.Graph.Transitions.Count ?? 0,
+                    negatives = result?.Graph.NegativeTransitions.Count ?? 0, candidateEvaluations = 0, elapsedMilliseconds = duration.TotalMilliseconds },
+                coveredPositiveIds = Array.Empty<string>(), missingPositiveIds = Array.Empty<string>(),
+                coveredRejectionIds = Array.Empty<string>(), missingRejectionIds = Array.Empty<string>(), replayResults = (object?)null,
+                explorationReused = false, replayReused = false, durationMilliseconds = duration.TotalMilliseconds, error }, ProofEvidence.Json);
+        }
+
+        public static void RequireComplete(ExplorationResult result, string? partialPath = null,
+            long maxBytes = 26214400, CancellationToken cancellationToken = default)
+        {
+            if (result.IsComplete) return;
+            result.Graph.Metadata["completeness"] = "INCOMPLETE";
+            if (partialPath is not null)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(partialPath))!);
+                SeexplDocument.SaveGraph(result.Graph, partialPath, maxBytes, cancellationToken);
+            }
+            throw new InvalidOperationException($"INCOMPLETE exploration: {result.TerminationReason}; no proof, replay or generation permitted.");
+        }
+
         public static int CmdExplore(string[] rest)
         {
             if (rest.Length == 0 || IsHelp(rest[0]))
@@ -1036,44 +1260,7 @@ namespace Sek.Cli
                 return rest.Length == 0 ? 1 : 0;
             }
 
-            var machine = rest[0];
-            var solverName = GetOption(rest, "--solver") ?? "z3";
-            var (config, dir, cord) = LoadProject(rest);
-
-            var cordMachine = cord.GetMachine(machine);
-            if (cordMachine is null)
-            {
-                Console.Error.WriteLine($"sek: error: machine '{machine}' not found in Cord. Available: {string.Join(", ", cord.Script.Machines.Select(m => m.Name))}");
-                return 1;
-            }
-
-            // Behavior-mode: a pure Cord scenario/operator machine (no model program).
-            if (string.IsNullOrWhiteSpace(config.Model.Type))
-            {
-                var bgraph = ExploreBehavior(cord, machine);
-                var boutPath = GetOption(rest, "--out") ?? Path.Combine(config.ResolveOutDir(dir), machine + ".seexpl");
-                Directory.CreateDirectory(Path.GetDirectoryName(boutPath)!);
-                SeexplDocument.FromGraph(bgraph).Save(boutPath);
-                Console.WriteLine($"Explored behavior '{machine}': {bgraph.States.Count} states, {bgraph.Transitions.Count} transitions, {bgraph.States.Count(s => s.Accepting)} accepting.");
-                Console.WriteLine($"Wrote {boutPath}");
-                return 0;
-            }
-
-            var result = ExploreMachine(config, dir, cord, machine, solverName);
-            var graph = result.Graph;
-
-            var outPath = GetOption(rest, "--out") ?? Path.Combine(config.ResolveOutDir(dir), machine + ".seexpl");
-            Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
-            SeexplDocument.FromGraph(graph).Save(outPath);
-
-            Console.WriteLine($"Explored '{machine}': {graph.States.Count} states, {graph.Transitions.Count} transitions, {graph.States.Count(s => s.Accepting)} accepting{(result.HitBound ? " (bound hit)" : "")}.");
-            Console.WriteLine($"Wrote {outPath}");
-            if (result.Diagnostics.Count > 0)
-            {
-                Console.WriteLine($"  {result.Diagnostics.Count} rule diagnostic(s); first: {result.Diagnostics[0]}");
-            }
-
-            return 0;
+            return ExecuteProofCommand("explore", rest);
         }
 
         // --- validate ------------------------------------------------------------------
@@ -1132,46 +1319,7 @@ namespace Sek.Cli
                 return rest.Length == 0 ? 1 : 0;
             }
 
-            var machine = rest[0];
-            var solverName = GetOption(rest, "--solver") ?? "z3";
-            var (config, dir, cord) = LoadProject(rest);
-
-            if (cord.GetMachine(machine) is null)
-            {
-                Console.Error.WriteLine($"sek: error: machine '{machine}' not found. Available: {string.Join(", ", cord.Script.Machines.Select(m => m.Name))}");
-                return 1;
-            }
-
-            if (config.Binding is null)
-            {
-                Console.Error.WriteLine("sek: error: no 'binding' configured in .specexplorerkit/config.json.");
-                return 1;
-            }
-
-            var result = ExploreMachine(config, dir, cord, machine, solverName);
-            Console.WriteLine($"Explored '{machine}': {result.Graph.States.Count} states, {result.Graph.Transitions.Count} transitions.");
-
-            var bindingAsm = Path.GetFullPath(Path.Combine(dir, config.Binding.Assembly));
-            var report = Conformance.Replay(result.Graph, bindingAsm, config.Binding.Namespace);
-
-            Console.WriteLine($"Conformance against SUT ({config.Binding.Namespace}):");
-            Console.WriteLine($"  transitions replayed : {report.TransitionsReplayed}");
-            Console.WriteLine($"  succeeded            : {report.Succeeded}");
-            Console.WriteLine($"  failed               : {report.Failed}");
-            Console.WriteLine($"  negative replayed    : {report.NegativeReplayed} (illegal actions attempted)");
-            Console.WriteLine($"  negative rejected    : {report.NegativeRejected} (SUT correctly refused)");
-            Console.WriteLine($"  actions covered      : {report.ActionsCovered.Count} ({string.Join(", ", report.ActionsCovered.OrderBy(x => x))})");
-
-            if (!report.Passed)
-            {
-                Console.Error.WriteLine("  failures:");
-                foreach (var f in report.Failures.Take(20)) Console.Error.WriteLine($"    - {f}");
-                Console.WriteLine("TEST FAILED");
-                return 1;
-            }
-
-            Console.WriteLine("TEST PASSED");
-            return 0;
+            return ExecuteProofCommand("test", rest);
         }
 
         // --- generate (test-case generation) -------------------------------------------
@@ -1184,50 +1332,7 @@ namespace Sek.Cli
                 return rest.Length == 0 ? 1 : 0;
             }
 
-            var machine = rest[0];
-            var solverName = GetOption(rest, "--solver") ?? "z3";
-            var (config, dir, cord) = LoadProject(rest);
-
-            if (cord.GetMachine(machine) is null)
-            {
-                Console.Error.WriteLine($"sek: error: machine '{machine}' not found. Available: {string.Join(", ", cord.Script.Machines.Select(m => m.Name))}");
-                return 1;
-            }
-
-            if (config.Binding is null)
-            {
-                Console.Error.WriteLine("sek: error: test generation needs a 'binding' in .specexplorerkit/config.json (generated tests replay against the SUT).");
-                return 1;
-            }
-
-            var maxTests = int.TryParse(GetOption(rest, "--max"), out var m) && m > 0 ? m : 50;
-
-            var result = ExploreMachine(config, dir, cord, machine, solverName);
-            var graph = result.Graph;
-            Console.WriteLine($"Explored '{machine}': {graph.States.Count} states, {graph.Transitions.Count} transitions.");
-
-            // Strategy: `--strategy` overrides the machine's `construct test cases where Strategy = "…"`.
-            var strategyName = GetOption(rest, "--strategy") ?? FindTestStrategy(cord, machine);
-            var strategy = TestGen.ParseStrategy(strategyName);
-            var paths = TestGen.SelectPaths(graph, maxTests, strategy);
-            if (paths.Count == 0)
-            {
-                Console.Error.WriteLine("sek: error: no test paths could be derived from the exploration.");
-                return 1;
-            }
-            Console.WriteLine($"Strategy: {strategy} ({paths.Count} test path(s)).");
-
-            var outDir = GetOption(rest, "--out") ?? Path.Combine(config.ResolveOutDir(dir), machine + "Tests");
-            var testNs = GetOption(rest, "--namespace")
-                         ?? (string.IsNullOrWhiteSpace(config.Binding.Namespace) ? "SpecExplorerKit.GeneratedTests" : config.Binding.Namespace + ".Tests");
-            var bindingAsm = Path.GetFullPath(Path.Combine(dir, config.Binding.Assembly));
-
-            var gen = TestGen.EmitXunit(graph, paths, outDir, testNs, bindingAsm, config.Binding.Namespace);
-
-            Console.WriteLine($"Generated {gen.TestCount} positive xUnit test(s) covering {gen.CoveredTransitions}/{gen.TotalTransitions} transitions, plus {gen.NegativeTestCount} negative (illegal-action rejection) test(s).");
-            Console.WriteLine($"Wrote {gen.TestFile}");
-            Console.WriteLine($"Run with: dotnet test \"{gen.ProjectDir}\"");
-            return 0;
+            return ExecuteProofCommand("generate", rest);
         }
 
         public static int Unknown(string command)
@@ -1248,6 +1353,7 @@ namespace Sek.Cli
             Commands:
               init [--project <dir>]        Scaffold a .specexplorerkit/ project
               validate [--project <dir>]    Check the model program and Cord scripts line up
+              build [--project <dir>]       Build and attest the strict proof closure (Debug)
               explore <machine>             Explore a machine into a .seexpl graph
                                               --project <dir>   (default: current dir)
                                               --out <file>      (default: .specexplorerkit/out/<machine>.seexpl)
@@ -1260,6 +1366,9 @@ namespace Sek.Cli
                                               --namespace <ns>  (default: <binding-namespace>.Tests)
                                               --max <n>         (max test paths; default 50)
               version                       Print version
+
+                        Proof options (config.proof): --report <file>, --reuse <complete.seexpl>
+                        Diagnostic export: --partial-out <file> (INCOMPLETE only; command still fails)
             """);
         }
     }

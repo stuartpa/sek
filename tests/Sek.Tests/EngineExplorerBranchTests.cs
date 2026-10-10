@@ -108,6 +108,19 @@ public class EngineExplorerBranchTests
         }
     }
 
+    public sealed class LimitProbeModel : ModelProgram
+    {
+        public static int Invocations { get; set; }
+        public int Count { get; set; }
+
+        [Rule("Probe.Advance")]
+        public void Advance(bool alternate)
+        {
+            Invocations++;
+            Count++;
+        }
+    }
+
     private static ExplorationResult Explore<T>(ExplorationOptions? options = null) where T : ModelProgram
     {
         var intro = new ModelIntrospector(typeof(T));
@@ -147,6 +160,32 @@ public class EngineExplorerBranchTests
     // ---- Bounds -----------------------------------------------------------------
 
     [Fact]
+    public void StoppedBudget_RejectsAllAccountingAndPreservesFirstReason()
+    {
+        var budget = new ExplorationBudget(new ExplorationOptions());
+        Assert.False(budget.Stop("candidate-limit"));
+        Assert.False(budget.TryCandidate());
+        Assert.False(budget.TryState());
+        Assert.False(budget.TryTransition());
+        Assert.False(budget.TryNegative());
+        Assert.False(budget.Stop("deadline"));
+        Assert.Equal("candidate-limit", budget.TerminationReason);
+        Assert.Equal(0, budget.CandidateEvaluations);
+        Assert.Equal(0, budget.States);
+        Assert.Equal(0, budget.Transitions);
+        Assert.Equal(0, budget.NegativeTransitions);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Budget_RejectsNonpositiveDeadline(int milliseconds)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ExplorationBudget(
+            new ExplorationOptions { MaxElapsedTime = TimeSpan.FromMilliseconds(milliseconds) }));
+    }
+
+    [Fact]
     public void MaxDepth_LimitsExpansion()
     {
         var deep = Explore<ResultModel>();
@@ -170,7 +209,93 @@ public class EngineExplorerBranchTests
         Assert.True(r.Graph.Transitions.Count <= 1);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ResourceLimit_StopsAllRemainingCandidates(bool stateLimit)
+    {
+        LimitProbeModel.Invocations = 0;
+        var options = stateLimit
+            ? new ExplorationOptions { MaxStates = 1 }
+            : new ExplorationOptions { MaxTransitions = 0 };
+
+        var result = Explore<LimitProbeModel>(options);
+
+        Assert.True(result.HitBound);
+        Assert.Equal(1, LimitProbeModel.Invocations);
+        Assert.Single(result.Graph.States);
+        Assert.Empty(result.Graph.Transitions);
+        Assert.Empty(result.Graph.NegativeTransitions);
+    }
+
     // ---- Steering goals ---------------------------------------------------------
+
+    [Fact]
+    public void CandidateLimit_StopsArgumentEnumeration()
+    {
+        var result = Explore<ArgGuardModel>(new ExplorationOptions { MaxCandidateEvaluations = 1 });
+        Assert.False(result.IsComplete);
+        Assert.Equal("candidate-limit", result.TerminationReason);
+        Assert.Equal("1", result.Graph.Metadata["candidateEvaluations"]);
+    }
+
+    [Fact]
+    public void CancelledExploration_DoesNotInvokeModel()
+    {
+        LimitProbeModel.Invocations = 0;
+        var result = Explore<LimitProbeModel>(new ExplorationOptions { CancellationToken = new CancellationToken(true) });
+        Assert.False(result.IsComplete);
+        Assert.Equal("cancelled", result.TerminationReason);
+        Assert.Equal(0, LimitProbeModel.Invocations);
+    }
+
+    [Fact]
+    public void NegativeLimit_IsIncompleteRatherThanTruncatedProof()
+    {
+        var result = Explore<GateModel>(new ExplorationOptions { MaxNegativeTransitions = 0 });
+        Assert.False(result.IsComplete);
+        Assert.Equal("negative-limit", result.TerminationReason);
+        Assert.Empty(result.Graph.NegativeTransitions);
+    }
+
+    [Fact]
+    public void DepthBoundary_DistinguishesTerminalFromUnexpandedSuccessor()
+    {
+        Assert.True(Explore<ResultModel>(new ExplorationOptions { MaxDepth = 3 }).IsComplete);
+        var incomplete = Explore<ResultModel>(new ExplorationOptions { MaxDepth = 2 });
+        Assert.False(incomplete.IsComplete);
+        Assert.Equal("depth-limit", incomplete.TerminationReason);
+    }
+
+    [Fact]
+    public void SharedBudget_DoesNotRestartForAnotherExploration()
+    {
+        var options = new ExplorationOptions { MaxCandidateEvaluations = 1 };
+        options.Budget = new ExplorationBudget(options);
+        Explore<ResultModel>(options);
+        var repeated = Explore<ResultModel>(options);
+        Assert.False(repeated.IsComplete);
+        Assert.Equal("candidate-limit", repeated.TerminationReason);
+        Assert.Empty(repeated.Graph.States);
+    }
+
+    private sealed class DeadlineClock : TimeProvider
+    {
+        private long ticks;
+        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+        public override long GetTimestamp() => ticks += TimeSpan.TicksPerSecond;
+    }
+
+    [Fact]
+    public void Deadline_UsesInjectedClockWithoutWaiting()
+    {
+        var result = Explore<ResultModel>(new ExplorationOptions
+        {
+            TimeProvider = new DeadlineClock(), MaxElapsedTime = TimeSpan.FromSeconds(2)
+        });
+        Assert.False(result.IsComplete);
+        Assert.Equal("deadline", result.TerminationReason);
+    }
 
     [Fact]
     public void GoalPredicate_RecordsGoalStates()

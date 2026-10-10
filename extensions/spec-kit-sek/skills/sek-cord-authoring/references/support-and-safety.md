@@ -57,13 +57,16 @@ documentation—define behavior. Successful parsing is not runtime support.
 7. Use constructs only around model-backed targets.
 8. Avoid reflective state slices unless no modeled initialization action works.
 9. Convert reached `: fail` states into an external failing verdict.
-10. Generate model-derived negative conformance from an unsliced machine; slices omit it.
+10. Generate model-derived negative conformance from a direct unsliced model construct with
+    explicit scoped config/actions; legal scenario products omit it. Scope must retain every
+    required guard/input obligation and must not imply whole-product completeness.
 11. Do not infer per-input rejection coverage from an action-level negative edge.
 12. Do not claim asynchronous event conformance from generated `Observe`.
 13. Do not claim dynamic SUT-handle threading from `/` binding in generated tests.
 14. Reject bounds, empty/suspicious graphs, missing actions, unexpected acceptance/fail states,
     unmet requirements, and missing negative tests.
-15. Build current model and SUT binaries; reject stale graphs and generated suites.
+15. Build current model and SUT binaries; strict proof requires `sek build` attestation, not
+    legacy prebuilds. Reject stale graphs and generated suites.
 16. Treat `sek validate` as necessary but insufficient for scopes, invocation references, arity,
     finite domains, constructs, and runtime semantics.
 
@@ -73,3 +76,37 @@ For each machine record Cord/model identities, SEK version, solver, bounds and b
 states/transitions/acceptance, action labels and arguments, fail/goal/requirement counts, positive
 paths, negative tests, refreshed generated destination, binding identity, and replay result. Keep
 direct-model evidence separate from sliced-machine evidence because they prove different things.
+
+## Strict proof contract
+
+The implemented CLI contract is defined by `src/Sek.Cli/ProofEvidence.cs`. Set `proof` in
+`.specexplorerkit/config.json` to a project-relative JSON contract path; its `schemaVersion`
+is `1.0`. Declare exact machine names, exact `actions`, `requiredActions`, positive cases,
+rejections, build projects, and explicit closure inputs. Unknown/duplicate fields, ambiguous
+IDs, action-universe mismatches, or missing scope fail closed. A scoped direct model may
+exclude unrelated rules only when all obligations for the declared scope remain represented.
+
+Use stable case `id`s across positive and rejection inventories and stable model guard
+`obligationId`s. Match concrete `arguments` (recorded strings) and `fromState` where needed;
+an action-level edge does not prove every input case. Rejections require `obligationId` and
+a fully qualified `expectedExceptionType`; declare `expectedMessageContains` for the required
+message fragment. Replay must assert that expected error, not merely any thrown exception.
+
+Run `sek build --project <project>` to record source/closure, toolchain and binary hashes in
+`build-attestation.json`. Explicit `dotnet build` remains the legacy prebuild path, not strict
+attestation. Any changed input/toolchain/binary requires re-attestation and fresh evidence.
+Use explicit source files for mutable adapter closures rather than hashing runtime cache output.
+
+Safety ceilings (contracts may lower, never raise them): 5,000 states, 20,000 transitions,
+5,000 negatives, 250,000 shared candidate evaluations, 120 seconds exploration, 300 seconds
+per external build/replay phase, and 26,214,400 bytes (25 MiB) per graph. Candidate accounting
+is shared across compilation/exploration, not a fresh allowance for each operation.
+
+Only COMPLETE graphs can become proof checkpoints or feed strict test/generation. Require
+nonempty accepting legal witnesses, every declared case/required action, model-derived
+rejections where required, successful replay, and no missing IDs. A diagnostic partial graph
+or exit-zero legacy run is not structured adequacy. Explicit `--reuse <checkpoint.seexpl>`
+on `test`/`generate` validates the exact machine, current attested fingerprint, graph hash,
+COMPLETE marker and `.proof.json` sidecar; replay is still fresh, not reused.
+On failure, retain diagnostics and identify the missing obligation or scope defect. Do not
+retry in loops, increase budgets, silently drop cases, hand-edit generated tests, or print.

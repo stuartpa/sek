@@ -109,6 +109,24 @@ public class ModelingTests
         public bool Ready { get; set; }
         public void Enable() => Ready = true;
         public void Guarded() => Require(Ready, "not ready");
+        public void Bounded(bool condition) => RequireBound(condition, "finite model bound");
+        public void Identified(bool condition, string obligation) => Require(condition, "semantic guard", obligation);
+    }
+
+    [Fact]
+    public void ModelProgram_BoundAndSemanticGuardKeepDistinctIdentities()
+    {
+        var model = new TinyModel();
+        model.Bounded(true);
+        var bound = Assert.Throws<GuardDisabledException>(() => model.Bounded(false));
+        Assert.True(bound.IsExplorationBound);
+        Assert.Null(bound.ObligationId);
+        model.Identified(true, "obligation");
+        var semantic = Assert.Throws<GuardDisabledException>(() => model.Identified(false, "obligation"));
+        Assert.False(semantic.IsExplorationBound);
+        Assert.Equal("obligation", semantic.ObligationId);
+        Assert.Throws<System.ArgumentException>(() => model.Identified(true, " "));
+        Assert.Throws<System.ArgumentNullException>(() => model.Identified(false, null!));
     }
 
     // ---- Requirement capture -----------------------------------------------------------

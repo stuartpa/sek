@@ -13,6 +13,8 @@ public sealed class ExplorationResult
 {
     public required ExplorationGraph Graph { get; init; }
     public bool HitBound { get; init; }
+    public string? TerminationReason { get; init; }
+    public bool IsComplete => !HitBound && TerminationReason is null && Diagnostics.Count == 0;
     public List<string> Diagnostics { get; } = new();
 
     /// <summary>Distinct requirement ids captured (via <see cref="Sek.Modeling.Requirement.Capture"/>)
@@ -37,6 +39,7 @@ public sealed class Explorer
     private readonly ModelIntrospector _model;
     private readonly ExplorationOptions _options;
     private readonly ParameterGeneration? _paramGen;
+    private readonly ExplorationBudget _budget;
     private readonly Dictionary<string, List<object?[]>> _argSetCache = new();
     private readonly JsonSerializerOptions _json = new()
     {
@@ -49,6 +52,7 @@ public sealed class Explorer
         _model = model;
         _options = options ?? new ExplorationOptions();
         _paramGen = parameterGeneration;
+        _budget = _options.Budget ?? new ExplorationBudget(_options);
     }
 
     public ExplorationResult Explore(string machineName) => Explore(machineName, null);
@@ -67,6 +71,7 @@ public sealed class Explorer
         var goals = new List<string>();
         var capturedReqs = new SortedSet<string>(StringComparer.Ordinal);
 
+        if (!_budget.TryState()) goto ExplorationFinished;
         // Initial state.
         var initialInstance = startJson is not null ? Deserialize(startJson) : CreateInstance();
         var initialJson = Serialize(initialInstance);
@@ -86,10 +91,7 @@ public sealed class Explorer
         {
             var (fromId, fromJson, depth) = queue.Dequeue();
 
-            if (depth >= _options.MaxDepth)
-            {
-                continue;
-            }
+            if (!_budget.Check()) goto ExplorationFinished;
 
             // A state instance used to evaluate domains (domains may read state).
             var domainInstance = Deserialize(fromJson);
@@ -99,6 +101,7 @@ public sealed class Explorer
             // model-derived negative edge (attempting it here is illegal and a SUT must reject it).
             var enabledHere = new HashSet<string>(StringComparer.Ordinal);
             var disabledReasons = new Dictionary<string, (string Reason, IReadOnlyList<string> Args)>(StringComparer.Ordinal);
+            var identifiedRejections = new List<NegativeTransition>();
 
             foreach (var rule in _model.Rules)
             {
@@ -106,10 +109,21 @@ public sealed class Explorer
                 var domainValues = ResolveDomains(rule, domainInstance);
                 foreach (var argSet in GenerateArgSets(rule, domainValues))
                 {
+                    if (!_budget.TryCandidate()) goto ExplorationFinished;
                     var target = Deserialize(fromJson);
                     var invokeArgs = MaterializeArgs(rule, target, argSet);
-                    if (!TryInvoke(rule, target, invokeArgs, result.Diagnostics, out var retVal, out var guardReason))
+                    if (!TryInvoke(rule, target, invokeArgs, result.Diagnostics, out var retVal, out var guardReason, out var obligationId))
                     {
+                        if (guardReason is not null && obligationId is not null)
+                        {
+                            var invocation = new ActionInvocation(rule.ActionLabel, invokeArgs.Select(Stringify).ToList(), ActionKindOf(rule.ActionLabel));
+                            if (_options.RejectionFilter is null || _options.RejectionFilter(obligationId, fromJson, invocation))
+                            {
+                                if (!_budget.TryNegative()) goto ExplorationFinished;
+                                identifiedRejections.Add(new NegativeTransition(fromId, invocation, guardReason) { ObligationId = obligationId });
+                            }
+                            continue;
+                        }
                         // Remember the forbidden action WITH its argument set, so a negative test
                         // reproduces the actual illegal invocation (e.g. a duplicate Create(1)),
                         // not an argless default.
@@ -124,12 +138,24 @@ public sealed class Explorer
                     var toCanonical = CanonicalJson.Canonicalize(toJson);
                     var toHash = CanonicalJson.Hash(toCanonical);
 
+                    if (graph.Transitions.Count >= _options.MaxTransitions)
+                    {
+                        hitBound = true;
+                        _budget.Stop("transition-limit");
+                        goto ExplorationFinished;
+                    }
+
                     if (!hashToId.TryGetValue(toHash, out var toId))
                     {
-                        if (graph.States.Count >= _options.MaxStates)
+                        if (depth >= _options.MaxDepth)
+                        {
+                            _budget.Stop("depth-limit");
+                            goto ExplorationFinished;
+                        }
+                        if (!_budget.TryState())
                         {
                             hitBound = true;
-                            continue;
+                            goto ExplorationFinished;
                         }
 
                         toId = "S" + nextId++;
@@ -140,35 +166,41 @@ public sealed class Explorer
                         queue.Enqueue((toId, toJson, depth + 1));
                     }
 
-                    if (graph.Transitions.Count >= _options.MaxTransitions)
-                    {
-                        hitBound = true;
-                        break;
-                    }
-
+                    if (!_budget.TryTransition()) goto ExplorationFinished;
                     var action = new ActionInvocation(rule.ActionLabel, invokeArgs.Select(Stringify).ToList(), ActionKindOf(rule.ActionLabel), ResultOf(rule, retVal));
                     graph.Transitions.Add(new Transition(fromId, action, toId));
                 }
+                if (!_budget.Check()) goto ExplorationFinished;
             }
 
             // Record model-derived negative edges: actions guard-disabled here for every arg set
             // (never enabled) — attempting them from this state is illegal and a SUT must reject them.
+            graph.NegativeTransitions.AddRange(identifiedRejections);
             foreach (var (label, info) in disabledReasons)
             {
+                if (_options.RejectionFilter is not null) continue;
                 if (enabledHere.Contains(label)) continue;
+                if (!_budget.TryNegative()) goto ExplorationFinished;
                 graph.NegativeTransitions.Add(new NegativeTransition(
                     fromId, new ActionInvocation(label, info.Args, ActionKindOf(label)), info.Reason));
             }
         }
 
+        ExplorationFinished:
+        hitBound |= _budget.TerminationReason is not null;
         graph.Metadata["states"] = graph.States.Count.ToString();
         graph.Metadata["transitions"] = graph.Transitions.Count.ToString();
         graph.Metadata["accepting"] = graph.States.Count(s => s.Accepting).ToString();
         graph.Metadata["hitBound"] = hitBound.ToString();
+        graph.Metadata["completeness"] = hitBound || result.Diagnostics.Count > 0 ? "INCOMPLETE" : "COMPLETE";
+        graph.Metadata["terminationReason"] = _budget.TerminationReason ?? (result.Diagnostics.Count > 0 ? "model-error" : "complete");
+        graph.Metadata["candidateEvaluations"] = _budget.CandidateEvaluations.ToString();
+        graph.Metadata["elapsedMilliseconds"] = _budget.Elapsed.TotalMilliseconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
         if (_options.GoalPredicate is not null) graph.Metadata["goals"] = string.Join(",", goals);
         if (capturedReqs.Count > 0) graph.Metadata["requirementsCaptured"] = string.Join(",", capturedReqs);
 
-        var explored = new ExplorationResult { Graph = graph, HitBound = hitBound };
+        var explored = new ExplorationResult { Graph = graph, HitBound = hitBound, TerminationReason = _budget.TerminationReason };
+        explored.Diagnostics.AddRange(result.Diagnostics);
         foreach (var r in capturedReqs) explored.CapturedRequirements.Add(r);
         foreach (var kv in result.StateJson) explored.StateJson[kv.Key] = kv.Value;
         return explored;
@@ -191,6 +223,7 @@ public sealed class Explorer
         var capturedReqs = new SortedSet<string>(StringComparer.Ordinal);
         var emptyEnv = (IReadOnlyDictionary<string, string>)new Dictionary<string, string>(StringComparer.Ordinal);
 
+        if (!_budget.TryState()) goto SlicedExplorationFinished;
         var initialInstance = CreateInstance();
         var initialJson = Serialize(initialInstance);
         var initialHash = CanonicalJson.Hash(CanonicalJson.Canonicalize(initialJson));
@@ -199,13 +232,14 @@ public sealed class Explorer
         graph.InitialStateId = initialId;
         graph.States.Add(new ModelState(initialId, initialHash, Label: null,
             Accepting: CombinedAccepting(scenario, initialInstance, scenario.Start), Initial: true));
+        result.StateJson[initialId] = initialJson;
         queue.Enqueue((initialId, initialJson, scenario.Start, 0, emptyEnv));
         var nextId = 1;
 
         while (queue.Count > 0)
         {
             var (fromId, fromJson, dfaState, depth, env) = queue.Dequeue();
-            if (depth >= _options.MaxDepth) continue;
+            if (!_budget.Check()) goto SlicedExplorationFinished;
 
             var domainInstance = Deserialize(fromJson);
             foreach (var rule in _model.Rules)
@@ -247,6 +281,7 @@ public sealed class Explorer
 
                 foreach (var argSet in GenerateArgSets(rule, domainValues))
                 {
+                    if (!_budget.TryCandidate()) goto SlicedExplorationFinished;
                     var target = Deserialize(fromJson);
                     var invokeArgs = MaterializeArgs(rule, target, argSet);
 
@@ -290,13 +325,16 @@ public sealed class Explorer
                     var toHash = CanonicalJson.Hash(CanonicalJson.Canonicalize(toJson));
                     var toCombined = toHash + "@" + ndfa + (scenario.HasReturnBindings ? "#" + EnvSig(toEnv) : "");
 
+                    if (graph.Transitions.Count >= _options.MaxTransitions) { _budget.Stop("transition-limit"); goto SlicedExplorationFinished; }
                     if (!hashToId.TryGetValue(toCombined, out var toId))
                     {
-                        if (graph.States.Count >= _options.MaxStates) { hitBound = true; continue; }
+                        if (depth >= _options.MaxDepth) { _budget.Stop("depth-limit"); goto SlicedExplorationFinished; }
+                        if (!_budget.TryState()) goto SlicedExplorationFinished;
                         toId = "S" + nextId++;
                         hashToId[toCombined] = toId;
                         graph.States.Add(new ModelState(toId, toHash, Label: null,
                             Accepting: CombinedAccepting(scenario, target, ndfa)));
+                        result.StateJson[toId] = toJson;
                         // Failure states are terminal violations: do not expand past them.
                         if (!scenario.IsFail(ndfa))
                         {
@@ -304,7 +342,7 @@ public sealed class Explorer
                         }
                     }
 
-                    if (graph.Transitions.Count >= _options.MaxTransitions) { hitBound = true; break; }
+                    if (!_budget.TryTransition()) goto SlicedExplorationFinished;
                     var action = new ActionInvocation(rule.ActionLabel, invokeArgs.Select(Stringify).ToList(), ActionKindOf(bareLabel), ResultOf(rule, retVal));
                     graph.Transitions.Add(new Transition(fromId, action, toId));
 
@@ -315,13 +353,20 @@ public sealed class Explorer
                         break;
                     }
                 }
+                if (!_budget.Check()) goto SlicedExplorationFinished;
             }
         }
 
+        SlicedExplorationFinished:
+        hitBound |= _budget.TerminationReason is not null;
         graph.Metadata["states"] = graph.States.Count.ToString();
         graph.Metadata["transitions"] = graph.Transitions.Count.ToString();
         graph.Metadata["accepting"] = graph.States.Count(s => s.Accepting).ToString();
         graph.Metadata["hitBound"] = hitBound.ToString();
+        graph.Metadata["completeness"] = hitBound || result.Diagnostics.Count > 0 ? "INCOMPLETE" : "COMPLETE";
+        graph.Metadata["terminationReason"] = _budget.TerminationReason ?? (result.Diagnostics.Count > 0 ? "model-error" : "complete");
+        graph.Metadata["candidateEvaluations"] = _budget.CandidateEvaluations.ToString();
+        graph.Metadata["elapsedMilliseconds"] = _budget.Elapsed.TotalMilliseconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
         graph.Metadata["mode"] = "sliced";
         if (scenario.HasFailStates)
         {
@@ -329,7 +374,9 @@ public sealed class Explorer
         }
 
         if (capturedReqs.Count > 0) graph.Metadata["requirementsCaptured"] = string.Join(",", capturedReqs);
-        var sliced = new ExplorationResult { Graph = graph, HitBound = hitBound };
+        var sliced = new ExplorationResult { Graph = graph, HitBound = hitBound, TerminationReason = _budget.TerminationReason };
+        sliced.Diagnostics.AddRange(result.Diagnostics);
+        foreach (var state in result.StateJson) sliced.StateJson[state.Key] = state.Value;
         foreach (var r in capturedReqs) sliced.CapturedRequirements.Add(r);
         return sliced;
     }
@@ -410,6 +457,7 @@ public sealed class Explorer
                 {
                     foreach (var v in en)
                     {
+                        if (!_budget.TryCandidate()) break;
                         values.Add(Coerce(v, p.Type));
                     }
                 }
@@ -486,9 +534,13 @@ public sealed class Explorer
     }
 
     private static bool TryInvoke(RuleInfo rule, ModelProgram target, object?[] args, List<string> diagnostics, out object? returnValue, out string? guardReason)
+        => TryInvoke(rule, target, args, diagnostics, out returnValue, out guardReason, out _);
+
+    private static bool TryInvoke(RuleInfo rule, ModelProgram target, object?[] args, List<string> diagnostics, out object? returnValue, out string? guardReason, out string? obligationId)
     {
         returnValue = null;
         guardReason = null;
+        obligationId = null;
         try
         {
             Requirement.Reset(); // capture requirement ids raised by this invocation
@@ -503,6 +555,7 @@ public sealed class Explorer
             // exploration bound disables the action for finite exploration only and is NOT a
             // negative edge, so it reports no reason.
             guardReason = g.IsExplorationBound ? null : g.Message; // guard not satisfied: action disabled here
+            obligationId = g.IsExplorationBound ? null : g.ObligationId;
             return false;
         }
         catch (TargetInvocationException tie)
@@ -809,8 +862,10 @@ public sealed class Explorer
         }
 
         var argSets = new List<object?[]>();
-        foreach (var a in _paramGen.Solver.Generate(solverParams, constraints, combination, _paramGen.Limit))
+        foreach (var a in _paramGen.Solver.Generate(solverParams, constraints, combination, _paramGen.Limit + 1))
         {
+            if (!_budget.TryCandidate()) yield break;
+            if (argSets.Count >= _paramGen.Limit) { _budget.Stop("parameter-limit"); yield break; }
             var args = new object?[rule.Parameters.Count];
             for (var i = 0; i < rule.Parameters.Count; i++)
             {
@@ -841,6 +896,7 @@ public sealed class Explorer
         var combos = new List<IReadOnlyDictionary<string, object?>>();
         foreach (var args in CartesianProduct(effective))
         {
+            if (!_budget.TryCandidate()) break;
             var dict = new Dictionary<string, object?>(names.Count);
             for (var i = 0; i < names.Count; i++)
             {
@@ -1109,7 +1165,7 @@ public sealed class Explorer
         return ValueKind.Int;
     }
 
-    private static IEnumerable<object?[]> CartesianProduct(List<List<object?>> domains)
+    private IEnumerable<object?[]> CartesianProduct(List<List<object?>> domains)
     {
         if (domains.Count == 0)
         {
@@ -1120,6 +1176,7 @@ public sealed class Explorer
         var indices = new int[domains.Count];
         while (true)
         {
+            if (!_budget.Check()) yield break;
             if (domains.Any(d => d.Count == 0))
             {
                 yield break;

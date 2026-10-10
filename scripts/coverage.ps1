@@ -8,8 +8,8 @@
       pwsh scripts/coverage.ps1                      # full suite, percentages
       pwsh scripts/coverage.ps1 -Package sek         # also list sek's uncovered lines
       pwsh scripts/coverage.ps1 -Stable -Bar 90      # stable+fast, PASS/FAIL per module vs 90%
-  Kills stray dotnet processes first (they lock DLLs / the coverage file), clears the previous
-  TestResults, collects "XPlat Code Coverage", then parses the newest cobertura report.
+  Collects "XPlat Code Coverage" into an isolated results directory, then parses that run's
+  cobertura report. Existing results and unrelated processes are preserved.
 
 .PARAMETER Package
   If given, also prints the uncovered line numbers per file for that package (e.g. sek, Sek.Cord,
@@ -33,19 +33,19 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-Location (Split-Path $PSScriptRoot -Parent)
 
-taskkill /F /IM dotnet.exe /T 2>$null | Out-Null
-Remove-Item tests/Sek.Tests/TestResults -Recurse -Force -ErrorAction SilentlyContinue
+$resultsDirectory = Join-Path 'tests/Sek.Tests/TestResults' ('coverage-' + [Guid]::NewGuid().ToString('N'))
 
 $testArgs = @(
     'test', 'tests/Sek.Tests/Sek.Tests.csproj', '-c', 'Debug',
-    '--collect:XPlat Code Coverage', '--results-directory', 'tests/Sek.Tests/TestResults',
+    '--collect:XPlat Code Coverage', '--results-directory', $resultsDirectory,
     '--nologo', '-v', 'q'
 )
 if ($Stable) { $testArgs += @('--filter', 'FullyQualifiedName!~Test_SelfHost_Conformance') }
 
-dotnet @testArgs 2>&1 | Select-String -Pattern 'Passed!|Failed!' | Select-Object -Last 1
+dotnet @testArgs
+if ($LASTEXITCODE -ne 0) { throw "coverage test run failed with exit code $LASTEXITCODE" }
 
-$f = Get-ChildItem tests/Sek.Tests/TestResults -Recurse -Filter coverage.cobertura.xml |
+$f = Get-ChildItem $resultsDirectory -Recurse -Filter coverage.cobertura.xml |
     Sort-Object LastWriteTime | Select-Object -Last 1 -ExpandProperty FullName
 if (-not $f) { throw "no coverage report produced" }
 

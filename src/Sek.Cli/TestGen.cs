@@ -164,7 +164,7 @@ public static class TestGen
         while (queue.Count > 0)
         {
             var s = queue.Dequeue();
-            foreach (var t in graph.OutgoingFrom(s))
+            foreach (var t in graph.OutgoingFrom(s).OrderBy(t => WitnessKey(new[] { t }), StringComparer.Ordinal))
             {
                 if (visited.Add(t.ToStateId))
                 {
@@ -195,7 +195,7 @@ public static class TestGen
         // Reverse BFS from all accepting states; next[s] = transition to take from s to move
         // one hop closer to the nearest accepting state.
         var incoming = new Dictionary<string, List<Transition>>(StringComparer.Ordinal);
-        foreach (var t in graph.Transitions)
+        foreach (var t in graph.Transitions.OrderBy(t => WitnessKey(new[] { t }), StringComparer.Ordinal))
         {
             (incoming.TryGetValue(t.ToStateId, out var l) ? l : incoming[t.ToStateId] = new List<Transition>()).Add(t);
         }
@@ -203,7 +203,7 @@ public static class TestGen
         var next = new Dictionary<string, Transition>(StringComparer.Ordinal);
         var visited = new HashSet<string>(StringComparer.Ordinal);
         var queue = new Queue<string>();
-        foreach (var s in graph.States.Where(s => s.Accepting))
+        foreach (var s in graph.States.Where(s => s.Accepting).OrderBy(s => s.Id, StringComparer.Ordinal))
         {
             visited.Add(s.Id);
             queue.Enqueue(s.Id);
@@ -243,7 +243,8 @@ public static class TestGen
     /// <summary>Emits an xUnit test project (csproj + cs) into <paramref name="outDir"/>.</summary>
     public static GenResult EmitXunit(
         ExplorationGraph graph, List<TestPath> paths, string outDir,
-        string testNamespace, string bindingAssemblyPath, string bindingNamespace)
+        string testNamespace, string bindingAssemblyPath, string bindingNamespace,
+        IReadOnlyList<NegativeTransition>? selectedNegatives = null)
     {
         Directory.CreateDirectory(outDir);
         var safe = Sanitize(graph.Machine);
@@ -253,11 +254,11 @@ public static class TestGen
         var bindingFileName = SnapshotBindingAssets(bindingAssemblyPath, outDir);
 
         File.WriteAllText(csproj, Csproj());
-        File.WriteAllText(csfile, TestSource(graph, paths, safe, className, testNamespace, bindingFileName, bindingNamespace));
+        File.WriteAllText(csfile, TestSource(graph, paths, safe, className, testNamespace, bindingFileName, bindingNamespace, selectedNegatives));
 
         var covered = new HashSet<Transition>();
         foreach (var p in paths) foreach (var t in p.Steps) covered.Add(t);
-        return new GenResult(paths.Count, covered.Count, graph.Transitions.Count, outDir, csfile, graph.NegativeTransitions.Count);
+        return new GenResult(paths.Count, covered.Count, graph.Transitions.Count, outDir, csfile, selectedNegatives?.Count ?? graph.NegativeTransitions.Count);
     }
 
     private static string Csproj() =>
@@ -288,7 +289,7 @@ public static class TestGen
 
     private static string TestSource(
         ExplorationGraph graph, List<TestPath> paths, string safe, string className,
-        string ns, string bindingPath, string bindingNs)
+        string ns, string bindingPath, string bindingNs, IReadOnlyList<NegativeTransition>? selectedNegatives)
     {
         var covered = new HashSet<Transition>();
         foreach (var p in paths) foreach (var t in p.Steps) covered.Add(t);
@@ -345,9 +346,10 @@ public static class TestGen
         // Negative tests (model-derived): drive the legal prefix to the forbidding state, then
         // attempt the illegal action and assert the SUT REJECTS it. The model's guard says the
         // action is illegal there; a conforming SUT must refuse it.
-        for (var i = 0; i < graph.NegativeTransitions.Count; i++)
+        var negatives = selectedNegatives ?? graph.NegativeTransitions;
+        for (var i = 0; i < negatives.Count; i++)
         {
-            var n = graph.NegativeTransitions[i];
+            var n = negatives[i];
             var method = $"{safe}_Reject_{Sanitize(n.Action.Name)}_{(i + 1):D2}";
             sb.AppendLine("        [Fact]");
             sb.AppendLine($"        public void {method}()");
@@ -364,7 +366,9 @@ public static class TestGen
             var nargs = n.Action.Arguments.Count == 0
                 ? string.Empty
                 : ", " + string.Join(", ", n.Action.Arguments.Select(Literal));
-            sb.AppendLine($"            _sut.StepExpectingError({Literal(n.Action.Name)}, {Literal(n.Reason)}{nargs});");
+            var expectedType = Conformance.RejectionField(n, "ExpectedExceptionType");
+            var expectedMessage = Conformance.RejectionField(n, "ExpectedMessageContains");
+            sb.AppendLine($"            _sut.StepExpectingError({Literal(n.Action.Name)}, {Literal(n.Reason)}, {(expectedType is null ? "null" : Literal(expectedType))}, {(expectedMessage is null ? "null" : Literal(expectedMessage))}{nargs});");
             sb.AppendLine("        }");
             sb.AppendLine();
         }
@@ -383,6 +387,25 @@ public static class TestGen
         if (stateId == init) return System.Array.Empty<Transition>();
         var prefix = ShortestFromInit(graph, init);
         return PathFromInit(prefix, stateId);
+    }
+
+    public static string WitnessKey(IEnumerable<Transition> steps) => System.Text.Json.JsonSerializer.Serialize(
+        steps.Select(step => new { step.Action.Name, step.Action.Arguments, step.FromStateId, step.ToStateId }));
+
+    public static IReadOnlyList<Transition>? ConcretePrefixTo(ExplorationGraph graph, string stateId)
+    {
+        var initial = graph.InitialStateId ?? graph.States.FirstOrDefault(state => state.Initial)?.Id;
+        if (initial is null || graph.FindState(stateId) is null) return null;
+        if (stateId == initial) return Array.Empty<Transition>();
+        var parents = ShortestFromInit(graph, initial);
+        return parents.ContainsKey(stateId) ? PathFromInit(parents, stateId) : null;
+    }
+
+    public static IReadOnlyList<Transition>? ConcreteSuffixToAccepting(ExplorationGraph graph, string stateId)
+    {
+        if (graph.FindState(stateId)?.Accepting == true) return Array.Empty<Transition>();
+        var next = ShortestToAccepting(graph);
+        return next.ContainsKey(stateId) ? PathToAccepting(next, stateId) : null;
     }
 
     private static string Harness() =>
@@ -404,16 +427,30 @@ public static class TestGen
                                 "Snapshotted SUT binding assembly not found: " + full +
                                 ". Regenerate the standalone test project from a built binding.");
                         var dir = Path.GetDirectoryName(full);
+                        var resolver = new AssemblyDependencyResolver(full);
                         AssemblyLoadContext.Default.Resolving += (ctx, name) =>
                         {
+                            var resolved = resolver.ResolveAssemblyToPath(name);
+                            if (resolved != null && File.Exists(resolved)) return ctx.LoadFromAssemblyPath(resolved);
                             var candidate = Path.Combine(dir, name.Name + ".dll");
                             return File.Exists(candidate) ? ctx.LoadFromAssemblyPath(candidate) : null;
+                        };
+                        AssemblyLoadContext.Default.ResolvingUnmanagedDll += (assembly, name) =>
+                        {
+                            var resolved = resolver.ResolveUnmanagedDllToPath(name);
+                            return resolved == null ? IntPtr.Zero : System.Runtime.InteropServices.NativeLibrary.Load(resolved);
                         };
                         _asm = AssemblyLoadContext.Default.LoadFromAssemblyPath(full);
                         _ns = ns;
                     }
 
                     public void Step(string label, params string[] args)
+                    {
+                        var rejection = InvokeAction(label, args);
+                        if (rejection != null) throw rejection;
+                    }
+
+                    private Exception InvokeAction(string label, string[] args)
                     {
                         var dot = label.LastIndexOf('.');
                         Assert.True(dot > 0, "malformed action label: " + label);
@@ -423,11 +460,17 @@ public static class TestGen
                             BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
                         Assert.True(method != null, "no SUT method for action " + label);
                         var ps = method.GetParameters();
+                        Assert.Equal(ps.Length, args.Length);
                         var call = new object[ps.Length];
-                        for (var i = 0; i < ps.Length && i < args.Length; i++)
+                        for (var i = 0; i < ps.Length; i++)
                             call[i] = Coerce(args[i], ps[i].ParameterType);
                         var target = method.IsStatic ? null : Instance(type);
-                        method.Invoke(target, call);
+                        try { method.Invoke(target, call); }
+                        catch (TargetInvocationException exception) when (exception.InnerException != null)
+                        {
+                            return exception.InnerException;
+                        }
+                        return null;
                     }
 
                     // An observation of an `event` action (the SUT raises it). Replaying model-based
@@ -439,14 +482,14 @@ public static class TestGen
                     // current state and assert the SUT REJECTS it (throws / errors). The model's guard
                     // says this action is illegal here; a conforming SUT must refuse it. If the SUT
                     // accepts it, the test fails.
-                    public void StepExpectingError(string label, string reason, params string[] args)
+                    public void StepExpectingError(string label, string reason, string expectedExceptionType, string expectedMessageContains, params string[] args)
                     {
-                        var rejected = false;
-                        try { Step(label, args); }
-                        catch (Exception) { rejected = true; }
-                        Assert.True(rejected,
+                        var actual = InvokeAction(label, args);
+                        Assert.True(actual != null,
                             "SUT accepted an action the model forbids in this state ('" + label + "'" +
                             (string.IsNullOrEmpty(reason) ? "" : ": " + reason) + ") — expected a rejection.");
+                        if (expectedExceptionType != null) Assert.Equal(expectedExceptionType, actual.GetType().FullName);
+                        if (expectedMessageContains != null) Assert.Contains(expectedMessageContains, actual.Message);
                     }
 
                     private object Instance(Type type)
@@ -464,7 +507,7 @@ public static class TestGen
                     {
                         if (t == typeof(string)) return v;
                         if (t.IsEnum) return Enum.Parse(t, v, true);
-                        try { return Convert.ChangeType(v, t); } catch { return v; }
+                        return Convert.ChangeType(v, t, System.Globalization.CultureInfo.InvariantCulture);
                     }
                 }
 
@@ -484,12 +527,12 @@ public static class TestGen
         if (Directory.Exists(assetsDir)) Directory.Delete(assetsDir, recursive: true);
         Directory.CreateDirectory(assetsDir);
 
-        foreach (var pattern in new[] { "*.dll", "*.deps.json" })
+        foreach (var source in Directory.EnumerateFiles(sourceDir, "*", SearchOption.AllDirectories))
         {
-            foreach (var source in Directory.GetFiles(sourceDir, pattern, SearchOption.TopDirectoryOnly))
-            {
-                File.Copy(source, Path.Combine(assetsDir, Path.GetFileName(source)), overwrite: true);
-            }
+            if (source.StartsWith(Path.GetFullPath(outDir) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) continue;
+            var target = Path.Combine(assetsDir, Path.GetRelativePath(sourceDir, source));
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.Copy(source, target, overwrite: true);
         }
 
         return Path.GetFileName(binding);

@@ -73,4 +73,60 @@ public class TestGenBranchCoverageTests
         Assert.NotEmpty(TestGen.LegalPrefixTo(g, "S2"));   // reachable via S0→S1→S2
         Assert.Empty(TestGen.LegalPrefixTo(g, "S3"));      // unreachable island → empty
     }
+
+    [Fact]
+    public void ConcreteWitnesses_DistinguishUnreachable_AndGeneratedHarnessRejectsSetupErrors()
+    {
+        var graph = BuildGraph();
+        Assert.Null(TestGen.ConcretePrefixTo(graph, "S3"));
+        Assert.Null(TestGen.ConcreteSuffixToAccepting(graph, "absent"));
+        Assert.Equal(2, TestGen.ConcretePrefixTo(graph, "S2")!.Count);
+        var output = Path.Combine(Path.GetTempPath(), "sek_harness_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var generated = TestGen.EmitXunit(graph, TestGen.SelectPaths(graph, 5), output, "Gen.Tests", ThisAssembly, "Sek.Tests.GateSut");
+            var source = File.ReadAllText(generated.TestFile);
+            Assert.Contains("catch (TargetInvocationException", source);
+            Assert.DoesNotContain("catch (Exception) { rejected = true; }", source);
+            Assert.Contains("Assert.Equal(ps.Length, args.Length)", source);
+            Assert.Contains("Assert.Equal(expectedExceptionType, actual.GetType().FullName)", source);
+            Assert.Contains("Assert.Contains(expectedMessageContains, actual.Message)", source);
+        }
+        finally { Directory.Delete(output, true); }
+    }
+
+    [Fact]
+    public void StructuredProof_SelectsExactArgumentsAndJsonState_AndReportsMissingIds()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "sek_selection_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var item = new ProofCase { Id = "exact", Action = "A.Do", Arguments = new() { "x" },
+                FromState = new() { ["Count"] = System.Text.Json.JsonSerializer.SerializeToElement(1) } };
+            var contract = new ProofContract { SchemaVersion = "1.0", Builds = new() { new() { Project = "Model.csproj", Inputs = new() { "." } } },
+                Machines = new() { ["M"] = new() { Actions = new() { "Ev.Ring", "A.Do", "A.Blocked" }, PositiveCases = new() { item }, RequiredActions = new() { "A.Do" } } } };
+            var config = new ProjectConfig { Proof = "proof.json" };
+            void Save() => File.WriteAllText(Path.Combine(root, "proof.json"), System.Text.Json.JsonSerializer.Serialize(contract,
+                new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
+            Save();
+            var graph = BuildGraph();
+            graph.Metadata["proofStateJson"] = System.Text.Json.JsonSerializer.Serialize(new System.Collections.Generic.Dictionary<string, string> { ["S1"] = "{\"Count\":1}" });
+            var proof = new ProofEvidence(config, root);
+            Assert.Throws<InvalidDataException>(() => proof.VerifyActions("M", new[] { "A.Do" }));
+            Assert.Throws<InvalidDataException>(() => proof.Machine("m"));
+            var selection = proof.Select(graph, "M");
+            Assert.True(selection.Complete);
+            Assert.Equal(new[] { "exact" }, selection.CoveredPositiveIds);
+            Assert.Equal(2, Assert.Single(selection.Paths).Steps.Count);
+            item.Arguments = new() { "wrong" };
+            Save();
+            Assert.Contains("exact", new ProofEvidence(config, root).Select(graph, "M").MissingPositiveIds);
+            item.Arguments = new() { "x" };
+            item.FromState!["Count"] = System.Text.Json.JsonSerializer.SerializeToElement(2);
+            Save();
+            Assert.Contains("exact", new ProofEvidence(config, root).Select(graph, "M").MissingPositiveIds);
+        }
+        finally { Directory.Delete(root, true); }
+    }
 }

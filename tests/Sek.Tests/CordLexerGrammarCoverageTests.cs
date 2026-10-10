@@ -13,6 +13,30 @@ public class CordLexerGrammarCoverageTests
 {
     private static CordDocument Parse(string text) => CordDocument.ParseText(text);
 
+    [Theory]
+    [InlineData("// trailing comment")]
+    [InlineData("/* complete comment */")]
+    [InlineData("/* * lone slash / */")]
+    [InlineData(" \t\n")]
+    public void TriviaAtEndOfInput_ProducesOnlyEndToken(string source)
+    {
+        var token = Assert.Single(new Sek.Cord.Lexing.Lexer(source).Tokenize());
+        Assert.Equal(Sek.Cord.Lexing.TokenKind.EndOfFile, token.Kind);
+        Assert.Equal(string.Empty, token.Text);
+    }
+
+    [Theory]
+    [InlineData("-")]
+    [InlineData("-name")]
+    public void MinusWithoutNumericOperand_RejectsUnexpectedCharacter(string source)
+    {
+        var exception = Assert.Throws<Sek.Cord.Lexing.CordSyntaxException>(
+            () => new Sek.Cord.Lexing.Lexer(source).Tokenize());
+        Assert.Contains("Unexpected character '-'", exception.Message);
+        Assert.Equal(1, exception.Line);
+        Assert.Equal(1, exception.Column);
+    }
+
     [Fact]
     public void StringEscapes_AreDecoded()
     {

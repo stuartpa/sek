@@ -196,6 +196,33 @@ public class CordConstraintBranchTests
         Assert.Empty(r.Constraints.OfType<PredicateConstraint>());
     }
 
+    [Theory]
+    [InlineData("a == -0xFF")]
+    [InlineData("a == 0xABCDEF")]
+    [InlineData("a == -0xabcdef")]
+    [InlineData("a == -(a + 1)")]
+    [InlineData("!false && a > 0")]
+    [InlineData("a == (-2)")]
+    [InlineData("a - 2 == 3")]
+    public void ExprParser_NumericAndUnaryBoundariesProducePredicate(string expression)
+    {
+        var result = CordConstraintExtractor.Extract(Act($"Condition.IsTrue({expression});", ("int", "a")));
+        Assert.Single(result.Constraints.OfType<PredicateConstraint>());
+    }
+
+    [Theory]
+    [InlineData("a +")]
+    [InlineData("a == 0x")]
+    [InlineData("a == 9999999999999999999999999")]
+    [InlineData("a 2")]
+    [InlineData("a == )")]
+    [InlineData("(a > 1) && (")]
+    public void ExprParser_MalformedExpressionDoesNotClaimParsedPredicate(string expression)
+    {
+        var result = CordConstraintExtractor.Extract(Act($"Condition.IsTrue({expression});", ("int", "a")));
+        Assert.Empty(result.Constraints.OfType<PredicateConstraint>());
+    }
+
     [Fact]
     public void RoslynFallback_AcrossParamKinds()
     {

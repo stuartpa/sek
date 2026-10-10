@@ -23,6 +23,63 @@ public class SolvingZ3BranchCoverageTests
         new Z3Solver().Generate(ps, cons, new CombinationSpec(), 100);
 
     [Fact]
+    public void Z3_NumericDomains_PreserveOriginalConvertedValues()
+    {
+        var candidates = new (object? Value, long NumericValue)[]
+        {
+            (null, 0), (false, 0), (true, 1), (DayOfWeek.Monday, 1), (2.5m, 2),
+        };
+        foreach (var candidate in candidates)
+        {
+            var parameters = new List<SolverParam>
+            {
+                new() { Name = "value", Kind = ValueKind.Int, Domain = new[] { candidate.Value } },
+            };
+            var constraints = new List<SolverConstraint>
+            {
+                new PredicateConstraint { Expr = Bin("==", Var("value"), Int(candidate.NumericValue)) },
+            };
+            var assignment = Assert.Single(Solve(parameters, constraints));
+            Assert.Equal(candidate.Value, assignment["value"]);
+        }
+    }
+
+    [Fact]
+    public void Z3_NullStrings_UseEmptyStringDomainIndex()
+    {
+        var parameters = new List<SolverParam>
+        {
+            new() { Name = "text", Kind = ValueKind.String, Domain = new object?[] { null } },
+        };
+        var constraints = new List<SolverConstraint>
+        {
+            new PredicateConstraint
+            {
+                Expr = Bin("==", Var("text"), new LitExpr { Value = null, Kind = ValueKind.String }),
+            },
+        };
+        Assert.Equal(string.Empty, Assert.Single(Solve(parameters, constraints))["text"]);
+    }
+
+    [Theory]
+    [InlineData("same", "same", 1)]
+    [InlineData("left", "right", 0)]
+    public void Z3_StringConstantPredicates_ArePostFiltered(string left, string right, int count)
+    {
+        var parameters = new List<SolverParam>
+        {
+            new() { Name = "value", Kind = ValueKind.Int, Domain = new object?[] { 7 } },
+        };
+        var constraints = new List<SolverConstraint>
+        {
+            new PredicateConstraint { Expr = Bin("==", Str(left), Str(right)) },
+        };
+        var assignments = Solve(parameters, constraints);
+        Assert.Equal(count, assignments.Count);
+        Assert.All(assignments, assignment => Assert.Equal(7, assignment["value"]));
+    }
+
+    [Fact]
     public void Z3_StringEquality_SelectsByIndex()
     {
         var ps = new List<SolverParam> { new() { Name = "s", Kind = ValueKind.String, Domain = new object?[] { "a", "b", "c" } } };

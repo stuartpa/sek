@@ -13,6 +13,8 @@ public sealed class ProjectConfig
     [JsonPropertyName("cord")] public string Cord { get; set; } = "";
     [JsonPropertyName("binding")] public BindingRef? Binding { get; set; }
     [JsonPropertyName("out")] public string Out { get; set; } = ".specexplorerkit/out";
+    [JsonPropertyName("proof")] public string? Proof { get; set; }
+    [JsonPropertyName("reuse")] public string? Reuse { get; set; }
 
     public sealed class ModelRef
     {

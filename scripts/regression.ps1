@@ -65,6 +65,17 @@ foreach ($e in $entries) {
     $stderr = Get-Content $err -Raw -ErrorAction SilentlyContinue
     Remove-Item $out, $err -ErrorAction SilentlyContinue
 
+    if ($e.PSObject.Properties['expectedOutcome'] -and $e.expectedOutcome -eq 'INCOMPLETE') {
+        $reason = $e.terminationReason
+        if ($p.ExitCode -eq 0 -or -not $stderr.Contains("INCOMPLETE exploration: $reason;")) {
+            $fails += "$($e.project)/$($e.machine): expected nonzero INCOMPLETE $reason; got exit $($p.ExitCode)"
+        }
+        else {
+            $results += "[OK ] $($e.project)/$($e.machine): rejected incomplete $reason"
+        }
+        continue
+    }
+
     if ($p.ExitCode -ne 0) {
         $fails += "$($e.project)/$($e.machine): exit $($p.ExitCode) — $($stderr.Trim())"
         continue

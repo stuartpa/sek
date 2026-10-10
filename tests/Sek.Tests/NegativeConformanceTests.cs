@@ -73,6 +73,28 @@ namespace Sek.Tests
             return SekCli.InterpretConstruct(intro, cord, "M", cb, options, "enum", binds).Graph;
         }
 
+        public sealed class IdentifiedInputModel : ModelProgram
+        {
+            [Rule("W.Input")]
+            public void Input(bool valid) => Require(valid, "input rejected", "invalid-input");
+
+            [AcceptingCondition]
+            public bool Done() => true;
+        }
+
+        [Fact]
+        public void IdentifiedGuard_RecordsIllegalInputEvenWhenActionIsEnabled()
+        {
+            var result = new Explorer(new ModelIntrospector(typeof(IdentifiedInputModel))).Explore("Identified");
+            Assert.True(result.IsComplete);
+            Assert.Single(result.Graph.Transitions);
+            var rejection = Assert.Single(result.Graph.NegativeTransitions);
+            Assert.Equal("invalid-input", rejection.ObligationId);
+            Assert.Equal(new[] { "False" }, rejection.Action.Arguments);
+            var restored = SeexplDocument.FromGraph(result.Graph).ToGraph();
+            Assert.Equal("invalid-input", Assert.Single(restored.NegativeTransitions).ObligationId);
+        }
+
         [Fact]
         public void Explorer_RecordsGuardDisabledActionsAsNegativeEdges()
         {
@@ -177,6 +199,16 @@ namespace Sek.Tests
             var report = Conformance.Replay(GraphWithNegative(ActionInvocation.Of("Widget.Nope")), ThisAssembly, "Sek.Tests.ConfSut");
             Assert.False(report.Passed);
             Assert.Contains(report.Failures, f => f.Contains("negative 'Widget.Nope'"));
+        }
+
+        [Fact]
+        public void Conformance_Negative_ArityAndConversionAreSetupFailures()
+        {
+            var report = Conformance.Replay(GraphWithNegative(ActionInvocation.Of("W.Open", "extra")), ThisAssembly, "Sek.Tests.GateSut");
+            Assert.False(report.Passed);
+            Assert.Equal(0, report.NegativeRejected);
+            Assert.False(Conformance.MatchesRejection(new TimeoutException("fixture"), "System.InvalidOperationException", null));
+            Assert.False(Conformance.MatchesRejection(new InvalidOperationException("wrong"), "System.InvalidOperationException", "open"));
         }
 
         // ---- TestGen emits a NEGATIVE test with a legal prefix (non-initial forbidding state) ----

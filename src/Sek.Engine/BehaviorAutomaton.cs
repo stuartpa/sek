@@ -18,16 +18,75 @@ public sealed class BehaviorExplorer
 {
     private readonly Func<string, Behavior?> _resolveMachine;
     private readonly HashSet<string> _alphabet;
+    private readonly ExplorationOptions _options;
+    private readonly ExplorationBudget _budget;
     private int _nid;
+    private int _walkDepth;
+    private int _scanRemaining;
 
     public BehaviorExplorer(Func<string, Behavior?> resolveMachine, IEnumerable<string> alphabet)
+        : this(resolveMachine, alphabet, new ExplorationOptions())
+    {
+    }
+
+    public BehaviorExplorer(Func<string, Behavior?> resolveMachine, IEnumerable<string> alphabet, ExplorationOptions options)
     {
         _resolveMachine = resolveMachine;
-        _alphabet = new HashSet<string>(alphabet, StringComparer.Ordinal);
+        _options = options;
+        _budget = options.Budget ??= new ExplorationBudget(options);
+        _alphabet = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var symbol in alphabet)
+        {
+            Work();
+            _alphabet.Add(symbol);
+        }
+    }
+
+    private void Work([System.Runtime.CompilerServices.CallerMemberName] string operation = "")
+    {
+        if (!_budget.TryCandidate())
+            throw new InvalidOperationException($"INCOMPLETE behavior preprocessing: {_budget.TerminationReason} ({operation}; NFA nodes={_nid}; graph states={_budget.States})");
+    }
+
+    private void CheckBudget()
+    {
+        if (!_budget.Check())
+            throw new InvalidOperationException($"INCOMPLETE behavior preprocessing: {_budget.TerminationReason}");
+    }
+
+    private void Scan()
+    {
+        CheckBudget();
+        if (_scanRemaining == 0)
+        {
+            Work();
+            _scanRemaining = 31;
+        }
+        else _scanRemaining--;
+    }
+
+    private WalkScope EnterWalk(bool candidate = true)
+    {
+        if (candidate) Work();
+        else CheckBudget();
+        if (_walkDepth >= 256)
+        {
+            _budget.Stop("behavior-recursion-limit");
+            throw new InvalidOperationException($"INCOMPLETE behavior preprocessing: {_budget.TerminationReason}");
+        }
+
+        _walkDepth++;
+        return new WalkScope(this);
+    }
+
+    private readonly struct WalkScope(BehaviorExplorer owner) : IDisposable
+    {
+        public void Dispose() => owner._walkDepth--;
     }
 
     public ExplorationGraph Explore(string machineName, Behavior body)
     {
+        Work();
         foreach (var sym in CollectSymbols(body, new HashSet<string>(StringComparer.Ordinal)))
         {
             _alphabet.Add(sym);
@@ -44,6 +103,7 @@ public sealed class BehaviorExplorer
     /// </summary>
     public CompiledScenario Compile(Behavior body)
     {
+        Work();
         foreach (var sym in CollectSymbols(body, new HashSet<string>(StringComparer.Ordinal)))
         {
             _alphabet.Add(sym);
@@ -63,13 +123,14 @@ public sealed class BehaviorExplorer
     /// variable</c> for each <c>Action(args) / var</c>, and the set of bound variable names.</summary>
     private void CollectReturnBindings(Behavior? b, HashSet<string> seenMachines, Dictionary<string, string> map, HashSet<string> vars)
     {
+        using var walk = EnterWalk();
         switch (b)
         {
             case null: return;
             case InvocationBehavior inv:
                 if (inv.ReturnBinding is { Length: > 0 } v)
                 {
-                    map[SymbolOf(inv)] = v;
+                    map[CheckedSymbolOf(inv)] = v;
                     vars.Add(v);
                 }
 
@@ -94,6 +155,7 @@ public sealed class BehaviorExplorer
     /// references) — i.e. it is a model-checking scenario.</summary>
     private bool ContainsFail(Behavior? b, HashSet<string> seenMachines)
     {
+        using var walk = EnterWalk();
         switch (b)
         {
             case null: return false;
@@ -124,6 +186,17 @@ public sealed class BehaviorExplorer
         return inv.Target + "(" + string.Join(",", inv.Args.Select(NormArg)) + ")";
     }
 
+    private string CheckedSymbolOf(InvocationBehavior invocation)
+    {
+        Work();
+        if (invocation.Args is null || invocation.Args.Count == 0) return invocation.Target;
+        return invocation.Target + "(" + string.Join(",", invocation.Args.Select(argument =>
+        {
+            Scan();
+            return NormArg(argument);
+        })) + ")";
+    }
+
     /// <summary>Normalizes an argument token for matching: strips quotes and any type prefix
     /// (e.g. <c>ShareType.DISK</c> -&gt; <c>DISK</c>) so it aligns with a stringified value.</summary>
     public static string NormArg(string a)
@@ -136,6 +209,7 @@ public sealed class BehaviorExplorer
 
     private IEnumerable<string> CollectSymbols(Behavior? b, HashSet<string> seenMachines)
     {
+        using var walk = EnterWalk();
         switch (b)
         {
             case null:
@@ -150,7 +224,7 @@ public sealed class BehaviorExplorer
                 }
                 else if (inv.Args is { Count: > 0 })
                 {
-                    yield return SymbolOf(inv);
+                    yield return CheckedSymbolOf(inv);
                 }
 
                 yield break;
@@ -195,11 +269,19 @@ public sealed class BehaviorExplorer
         /// <summary>True when the scenario uses return-bindings (<c>Action(args) / var</c>).</summary>
         public bool HasReturnBindings => _returnBindings.Count > 0;
 
-        public bool IsAccepting(int state) => state >= 0 && _dfa.Accept(state);
+        public bool IsAccepting(int state)
+        {
+            _dfa.Check();
+            return state >= 0 && _dfa.Accept(state);
+        }
 
         /// <summary>True if <paramref name="state"/> is a model-checking failure state
         /// (reached a <c>: fail</c> annotation).</summary>
-        public bool IsFail(int state) => state >= 0 && _dfa.Fail(state);
+        public bool IsFail(int state)
+        {
+            _dfa.Check();
+            return state >= 0 && _dfa.Fail(state);
+        }
 
         /// <summary>True if the scenario has any failure states (a model-checking machine).</summary>
         public bool HasFailStates { get; }
@@ -208,6 +290,7 @@ public sealed class BehaviorExplorer
         /// yielding the next scenario state.</summary>
         public bool TryStep(int state, string label, out int next)
         {
+            _dfa.Check();
             next = -1;
             return state >= 0 && _dfa.On(state).TryGetValue(label, out next);
         }
@@ -217,12 +300,14 @@ public sealed class BehaviorExplorer
         /// argument-pinned form <c>bareLabel(...)</c>.</summary>
         public bool Permits(int state, string bareLabel)
         {
+            _dfa.Check();
             if (state < 0) return false;
             var on = _dfa.On(state);
             if (on.ContainsKey(bareLabel)) return true;
             var prefix = bareLabel + "(";
             foreach (var k in on.Keys)
             {
+                _dfa.Check();
                 if (k.StartsWith(prefix, StringComparison.Ordinal)) return true;
             }
 
@@ -235,11 +320,13 @@ public sealed class BehaviorExplorer
         /// must match exactly. Returns the next scenario state on the first matching pattern.</summary>
         public bool TryStepArgs(int state, string bareLabel, IReadOnlyList<string> concreteArgs, out int next)
         {
+            _dfa.Check();
             next = -1;
             if (state < 0) return false;
             var prefix = bareLabel + "(";
             foreach (var kv in _dfa.On(state))
             {
+                _dfa.Check();
                 var key = kv.Key;
                 if (!key.StartsWith(prefix, StringComparison.Ordinal) || !key.EndsWith(")", StringComparison.Ordinal))
                 {
@@ -256,6 +343,7 @@ public sealed class BehaviorExplorer
                 var ok = true;
                 for (var i = 0; i < pat.Length; i++)
                 {
+                    _dfa.Check();
                     if (pat[i] == "_") continue; // wildcard
                     if (!string.Equals(pat[i], concreteArgs[i], StringComparison.Ordinal)) { ok = false; break; }
                 }
@@ -273,6 +361,7 @@ public sealed class BehaviorExplorer
         /// variable <paramref name="boundVar"/> whose value the caller should capture.</summary>
         public bool TryStepBinding(int state, string bareLabel, IReadOnlyList<string> concreteArgs, IReadOnlyDictionary<string, string> env, out int next, out string? boundVar)
         {
+            _dfa.Check();
             next = -1;
             boundVar = null;
             if (state < 0) return false;
@@ -281,6 +370,7 @@ public sealed class BehaviorExplorer
 
             foreach (var kv in on)
             {
+                _dfa.Check();
                 var key = kv.Key;
                 if (key.StartsWith(prefix, StringComparison.Ordinal) && key.EndsWith(")", StringComparison.Ordinal))
                 {
@@ -291,6 +381,7 @@ public sealed class BehaviorExplorer
                     var ok = true;
                     for (var i = 0; i < pat.Length; i++)
                     {
+                        _dfa.Check();
                         if (pat[i] == "_") continue;                          // wildcard
                         if (_bindingVars.Contains(pat[i]))                    // binding-var reference
                         {
@@ -319,10 +410,12 @@ public sealed class BehaviorExplorer
         /// feed scenario-supplied argument values into parameter generation during slicing.</summary>
         public IEnumerable<string[]> ArgPatterns(int state, string bareLabel)
         {
+            _dfa.Check();
             if (state < 0) yield break;
             var prefix = bareLabel + "(";
             foreach (var kv in _dfa.On(state))
             {
+                _dfa.Check();
                 var key = kv.Key;
                 if (!key.StartsWith(prefix, StringComparison.Ordinal) || !key.EndsWith(")", StringComparison.Ordinal))
                 {
@@ -351,14 +444,24 @@ public sealed class BehaviorExplorer
         public NState Accept = null!;
     }
 
-    private NState New() => new() { Id = _nid++ };
+    private NState New()
+    {
+        Work();
+        return new NState { Id = _nid++ };
+    }
+
+    private void AddEdge(NState from, string? label, NState to)
+    {
+        Work();
+        from.Edges.Add((label, to));
+    }
 
     private Nfa Atom(string label)
     {
         var s = New();
         var a = New();
         a.Accept = true;
-        s.Edges.Add((label, a));
+        AddEdge(s, label, a);
         return new Nfa { Start = s, Accept = a };
     }
 
@@ -371,6 +474,7 @@ public sealed class BehaviorExplorer
 
     private Nfa Build(Behavior b)
     {
+        using var walk = EnterWalk();
         switch (b)
         {
             case InvocationBehavior inv:
@@ -385,7 +489,7 @@ public sealed class BehaviorExplorer
                 }
 
                 var machine = _resolveMachine(inv.Target);
-                return machine is not null ? Build(machine) : Atom(SymbolOf(inv));
+                return machine is not null ? Build(machine) : Atom(CheckedSymbolOf(inv));
 
             case GroupBehavior g:
                 return Build(g.Inner);
@@ -402,6 +506,15 @@ public sealed class BehaviorExplorer
 
             case LetBehavior l:
                 return Build(l.Inner);
+
+            case BindBehavior bind:
+                return Build(bind.Inner);
+
+            case ParallelBehavior parallel when parallel.Items.Count <= 1:
+                return Concat(parallel.Items.Select(Build).ToList());
+
+            case PermutationBehavior permutation when permutation.Items.Count <= 1:
+                return Concat(permutation.Items.Select(Build).ToList());
 
             case SequenceBehavior seq:
                 return Concat(seq.Items.Select(Build).ToList());
@@ -439,6 +552,7 @@ public sealed class BehaviorExplorer
 
     private Nfa Concat(List<Nfa> parts)
     {
+        Work();
         if (parts.Count == 0)
         {
             return Empty();
@@ -447,7 +561,7 @@ public sealed class BehaviorExplorer
         for (var i = 0; i < parts.Count - 1; i++)
         {
             parts[i].Accept.Accept = false;
-            parts[i].Accept.Edges.Add((null, parts[i + 1].Start));
+            AddEdge(parts[i].Accept, null, parts[i + 1].Start);
         }
 
         return new Nfa { Start = parts[0].Start, Accept = parts[^1].Accept };
@@ -460,9 +574,9 @@ public sealed class BehaviorExplorer
         a.Accept = true;
         foreach (var p in parts)
         {
-            s.Edges.Add((null, p.Start));
+            AddEdge(s, null, p.Start);
             p.Accept.Accept = false;
-            p.Accept.Edges.Add((null, a));
+            AddEdge(p.Accept, null, a);
         }
 
         return new Nfa { Start = s, Accept = a };
@@ -473,11 +587,11 @@ public sealed class BehaviorExplorer
         var s = New();
         var a = New();
         a.Accept = true;
-        s.Edges.Add((null, inner.Start));
-        s.Edges.Add((null, a));
+        AddEdge(s, null, inner.Start);
+        AddEdge(s, null, a);
         inner.Accept.Accept = false;
-        inner.Accept.Edges.Add((null, inner.Start));
-        inner.Accept.Edges.Add((null, a));
+        AddEdge(inner.Accept, null, inner.Start);
+        AddEdge(inner.Accept, null, a);
         return new Nfa { Start = s, Accept = a };
     }
 
@@ -486,10 +600,10 @@ public sealed class BehaviorExplorer
         var s = New();
         var a = New();
         a.Accept = true;
-        s.Edges.Add((null, inner.Start));
+        AddEdge(s, null, inner.Start);
         inner.Accept.Accept = false;
-        inner.Accept.Edges.Add((null, inner.Start));
-        inner.Accept.Edges.Add((null, a));
+        AddEdge(inner.Accept, null, inner.Start);
+        AddEdge(inner.Accept, null, a);
         return new Nfa { Start = s, Accept = a };
     }
 
@@ -498,15 +612,16 @@ public sealed class BehaviorExplorer
         var s = New();
         var a = New();
         a.Accept = true;
-        s.Edges.Add((null, inner.Start));
-        s.Edges.Add((null, a));
+        AddEdge(s, null, inner.Start);
+        AddEdge(s, null, a);
         inner.Accept.Accept = false;
-        inner.Accept.Edges.Add((null, a));
+        AddEdge(inner.Accept, null, a);
         return new Nfa { Start = s, Accept = a };
     }
 
     private Nfa Repeat(RepetitionBehavior rep)
     {
+        Work();
         switch (rep.Op)
         {
             case "*":
@@ -538,36 +653,44 @@ public sealed class BehaviorExplorer
     // enumerated. This keeps an unanchored scenario with many alternatives — whose full DFA is
     // exponential — costing only what the bounded model exploration actually visits.
 
-    private static bool Matches(string label, string sym) =>
-        label == sym
-        || label == "_"
-        || (label.StartsWith("!", StringComparison.Ordinal) && label[1..] != sym);
-
     /// <summary>A lazily-determinized automaton over action labels.</summary>
     internal interface IDfa
     {
         int Start { get; }
+        void Check();
         bool Accept(int state);
         bool Fail(int state);
         IReadOnlyDictionary<string, int> On(int state);
     }
 
-    private IDfa ToDfa(Behavior b) => b switch
+    private IDfa ToDfa(Behavior b)
     {
-        ParallelBehavior par when par.Items.Count == 2 => new ProductDfa(ToDfa(par.Items[0]), ToDfa(par.Items[1]), par.Op),
-        GroupBehavior g => ToDfa(g.Inner),
-        _ => new SubsetDfa(Build(b).Start, _alphabet),
-    };
+        using var walk = EnterWalk();
+        return b switch
+        {
+            ParallelBehavior par when par.Items.Count == 2 => new ProductDfa(this, ToDfa(par.Items[0]), ToDfa(par.Items[1]), par.Op),
+            GroupBehavior g => ToDfa(g.Inner),
+            _ => new SubsetDfa(this, Build(b).Start, _alphabet),
+        };
+    }
 
-    private static HashSet<NState> Closure(IEnumerable<NState> states)
+    private HashSet<NState> Closure(IEnumerable<NState> states)
     {
-        var set = new HashSet<NState>(states);
-        var stack = new Stack<NState>(set);
+        Work();
+        var set = new HashSet<NState>();
+        var stack = new Stack<NState>();
+        foreach (var state in states)
+        {
+            Scan();
+            if (set.Add(state)) stack.Push(state);
+        }
         while (stack.Count > 0)
         {
+            Scan();
             var s = stack.Pop();
             foreach (var (label, to) in s.Edges)
             {
+                Scan();
                 if (label is null && set.Add(to))
                 {
                     stack.Push(to);
@@ -582,67 +705,141 @@ public sealed class BehaviorExplorer
     /// materialized (with its outgoing transitions) on first query and memoized.</summary>
     private sealed class SubsetDfa : IDfa
     {
+        private readonly BehaviorExplorer _owner;
         private readonly HashSet<string> _alphabet;
         private readonly List<HashSet<NState>> _sets = new();
+        private readonly List<(bool Accept, bool Fail)> _flags = new();
         private readonly Dictionary<string, int> _ids = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, int> _moves = new(StringComparer.Ordinal);
         private readonly Dictionary<int, IReadOnlyDictionary<string, int>> _on = new();
 
-        public SubsetDfa(NState nfaStart, HashSet<string> alphabet)
+        public SubsetDfa(BehaviorExplorer owner, NState nfaStart, HashSet<string> alphabet)
         {
+            _owner = owner;
             _alphabet = alphabet;
-            Start = GetOrAdd(Closure(new[] { nfaStart }));
+            Start = GetOrAdd(owner.Closure(new[] { nfaStart }));
         }
 
         public int Start { get; }
 
+        public void Check() => _owner.CheckBudget();
+
         private int GetOrAdd(HashSet<NState> s)
         {
-            var key = string.Join(",", s.Select(x => x.Id).OrderBy(x => x));
+            _owner.Work();
+            var accept = false;
+            var fail = false;
+            var key = string.Join(",", s.Select(state =>
+            {
+                _owner.Scan();
+                accept |= state.Accept;
+                fail |= state.Fail;
+                return state.Id;
+            }).OrderBy(id => id));
+            _owner.Work();
             if (_ids.TryGetValue(key, out var id)) return id;
             id = _sets.Count;
             _ids[key] = id;
             _sets.Add(s);
+            _flags.Add((accept, fail));
             return id;
         }
 
-        public bool Accept(int state) => _sets[state].Any(x => x.Accept);
+        public bool Accept(int state)
+        {
+            Check();
+            return _flags[state].Accept;
+        }
 
-        public bool Fail(int state) => _sets[state].Any(x => x.Fail);
+        public bool Fail(int state)
+        {
+            Check();
+            return _flags[state].Fail;
+        }
+
+        private int MoveTo(HashSet<NState> move)
+        {
+            _owner.Work();
+            var key = string.Join(",", move.Select(node => { _owner.Scan(); return node.Id; }).OrderBy(id => id));
+            _owner.CheckBudget();
+            if (_moves.TryGetValue(key, out var cached)) return cached;
+            var next = GetOrAdd(_owner.Closure(move));
+            _moves[key] = next;
+            return next;
+        }
 
         public IReadOnlyDictionary<string, int> On(int state)
         {
+            Check();
             if (_on.TryGetValue(state, out var cached)) return cached;
+            using var walk = _owner.EnterWalk();
 
             var set = _sets[state];
             var d = new Dictionary<string, int>(StringComparer.Ordinal);
 
-            // The concrete edge labels leaving this subset (bare, pinned, or negated).
-            var concrete = set.SelectMany(st => st.Edges)
-                .Where(e => e.Label is not null && e.Label != "_" && !e.Label.StartsWith("!", StringComparison.Ordinal))
-                .Select(e => e.Label!);
+            var concrete = new Dictionary<string, HashSet<NState>>(StringComparer.Ordinal);
+            var universal = new HashSet<NState>();
+            var negated = new List<(string Excluded, NState To)>();
+            foreach (var node in set)
+            {
+                _owner.Scan();
+                foreach (var (label, to) in node.Edges)
+                {
+                    _owner.Scan();
+                    if (label is null) continue;
+                    if (label == "_") universal.Add(to);
+                    else if (label.StartsWith("!", StringComparison.Ordinal)) negated.Add((label[1..], to));
+                    else
+                    {
+                        if (!concrete.TryGetValue(label, out var targets))
+                            concrete[label] = targets = new HashSet<NState>();
+                        targets.Add(to);
+                    }
+                }
+            }
 
-            // A universal `_` or negated `!x` edge matches every *model action*, i.e. the bare
-            // (non-argument-pinned) alphabet symbols — not the scenario's own pinned symbols,
-            // which are only reached by their explicit atoms. Restricting `_` this way avoids
-            // materializing dead states for argument-pinned symbols the model never emits.
-            var hasUniversal = set.Any(st => st.Edges.Any(e =>
-                e.Label == "_" || (e.Label is not null && e.Label.StartsWith("!", StringComparison.Ordinal))));
-            IEnumerable<string> symbols = hasUniversal
-                ? _alphabet.Where(s => !s.Contains('(')).Concat(concrete).Distinct(StringComparer.Ordinal)
-                : concrete.Distinct(StringComparer.Ordinal);
+            var symbols = new HashSet<string>(StringComparer.Ordinal);
+            if (universal.Count > 0 || negated.Count > 0)
+            {
+                foreach (var symbol in _alphabet)
+                {
+                    _owner.Scan();
+                    if (!symbol.Contains('(')) symbols.Add(symbol);
+                }
+            }
+
+            foreach (var symbol in concrete.Keys)
+            {
+                _owner.Scan();
+                symbols.Add(symbol);
+            }
 
             foreach (var sym in symbols)
             {
+                _owner.Scan();
                 var move = new HashSet<NState>();
-                foreach (var st in set)
+                if (concrete.TryGetValue(sym, out var targets))
                 {
-                    foreach (var (label, to) in st.Edges)
+                    foreach (var target in targets)
                     {
-                        if (label is not null && Matches(label, sym)) move.Add(to);
+                        _owner.Scan();
+                        move.Add(target);
                     }
                 }
 
-                if (move.Count > 0) d[sym] = GetOrAdd(Closure(move));
+                foreach (var target in universal)
+                {
+                    _owner.Scan();
+                    move.Add(target);
+                }
+
+                foreach (var (excluded, target) in negated)
+                {
+                    _owner.Scan();
+                    if (excluded != sym) move.Add(target);
+                }
+
+                if (move.Count > 0) d[sym] = MoveTo(move);
             }
 
             _on[state] = d;
@@ -654,6 +851,7 @@ public sealed class BehaviorExplorer
     /// sync-interleave). Product states (pairs of sub-DFA states) are created on demand.</summary>
     private sealed class ProductDfa : IDfa
     {
+        private readonly BehaviorExplorer _owner;
         private readonly IDfa _l;
         private readonly IDfa _r;
         private readonly string _op;
@@ -662,8 +860,9 @@ public sealed class BehaviorExplorer
         private readonly Dictionary<(int, int), int> _ids = new();
         private readonly Dictionary<int, IReadOnlyDictionary<string, int>> _on = new();
 
-        public ProductDfa(IDfa l, IDfa r, string op)
+        public ProductDfa(BehaviorExplorer owner, IDfa l, IDfa r, string op)
         {
+            _owner = owner;
             _l = l;
             _r = r;
             _op = op;
@@ -672,8 +871,13 @@ public sealed class BehaviorExplorer
             // are small; this is not used for `sync`/`interleave`).
             if (op == "syncinterleave")
             {
-                var la = FullAlphabet(l);
-                la.IntersectWith(FullAlphabet(r));
+                var la = owner.FullAlphabet(l);
+                var ra = owner.FullAlphabet(r);
+                foreach (var symbol in la.ToArray())
+                {
+                    owner.Scan();
+                    if (!ra.Contains(symbol)) la.Remove(symbol);
+                }
                 _syncInterleaveShared = la;
             }
 
@@ -682,8 +886,11 @@ public sealed class BehaviorExplorer
 
         public int Start { get; }
 
+        public void Check() => _owner.CheckBudget();
+
         private int GetOrAdd(int li, int ri)
         {
+            _owner.Work();
             if (_ids.TryGetValue((li, ri), out var id)) return id;
             id = _pairs.Count;
             _ids[(li, ri)] = id;
@@ -691,23 +898,40 @@ public sealed class BehaviorExplorer
             return id;
         }
 
-        public bool Accept(int state) { var (li, ri) = _pairs[state]; return _l.Accept(li) && _r.Accept(ri); }
+        public bool Accept(int state)
+        {
+            using var walk = _owner.EnterWalk(candidate: false);
+            var (li, ri) = _pairs[state];
+            return _l.Accept(li) && _r.Accept(ri);
+        }
 
-        public bool Fail(int state) { var (li, ri) = _pairs[state]; return _l.Fail(li) || _r.Fail(ri); }
+        public bool Fail(int state)
+        {
+            using var walk = _owner.EnterWalk(candidate: false);
+            var (li, ri) = _pairs[state];
+            return _l.Fail(li) || _r.Fail(ri);
+        }
 
         public IReadOnlyDictionary<string, int> On(int state)
         {
+            Check();
             if (_on.TryGetValue(state, out var cached)) return cached;
+            using var walk = _owner.EnterWalk();
 
             var (li, ri) = _pairs[state];
             var lon = _l.On(li);
             var ron = _r.On(ri);
-            var union = new HashSet<string>(lon.Keys, StringComparer.Ordinal);
-            union.UnionWith(ron.Keys);
+            var union = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var symbol in lon.Keys.Concat(ron.Keys))
+            {
+                _owner.Scan();
+                union.Add(symbol);
+            }
 
             var d = new Dictionary<string, int>(StringComparer.Ordinal);
             foreach (var sym in union)
             {
+                _owner.Scan();
                 // A bare label transition matches any argument-pinned form of it, so a scenario
                 // over bare labels syncs with one that pins arguments (`CreateResponse` syncs
                 // with `CreateResponse(1)`), yielding the pinned symbol.
@@ -739,7 +963,7 @@ public sealed class BehaviorExplorer
 
     /// <summary>Fully materializes a (lazy) DFA and returns the set of all symbols on its
     /// transitions — its action signature. Bounded by the DFA size.</summary>
-    private static HashSet<string> FullAlphabet(IDfa dfa)
+    private HashSet<string> FullAlphabet(IDfa dfa)
     {
         var syms = new HashSet<string>(StringComparer.Ordinal);
         var seen = new HashSet<int> { dfa.Start };
@@ -747,9 +971,11 @@ public sealed class BehaviorExplorer
         queue.Enqueue(dfa.Start);
         while (queue.Count > 0)
         {
+            Work();
             var s = queue.Dequeue();
             foreach (var (k, to) in dfa.On(s))
             {
+                Scan();
                 syms.Add(k);
                 if (seen.Add(to)) queue.Enqueue(to);
             }
@@ -768,42 +994,77 @@ public sealed class BehaviorExplorer
         return false;
     }
 
-    private static ExplorationGraph ToGraph(string machine, IDfa dfa)
+    private ExplorationGraph ToGraph(string machine, IDfa dfa)
     {
         var graph = new ExplorationGraph { Machine = machine };
-        graph.InitialStateId = "S" + dfa.Start;
+        var visited = new HashSet<int>();
+        var queue = new Queue<(int State, int Depth)>();
 
-        var visited = new HashSet<int> { dfa.Start };
-        var queue = new Queue<int>();
-        queue.Enqueue(dfa.Start);
-        var states = new List<int>();
-        var edges = new List<(int From, string Sym, int To)>();
-
-        while (queue.Count > 0)
+        bool Admit(int state, int depth)
         {
-            var s = queue.Dequeue();
-            states.Add(s);
-            foreach (var (sym, to) in dfa.On(s).OrderBy(kv => kv.Key, StringComparer.Ordinal))
+            var accepting = dfa.Accept(state);
+            if (!_budget.TryState()) return false;
+            visited.Add(state);
+            graph.States.Add(new ModelState("S" + state, "S" + state, Label: null, Accepting: accepting, Initial: state == dfa.Start));
+            queue.Enqueue((state, depth));
+            return true;
+        }
+
+        try
+        {
+            if (_options.MaxStates == 0) _budget.Stop("state-limit");
+            else if (Admit(dfa.Start, 0)) graph.InitialStateId = "S" + dfa.Start;
+
+            while (queue.Count > 0 && _budget.Check())
             {
-                edges.Add((s, sym, to));
-                if (visited.Add(to)) queue.Enqueue(to);
+                Work();
+                var (state, depth) = queue.Dequeue();
+                var outgoing = dfa.On(state).Select(edge => { Work(); return edge; })
+                    .OrderBy(edge => edge.Key, StringComparer.Ordinal);
+                foreach (var (symbol, next) in outgoing)
+                {
+                    Work();
+                    if (graph.Transitions.Count >= _options.MaxTransitions)
+                    {
+                        _budget.Stop("transition-limit");
+                        break;
+                    }
+
+                    if (!visited.Contains(next))
+                    {
+                        if (depth >= _options.MaxDepth)
+                        {
+                            _budget.Stop("depth-limit");
+                            break;
+                        }
+
+                        if (graph.States.Count >= _options.MaxStates)
+                        {
+                            _budget.Stop("state-limit");
+                            break;
+                        }
+
+                        if (!Admit(next, depth + 1)) break;
+                    }
+
+                    if (!_budget.TryTransition()) break;
+                    graph.Transitions.Add(new Transition("S" + state, new ActionInvocation(symbol, Array.Empty<string>()), "S" + next));
+                }
             }
         }
-
-        foreach (var s in states.OrderBy(x => x))
+        catch (InvalidOperationException) when (_budget.TerminationReason is not null)
         {
-            graph.States.Add(new ModelState("S" + s, "S" + s, Label: null, Accepting: dfa.Accept(s), Initial: s == dfa.Start));
         }
 
-        foreach (var (from, sym, to) in edges)
-        {
-            graph.Transitions.Add(new Transition("S" + from, new ActionInvocation(sym, Array.Empty<string>()), "S" + to));
-        }
-
+        _budget.Check();
         graph.Metadata["states"] = graph.States.Count.ToString();
         graph.Metadata["transitions"] = graph.Transitions.Count.ToString();
         graph.Metadata["accepting"] = graph.States.Count(s => s.Accepting).ToString();
         graph.Metadata["mode"] = "behavior";
+        graph.Metadata["completeness"] = _budget.TerminationReason is null ? "COMPLETE" : "INCOMPLETE";
+        graph.Metadata["terminationReason"] = _budget.TerminationReason ?? "complete";
+        graph.Metadata["candidateEvaluations"] = _budget.CandidateEvaluations.ToString();
+        graph.Metadata["elapsedMilliseconds"] = _budget.Elapsed.TotalMilliseconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
         return graph;
     }
 }
