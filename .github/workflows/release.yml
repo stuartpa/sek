@@ -46,6 +46,12 @@ jobs:
         shell: pwsh
         run: ./scripts/pack-extension.ps1 -Version ${{ steps.ver.outputs.version }} -Configuration Release
 
+      - name: Checksum tool package
+        shell: bash
+        run: |
+          cd dist
+          sha256sum "SpecExplorerKit.Tool.${{ steps.ver.outputs.version }}.nupkg" > "SpecExplorerKit.Tool.${{ steps.ver.outputs.version }}.nupkg.sha256"
+
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         shell: bash
@@ -57,4 +63,5 @@ jobs:
             --notes-file "docs/release-notes/v${{ steps.ver.outputs.version }}.md" \
             "dist/spec-kit-sek.zip" \
             "dist/SpecExplorerKit.Tool.${{ steps.ver.outputs.version }}.nupkg" \
+            "dist/SpecExplorerKit.Tool.${{ steps.ver.outputs.version }}.nupkg.sha256" \
             "dist/SpecExplorerKit.Modeling.${{ steps.ver.outputs.version }}.nupkg"

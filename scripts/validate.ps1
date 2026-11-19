@@ -15,6 +15,16 @@ if ($IsLinux) {
 
 Write-Host '== Building SEK solution =='
 dotnet build (Join-Path $root 'Sek.slnx') -v q
+if ($LASTEXITCODE -ne 0) { throw 'SEK solution build failed.' }
+
+$manifest = Get-Content (Join-Path $root 'samples/regression.manifest.json') -Raw | ConvertFrom-Json
+
+function Test-ExploreOutcome($entry, $exitCode, $output) {
+    if ($entry -and $entry.expectedOutcome -eq 'INCOMPLETE') {
+        return $exitCode -eq 1 -and $output.Contains("INCOMPLETE exploration: $($entry.terminationReason);")
+    }
+    return $exitCode -eq 0
+}
 
 # sample dir -> @(machines...). Operators is behavior-mode (no model project).
 $samples = [ordered]@{
@@ -35,8 +45,11 @@ foreach ($name in $samples.Keys) {
     $proj = Join-Path $root "samples/$name"
     foreach ($machine in $samples[$name]) {
         Write-Host "== Explore: $name / $machine =="
-        & dotnet $sek explore $machine --project $proj
-        if ($LASTEXITCODE -ne 0) { $failures += "$name/$machine" }
+        $output = & dotnet $sek explore $machine --project $proj 2>&1
+        $exitCode = $LASTEXITCODE
+        $output | ForEach-Object { Write-Host $_ }
+        $entry = $manifest.entries | Where-Object { $_.project -eq "samples/$name" -and $_.machine -eq $machine }
+        if (-not (Test-ExploreOutcome $entry $exitCode ($output -join "`n"))) { $failures += "$name/$machine" }
     }
 }
 
@@ -44,4 +57,4 @@ if ($failures.Count -gt 0) {
     Write-Error ("Validation FAILED for: " + ($failures -join ', '))
     exit 1
 }
-Write-Host "`nValidation PASSED: all samples explored successfully."
+Write-Host "`nValidation PASSED: all samples matched their expected outcomes."
